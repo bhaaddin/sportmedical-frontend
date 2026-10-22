@@ -32,6 +32,13 @@ describe('clubIdOfRoute (the calendar)', () => {
   ])('%s is not a club calendar', (path) => {
     expect(clubIdOfRoute(path)).toBeNull();
   });
+  it('R21: the cancelled-orders view is a section page, never a club id nor a stage', () => {
+    for (const path of ['/clubs/objednavky/historie']) {
+      expect(clubIdOfRoute(path)).toBeNull();
+      expect(clubPageIdOfRoute(path)).toBeNull();
+      expect(isPlannerRoute(path)).toBe(false);
+    }
+  });
   it('the history of an order is never a club id, whatever the order id looks like', () => {
     expect(clubIdOfRoute(`/clubs/objednavky/${ID}/historie`)).toBeNull();
     expect(clubPageIdOfRoute(`/clubs/objednavky/${ID}/historie`)).toBeNull();

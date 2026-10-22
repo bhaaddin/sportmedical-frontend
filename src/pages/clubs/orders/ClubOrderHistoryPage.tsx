@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { clubOrdersApi, ORDER_STATUS_LABEL } from '../../../api/clubOrders';
 import type { OrderHistoryItem } from '../../../api/clubOrders';
+import { CLUB_ORDERS_HISTORY_PATH } from '../../../components/shell/plannerRoutes';
 import { orderCode } from '../../../components/clubs/order/orderFormat';
 import { STATUS_TONE } from '../../../components/clubs/orders/orderLogic';
 import { visibleToClub } from '../../../components/clubs/orders/ClubVisibleHistory';
@@ -50,7 +51,8 @@ export default function ClubOrderHistoryPage() {
     enabled: orderId !== '',
   });
   const order = query.data;
-  const back = () => navigate('/clubs/objednavky', { state: { openOrderId: orderId } });
+  /* R21: a cancelled order is not in the orders list - back leads to the cancelled-orders view, which opens it. */
+  const back = () => navigate(order?.status === 'Cancelled' ? CLUB_ORDERS_HISTORY_PATH : '/clubs/objednavky', { state: { openOrderId: orderId } });
 
   const entries = order !== undefined ? historyEntries(order.history, view) : [];
   const clubCount = order !== undefined ? visibleToClub(order.history).length : 0;

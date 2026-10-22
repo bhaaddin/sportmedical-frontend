@@ -130,6 +130,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     const linesTotal = lineValues.some((v) => v === null) ? null : lineValues.reduce<number>((sum, v) => sum + (v ?? 0), 0);
     return (
       <Stack spacing={2} data-testid="order-detail" data-status={order.status}>
+        {order.status === 'Cancelled' ? (
+          <Alert severity="info" data-testid="order-readonly">Zrušená objednávka — jen ke čtení. Co se s ní dělo, najdete v Historii.</Alert>
+        ) : null}
         <Block title="Souhrn">
           <Stack direction="row" sx={{ gap: 3, flexWrap: 'wrap', mb: 1.5 }}>
             <Box><Typography sx={{ fontSize: 22, fontWeight: 700 }}>{order.totalSeats}</Typography><Typography variant="caption" color="text.secondary">míst</Typography></Box>
@@ -376,7 +379,8 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           </>
         );
       case 'Cancelled':
-        return writeButton;
+        /* R21: a cancelled order is read-only - no edit, no message, no invoice; its history is one button away. */
+        return null;
       default:
         return null;
     }

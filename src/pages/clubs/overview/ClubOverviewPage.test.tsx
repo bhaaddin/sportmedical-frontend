@@ -164,6 +164,31 @@ describe('the club page, ready', () => {
     expect(JSON.parse(where().textContent ?? 'null')).toEqual({ openOrderId: A });
   });
 
+  it('R21: the orders shelf lists LIVE orders only; the cancelled are behind a Historie link with their count, pre-filtered to this club', async () => {
+    const C = '80e74a6c-0000-4000-8000-00000000000c';
+    listOrders.mockResolvedValue([order(A, { history: [] }), order(B, { status: 'Requested', history: [] }), order(C, { status: 'Cancelled', history: [] })]);
+    mount();
+    const orders = await waitFor(() => {
+      const el = shelf('club-orders');
+      expect(within(el).getAllByRole('listitem')).toHaveLength(2);
+      return el;
+    });
+    expect(orders).not.toHaveTextContent('Zrušeno');
+    expect(within(orders).queryByText(/KO-0000000C/)).toBeNull();
+    const link = within(orders).getByTestId('club-orders-history-link');
+    expect(link).toHaveAttribute('href', '/clubs/objednavky/historie?clubId=club-1');
+    expect(link).toHaveTextContent('Historie (1)');
+  });
+
+  it('R21: a cancelled order is not read for the recent changes', async () => {
+    const C = '80e74a6c-0000-4000-8000-00000000000c';
+    listOrders.mockResolvedValue([order(A, { history: [] }), order(C, { status: 'Cancelled', createdAtUtc: '2026-10-09T08:00:00Z', history: [] })]);
+    mount();
+    await screen.findAllByTestId('club-change');
+    expect(getOrder).toHaveBeenCalledWith(A);
+    expect(getOrder).not.toHaveBeenCalledWith(C);
+  });
+
   it('the Historie button of an order goes to that order\'s history page', async () => {
     mount();
     const button = await screen.findByRole('button', { name: 'Historie objednávky KO-0000000A' });

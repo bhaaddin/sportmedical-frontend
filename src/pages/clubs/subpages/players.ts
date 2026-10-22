@@ -69,6 +69,8 @@ export function collectPlayers(blocks: readonly ClubBlockView[], orders: readonl
   };
   for (const b of blocks) take(b, null);
   for (const o of orders) {
+    /* R21: a cancelled order's players are not live players - they stay readable in the order itself. */
+    if (o.status === 'Cancelled') continue;
     for (const b of o.blocks) {
       take({ clubId: b.clubId || o.clubId, clubName: b.clubName || o.clubName, colorHex: b.colorHex, athletes: b.athletes }, o.clubColorHex);
     }

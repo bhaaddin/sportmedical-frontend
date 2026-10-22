@@ -91,7 +91,8 @@ export function useCommandSearch(query: string, open: boolean): CommandSearch {
         rows.map((c) => entityCommand({ kind: 'club', id: c.id, label: c.name }, [c.city, c.isActive ? null : 'neaktivní'].filter(Boolean).join(' · ') || undefined)),
       ),
       ask(() => queryClient.fetchQuery({ queryKey: ['shelf', 'club-orders', 'all'], queryFn: () => clubOrdersApi.list({}), staleTime: MINUTE }), (rows) =>
-        rows.map((o) => entityCommand({ kind: 'order', id: o.id, label: [o.clubName, o.serviceName].filter(Boolean).join(' · ') }, ORDER_STATUS_LABEL[o.status])),
+        /* R21: a cancelled order is history, not a result to open from the search (a deep link to it still works) */
+        rows.filter((o) => o.status !== 'Cancelled').map((o) => entityCommand({ kind: 'order', id: o.id, label: [o.clubName, o.serviceName].filter(Boolean).join(' · ') }, ORDER_STATUS_LABEL[o.status])),
       ),
     );
     if (mayOpen('invoice', held)) {

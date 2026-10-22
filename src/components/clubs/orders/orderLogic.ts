@@ -12,6 +12,30 @@ import { routedActivities, type RoutedOrder } from './orderWindows';
 
 export type OrderStatusFilter = 'all' | ClubOrderStatus;
 
+/*
+ * R21 (stage 7): the normal lists show LIVE orders only - Invited, Requested, Confirmed and Completed. A cancelled order
+ * lives in the special "Historie" view (/clubs/objednavky/historie) and is still readable there and by a deep link.
+ * These three are the ONE place that says which is which; every list and count that must not show a cancelled order
+ * as live goes through them.
+ */
+export const isCancelledOrder = (order: Pick<ClubOrderView, 'status'>): boolean => order.status === 'Cancelled';
+
+/** Everything but the cancelled orders. */
+export const withoutCancelled = <T extends Pick<ClubOrderView, 'status'>>(orders: readonly T[]): T[] => orders.filter((o) => !isCancelledOrder(o));
+
+/** Only the cancelled orders. */
+export const onlyCancelled = <T extends Pick<ClubOrderView, 'status'>>(orders: readonly T[]): T[] => orders.filter(isCancelledOrder);
+
+/**
+ * When and why an order was cancelled, read from its own history (the list answers carry none): the newest entry that
+ * speaks of a cancellation, else null. `text` is that entry's wording - the reason when the desk gave one.
+ */
+export function cancellationOf(history: readonly { atUtc: string; user: string; text: string }[] | undefined): { atUtc: string; user: string; text: string } | null {
+  const entries = (history ?? []).filter((h) => /zru[sš]/i.test(h.text));
+  if (entries.length === 0) return null;
+  return [...entries].sort((a, b) => b.atUtc.localeCompare(a.atUtc))[0] ?? null;
+}
+
 /** The terms an order stands on: the confirmed windows once it has them, otherwise what the club asked for. */
 export function orderTerms(order: ClubOrderView): OrderRange[] {
   const live = order.blocks.filter((b) => b.status === 'Active');

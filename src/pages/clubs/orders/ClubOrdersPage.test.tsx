@@ -126,7 +126,7 @@ describe.each([
     expect(root).toHaveAttribute('data-layout', device);
     expect(root).toHaveAttribute('data-columns', String(columns));
     if (columns === 0) {
-      expect(await screen.findAllByTestId('order-row')).toHaveLength(5);
+      expect(await screen.findAllByTestId('order-row')).toHaveLength(4);
       expect(screen.queryAllByTestId('order-card')).toHaveLength(0);
       const first = screen.getAllByTestId('order-row')[0];
       expect(first).toHaveTextContent('FK Slaný');
@@ -139,10 +139,44 @@ describe.each([
       expect(first).toHaveTextContent('36');
       expect(first).toHaveTextContent('Odesláno klubem');
     } else {
-      expect(await screen.findAllByTestId('order-card')).toHaveLength(5);
+      expect(await screen.findAllByTestId('order-card')).toHaveLength(4);
       expect(screen.queryAllByTestId('order-row')).toHaveLength(0);
     }
     if (device === 'phone') expect(screen.getByTestId('pinned-actions')).toBeInTheDocument();
+  });
+});
+
+describe('R21: live orders only, the cancelled behind Historie', () => {
+  it('lists no cancelled order and says how many wait in Historie', async () => {
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const rows = await screen.findAllByTestId('order-row');
+    expect(rows).toHaveLength(4);
+    expect(rows.map((r) => r.textContent).join(' ')).not.toContain('Zrušeno');
+    const button = screen.getByTestId('orders-history-button');
+    expect(button).toHaveTextContent('Historie (1)');
+    expect(button).toHaveAccessibleName('Historie zrušených objednávek (1)');
+  });
+
+  it('the button leads to the special view, keeping the club filter', async () => {
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findAllByTestId('order-row');
+    await user.click(screen.getByTestId('orders-history-button'));
+    expect(await screen.findByTestId('state')).toHaveTextContent('/clubs/objednavky/historie');
+  });
+
+  it.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]] as const)('the button is in the header at %s', async (_name, width) => {
+    setViewport(width);
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findByTestId('club-orders');
+    expect(screen.getAllByTestId('orders-history-button')).toHaveLength(1);
+  });
+
+  it('only cancelled orders exist: the list says so and points to Historie', async () => {
+    list.mockResolvedValue([orders[4]]);
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    expect(await screen.findByText('Zatím tu žádná objednávka není.')).toBeInTheDocument();
+    expect(screen.getByText(/Zrušené objednávky najdete v Historii/)).toBeInTheDocument();
   });
 });
 
@@ -152,13 +186,13 @@ describe('filters', () => {
     render(<Wrap><ClubOrdersPage /></Wrap>);
     await screen.findAllByTestId('order-row');
     const group = screen.getByRole('group', { name: 'Stav objednávky' });
-    expect(within(group).getByRole('button', { name: /^Vše\s*5$/ })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: /^Vše\s*4$/ })).toBeInTheDocument();
     expect(within(group).getByRole('button', { name: /Čeká na formulář\s*1/ })).toBeInTheDocument();
     expect(within(group).getByRole('button', { name: /Potvrzeno\s*2/ })).toBeInTheDocument();
     await user.click(within(group).getByRole('button', { name: /Potvrzeno/ }));
     expect(screen.getAllByTestId('order-row')).toHaveLength(2);
-    await user.click(within(group).getByRole('button', { name: /Zrušeno/ }));
-    expect(screen.getAllByTestId('order-row')).toHaveLength(1);
+    /* R21: no "Zrušeno" chip - the cancelled order is behind the Historie button */
+    expect(within(group).queryByRole('button', { name: /Zrušeno/ })).toBeNull();
   });
 
   it('asks the server for one club and for a date range', async () => {
@@ -272,9 +306,14 @@ describe('detail and actions', () => {
     await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-4', false, false));
   });
 
-  it('Cancelled keeps one action: write to the club (its portal shows the notices)', async () => {
-    await openRow(4);
-    expect(within(screen.getByTestId('order-actions')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Napsat klubu']);
+  it('R21: a deep link to a CANCELLED order opens it read-only - no edit action at all, only the history button', async () => {
+    render(<Wrap state={{ openOrderId: 'o-5' }}><ClubOrdersPage /></Wrap>);
+    const detail = await screen.findByTestId('order-detail');
+    expect(detail).toHaveAttribute('data-status', 'Cancelled');
+    expect(within(detail).getByTestId('order-readonly')).toHaveTextContent('jen ke čtení');
+    expect(screen.queryByTestId('order-actions')).toBeNull();
+    expect(within(detail).queryByTestId('order-edit-buttons')).toBeNull();
+    expect(screen.getByTestId('order-history-button')).toBeInTheDocument();
   });
 
   it('uses a full-screen drawer on a phone', async () => {
