@@ -41,7 +41,7 @@ export function WorkerBusyNotice({ busy, onOverride, working = false, forbidden 
           <Typography variant="caption" color="text.secondary">{WORKER_BUSY_TEXT.overrideHint}</Typography>
           <TextField size="small" label={WORKER_BUSY_TEXT.overrideReason} value={reason} onChange={(e) => setReason(e.target.value)} fullWidth />
           <div>
-            <Button size="small" color="warning" variant="contained" disabled={working || reason.trim() === ''} onClick={() => onOverride(reason.trim())} sx={{ minHeight: 40 }}>
+            <Button size="small" color="warning" variant="contained" disabled={working || reason.trim() === ''} onClick={() => onOverride(reason.trim())} sx={{ minHeight: 44 }}>
               {WORKER_BUSY_TEXT.override}
             </Button>
           </div>
