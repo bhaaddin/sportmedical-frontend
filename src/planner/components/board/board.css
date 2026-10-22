@@ -625,3 +625,24 @@
 .sm-planner .day-calendar { align-items: flex-start; }
 .sm-planner .day-calendar > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; line-height: 1.12; overflow: hidden; text-align: left; overflow-wrap: anywhere; }
 .sm-planner .day-calendar i { margin-top: 2px; }
+
+/* ---- R4: a worker busy in another column - a locked, hatched slot WITH THE REASON (above the grid, below the cards) ---- */
+.sm-planner .board-clashes { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.sm-planner .board-clash {
+  position: absolute;
+  left: calc((var(--col) * var(--subs) + var(--sub)) * 100% / (7 * var(--subs)) + 2px);
+  width: calc(100% / (7 * var(--subs)) - 4px);
+  border-radius: 5px;
+  border: 1px dashed #d7a24a;
+  background-color: #1d1a12;
+  background-image: repeating-linear-gradient(135deg, rgba(215, 162, 74, 0.28) 0 7px, rgba(215, 162, 74, 0.08) 7px 14px);
+  color: #ffe9bf;
+  overflow: hidden;
+  padding: 3px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.sm-planner .board-clash .board-sticky { align-items: flex-start; gap: 1px; }
+.sm-planner .board-clash .icon { width: 12px; height: 12px; }
+.sm-planner .board-clash b { font-weight: 800; letter-spacing: 0.02em; }
+.sm-planner .board-clash small { font-size: 9.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }

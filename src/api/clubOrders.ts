@@ -430,6 +430,30 @@ async function call<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** The answer of `release-unfilled` (contract): what was given back. */
+export interface ReleaseUnfilledResult {
+  orderId: string;
+  windowsRemoved: number;
+  windowsShortened: number;
+  minutesReleased: number;
+  stretchesKept: number;
+  onlyExpired: boolean;
+  blockCancelled: boolean;
+}
+
+export function toRelease(data: unknown): ReleaseUnfilledResult {
+  const r = rec(data);
+  return {
+    orderId: str(r.orderId),
+    windowsRemoved: num(r.windowsRemoved),
+    windowsShortened: num(r.windowsShortened),
+    minutesReleased: num(r.minutesReleased),
+    stretchesKept: num(r.stretchesKept),
+    onlyExpired: r.onlyExpired === true,
+    blockCancelled: r.blockCancelled === true,
+  };
+}
+
 const BASE = '/api/v1/club-orders';
 
 export const clubOrdersApi = {
@@ -453,6 +477,18 @@ export const clubOrdersApi = {
     }),
 
   get: (id: string): Promise<ClubOrderView> => call(async () => toOrder(unwrap((await client.get(`${BASE}/${id}`)).data))),
+
+  /**
+   * Stage 2, R13: gives back the held time of the order's stretches that nobody filled (`bookings.edit`). A stretch with nobody is
+   * removed, one with athletes is shortened to its last booked athlete; booked athletes are never touched. Idempotent. `onlyExpired`
+   * releases only the stretches whose hold has run out. 404 / 405 = a server without the route (the button is then not offered).
+   */
+  releaseUnfilled: (id: string, input: { onlyExpired?: boolean; reason?: string } = {}): Promise<ReleaseUnfilledResult> =>
+    call(async () => {
+      const reason = (input.reason ?? '').trim();
+      const body = { onlyExpired: input.onlyExpired === true, ...(reason !== '' ? { reason } : {}) };
+      return toRelease(unwrap((await client.post(`${BASE}/${id}/release-unfilled`, body)).data));
+    }),
 
   update: (id: string, input: OrderUpdateInput, cancelAffectedAthletes = false): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.put(`${BASE}/${id}`, input, { params: cancelAffectedAthletes ? { cancelAffectedAthletes: true } : undefined })).data))),

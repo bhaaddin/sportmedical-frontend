@@ -948,6 +948,21 @@ export const timeBlockSchema = z.object({
   clubId: z.string().nullable().optional(),
   clubName: z.string().nullable().optional(),
   colorHex: z.string().nullable().optional(),
+  /*
+   * Stage 2, R13 (contract stage2-contract.md): a club block says which order holds the time and how far its players have got.
+   * All optional - an older server sends none of it and the block is drawn as before. Nothing is ever deleted by the flags:
+   * `holdExpired` only REPORTS that an empty stretch is past its hold.
+   */
+  clubOrderId: z.string().nullable().optional(),
+  orderCode: z.string().nullable().optional(),
+  orderStatus: z.string().nullable().optional(),
+  activityIds: z.array(z.string()).nullable().optional(),
+  seats: z.number().int().nullable().optional(),
+  registered: z.number().int().nullable().optional(),
+  playersMissing: z.boolean().nullable().optional(),
+  windowEmpty: z.boolean().nullable().optional(),
+  holdUntilUtc: z.string().nullable().optional(),
+  holdExpired: z.boolean().nullable().optional(),
 });
 export type TimeBlock = z.infer<typeof timeBlockSchema>;
 export const timeBlockListSchema = z.array(timeBlockSchema);
@@ -1020,6 +1035,17 @@ export const previewDaySchema = z.object({
   workerDisplayName: z.string().nullish().transform((v) => v ?? null),
   isChangedByOverride: z.boolean(),
   offeredActivityIds: z.array(z.string()).nullish().transform((v) => v ?? []),
+  /**
+   * Stage 2, R17: the day's lunch is a one-day exception of the weekly one (`breakStart` / `breakEnd` are already the EFFECTIVE lunch).
+   * `null` / absent = the weekly lunch stands (an older server never sends it).
+   */
+  lunchException: z
+    .object({
+      kind: z.enum(['moved', 'removed']),
+      originalStart: z.string().nullish().transform((v) => v ?? null),
+      originalEnd: z.string().nullish().transform((v) => v ?? null),
+    })
+    .nullish(),
 });
 export type PreviewDay = z.infer<typeof previewDaySchema>;
 export const previewListSchema = z.array(previewDaySchema);

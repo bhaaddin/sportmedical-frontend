@@ -36,6 +36,8 @@ import { useCalendarCatalogue } from '../../../components/booking/calendar/useCa
 import { pragueDateKey } from '../../../utils/time';
 import { boardSettings, useBoardSettings, type FacetCalendar, type FacetEmployee, type FacetService } from './boardSettings';
 import { aliasMap, serviceGroups, type GroupActivity } from './serviceGroups';
+import { BOOKING_SLOTS_QUERY_KEY, readBookingSlots } from '../../../api/bookingSlots';
+import type { RosterWorker } from './workerClash';
 
 export interface BoardCalendarData {
   /** Calendars and bookings have been read at least once. */
@@ -53,6 +55,11 @@ export interface BoardCalendarData {
   alias: ReadonlyMap<string, string>;
   /** The služba groups of the clinic, in order. */
   groups: ReturnType<typeof serviceGroups>;
+  /**
+   * R4: the shared-worker rule as the settings hold it (absent / off = today's behaviour). `workerOf` is the rota's worker of a
+   * calendar on a day (null = nobody, the calendar is the resource); `exceptions` are the people the rule does not apply to.
+   */
+  workerRule: { on: boolean; exceptions: ReadonlySet<string>; workerOf: (calendarId: string, day: string) => RosterWorker | null };
   calendarById: ReadonlyMap<string, Calendar>;
   /** The bookings the filters leave on screen, any day of the window. */
   appointments: DayAppointment[];
@@ -173,6 +180,21 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
 
   const { settings: display } = useCalendarDisplay();
 
+  /* R4: the clinic-wide switch (the same query the settings card reads); a server without it reads as off, the board draws nothing extra */
+  const slotsQuery = useQuery({ queryKey: BOOKING_SLOTS_QUERY_KEY, queryFn: readBookingSlots, staleTime: 5 * 60 * 1000, retry: false });
+  const slots = slotsQuery.data?.settings;
+  const workerRule = useMemo(
+    () => ({
+      on: slots?.singleWorkerAtATime === true,
+      exceptions: new Set(slots?.workerExceptions ?? []) as ReadonlySet<string>,
+      workerOf: (calendarId: string, day: string): RosterWorker | null => {
+        const row = previewByCalendar.get(calendarId)?.get(day);
+        return row && row.isOpen && row.workerUserId ? { id: row.workerUserId, name: row.workerDisplayName ?? 'Pracovník' } : null;
+      },
+    }),
+    [slots?.singleWorkerAtATime, slots?.workerExceptions, previewByCalendar],
+  );
+
   const calendarById = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars]);
   const shownIds = useMemo(() => new Set(shown.map((c) => c.id)), [shown]);
   const employeeId = settings.employeeId;
@@ -228,6 +250,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     calendars: shown,
     alias,
     groups,
+    workerRule,
     calendarById,
     appointments,
     blocksByCalendar,

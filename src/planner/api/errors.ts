@@ -11,6 +11,7 @@
  */
 import { AxiosError } from 'axios';
 import { BookingApiError } from '../../api/apiError';
+import { WORKER_BUSY_TEXT, isOverrideForbidden, workerBusyMessage, workerBusyOf } from '../../api/workerBusy';
 import { ClubBlockError } from '../../api/clubBlocks';
 import { ClubOrderError } from '../../api/clubOrders';
 import { PlannerWriteError, type AffectedAthlete, type PlannerWriteErrorCode } from '../data/PlannerDataSource';
@@ -76,6 +77,10 @@ export function toWriteError(error: unknown, fallback: string = TEXT.unknown): P
 
   if (error instanceof BookingApiError) {
     if (error.status === 412) return new PlannerWriteError('stale', TEXT.stale);
+    /* R4: the shared-worker rule names the clashing booking (calendar, činnost, time - never a patient). */
+    const busy = workerBusyOf(error);
+    if (busy !== null) return new PlannerWriteError('conflict', workerBusyMessage(busy));
+    if (isOverrideForbidden(error)) return new PlannerWriteError('forbidden', WORKER_BUSY_TEXT.forbidden);
     const code: PlannerWriteErrorCode =
       error.kind === 'validation' || error.kind === 'domainRule'
         ? 'validation'

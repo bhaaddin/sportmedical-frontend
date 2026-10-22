@@ -25,13 +25,19 @@ export class BookingApiError extends Error {
   readonly status: number | undefined;
   /** The backend's own user-facing text. Present only where 3.2 says to show it. */
   readonly serverMessage: string | undefined;
+  /** Stage 2: the stable problem code of the answer (`worker.busy`, `lunch.overlaps_booking`, ...), when it carries one. */
+  readonly code: string | undefined;
+  /** Stage 2: the structured detail object of the answer (`worker.busy` names the clashing booking); never shown raw. */
+  readonly details: unknown;
 
-  constructor(kind: BookingErrorKind, status: number | undefined, serverMessage?: string) {
+  constructor(kind: BookingErrorKind, status: number | undefined, serverMessage?: string, extra?: { code?: string | undefined; details?: unknown }) {
     super(kind);
     this.name = 'BookingApiError';
     this.kind = kind;
     this.status = status;
     this.serverMessage = serverMessage;
+    this.code = extra?.code;
+    this.details = extra?.details;
   }
 
   /** True when the slot was taken between loading the offer and submitting. */
@@ -49,6 +55,13 @@ interface ApiResultEnvelope {
   success?: boolean;
   message?: string;
   data?: unknown;
+}
+
+/** The `code` / `details` of an `ApiResult` problem body (both optional; nothing else of the body is kept). */
+function readProblem(payload: unknown): { code: string | undefined; details: unknown } {
+  if (payload === null || typeof payload !== 'object') return { code: undefined, details: undefined };
+  const p = payload as { code?: unknown; details?: unknown };
+  return { code: typeof p.code === 'string' && p.code !== '' ? p.code : undefined, details: p.details };
 }
 
 function readServerMessage(payload: unknown): string | undefined {
@@ -93,6 +106,7 @@ export function toBookingError(error: unknown): BookingApiError {
       kind,
       status,
       showsServerMessage ? readServerMessage(error.response?.data) : undefined,
+      readProblem(error.response?.data),
     );
   }
 

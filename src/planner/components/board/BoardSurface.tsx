@@ -12,7 +12,7 @@
  *               (`planning.selectedCategoryId !== null`) or one of those gestures runs, this component
  *               keeps its hands off the board.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Button, ClickAwayListener, Paper, Popover, Popper, useTheme } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -100,8 +100,12 @@ import { useSafeNavigate } from './useSafeNavigate';
 import { calendarColumns, calendarOfColumn, columnChips } from './calendarColumns';
 import { CalendarStrip } from './CalendarStrip';
 import { Icon } from '../Icons';
+import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../model/dayLock';
 import './board.css';
+
+/* R4 (and R17 / R13): new pop-outs are loaded when first needed, so the planner chunk keeps its budget */
+const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
   `repeating-linear-gradient(135deg, ${withAlpha(hex, strong)} 0px, ${withAlpha(hex, strong)} 7px, ${withAlpha(hex, weak)} 7px, ${withAlpha(hex, weak)} 14px)`;
@@ -278,8 +282,36 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     onCommit: commitMove,
     onNotice: showNotice,
     describeError: (error) => errorText(error, t),
+    onRefused: (error, request) => {
+      /* R4: the worker is busy in another calendar - the clash is named and the owner may override it with a reason */
+      const busy = workerBusyOf(error);
+      if (busy === null) return false;
+      setBusyMove({ request, busy, forbidden: false, working: false });
+      return true;
+    },
     onDragStart: () => setSelected(null),
   });
+  const [busyMove, setBusyMove] = useState<{ request: GridMoveRequest; busy: WorkerBusy; forbidden: boolean; working: boolean } | null>(null);
+  const overrideBusyMove = useCallback(
+    async (reason: string) => {
+      const current = busyMove;
+      if (!current) return;
+      setBusyMove({ ...current, working: true });
+      try {
+        await appointmentsApi.reschedule(current.request.calendarId, current.request.appointment.id, current.request.startUtc, reason, { notifyPatient: current.request.notifyPatient });
+        await refreshCalendar();
+        setBusyMove(null);
+        showNotice({ text: 'Termín přesunut. Výjimka je zapsaná v historii rezervace.', tone: 'info' });
+      } catch (error) {
+        if (isOverrideForbidden(error)) setBusyMove({ ...current, forbidden: true, working: false });
+        else {
+          setBusyMove(null);
+          showNotice({ text: errorText(error, t), tone: 'error' });
+        }
+      }
+    },
+    [busyMove, refreshCalendar, showNotice, t],
+  );
 
   /* ---- the model ---- */
   const model = useMemo(
@@ -302,6 +334,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               ...(config.excludeClubBlockIds ? { excludeClubBlockIds: config.excludeClubBlockIds } : {}),
               split,
               ...(calendar.alias ? { alias: calendar.alias } : {}),
+              workerRule: calendar.workerRule,
               isOpen: calendarOpen,
             }
           : null,
@@ -997,6 +1030,23 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               </div>
             ) : null}
 
+            {model.clashes.length ? (
+              <div className="board-clashes" aria-hidden="true" data-testid="board-clashes">
+                {model.clashes.map((c) => (
+                  <div
+                    key={c.key}
+                    className="board-clash"
+                    data-testid={`clash-${c.calendarId}-${c.day}-${c.sourceId}`}
+                    data-source-id={c.sourceId}
+                    title={`Pracovník je zaneprázdněn - ${c.reason}`}
+                    style={{ '--col': c.col, '--sub': c.sub, '--subs': c.subs, top: c.top, height: c.height } as CSSProperties}
+                  >
+                    <span className="board-sticky"><Icon name="lock" /><b>Zaneprázdněn</b><small>{c.reason}</small></span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             {model.windows.length ? (
               <div className="board-windows" data-testid="board-windows">
                 {model.windows.map((w) => <WindowBlock key={w.key} window={w} onOpen={openWindow} />)}
@@ -1260,6 +1310,18 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         ) : null}
       </Popper>
 
+      {busyMove ? (
+        <Suspense fallback={null}>
+          <WorkerBusyDialog
+            title="Přesun termínu"
+            busy={busyMove.busy}
+            working={busyMove.working}
+            forbidden={busyMove.forbidden}
+            onOverride={(reason) => void overrideBusyMove(reason)}
+            onClose={() => setBusyMove(null)}
+          />
+        </Suspense>
+      ) : null}
       {move.proposal && move.proposalAnchor !== undefined ? (
         <MoveConfirmDialog
           key={move.proposal.appointment.id}

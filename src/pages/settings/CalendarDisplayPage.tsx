@@ -36,6 +36,7 @@ import {
 import type { CalendarDisplaySettings, CalendarView } from '../../api/displaySettings';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import { BookingSlotsCard } from './BookingSlotsCard';
+import { SingleWorkerCard } from './SingleWorkerCard';
 import { DEFAULT_HOLIDAY_COLOR, holidayColorProblem } from '../../planner/model/dayLock';
 
 const VIEW_LABELS: Record<CalendarView, string> = {
@@ -329,6 +330,7 @@ export default function CalendarDisplayPage() {
           </Stack>
       </SoftCard>
       <BookingSlotsCard />
+      <SingleWorkerCard />
     </SettingsScreen>
   );
 }

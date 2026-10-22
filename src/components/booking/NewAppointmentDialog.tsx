@@ -29,6 +29,8 @@ import { calendarsApi } from "../../api/calendars";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
+import { isOverrideForbidden, workerBusyOf } from "../../api/workerBusy";
+import { WorkerBusyNotice } from "./WorkerBusyNotice";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
 import { DESIGN, SectionLabel, SoftCard, headSurface } from "../ui";
@@ -360,6 +362,8 @@ export function NewAppointmentDialog({
   const [quickBooked, setQuickBooked] = useState<QuickBookedView | null>(null);
   /* The server's refusal of the four facts, pinned to the box it named. */
   const [quickRefusal, setQuickRefusal] = useState<QuickRegisterError | null>(null);
+  /* R4: the last refusal was an override that the server would not take (a non-admin). */
+  const [overrideForbidden, setOverrideForbidden] = useState(false);
 
   /* A patient handed over by their card is looked up once and put in place. */
   useEffect(() => {
@@ -694,6 +698,8 @@ export function NewAppointmentDialog({
       onBooked();
     },
     onError: (error) => {
+      /* R4: the worker is busy with something else; whoever may override it sees the reason box (see WorkerBusyNotice). */
+      setOverrideForbidden(isOverrideForbidden(error));
       if (error instanceof BookingApiError && error.isConflict) {
         /* 6.3: the offer is stale, so fetch it again and keep the form. */
         setConflict(error);
@@ -762,6 +768,13 @@ export function NewAppointmentDialog({
       onBooked();
     },
     onError: (error) => {
+      setOverrideForbidden(isOverrideForbidden(error));
+      if (workerBusyOf(error) !== null) {
+        setConflict(error as BookingApiError);
+        setQuickRefusal(null);
+        void queryClient.invalidateQueries({ queryKey: ["availability", effectiveCalendarId, activity?.id ?? ""] });
+        return;
+      }
       if (isQuickConflict(error)) {
         /* 6.3: somebody was faster. Reload the offer, keep what was typed. */
         setConflict(new BookingApiError("conflict", 409, quickConflictText(error)));
@@ -1601,9 +1614,15 @@ export function NewAppointmentDialog({
           {/* The server's answer on the chosen time, with the override for whoever may use it. */}
           {availabilityBlock ? <Box sx={{ mt: 2 }}>{availabilityBlock}</Box> : null}
           {conflict ? (
-            <Alert severity="info" sx={{ mt: 1.5 }} onClose={() => setConflict(null)}>
-              {errorText(conflict, t)}
-            </Alert>
+            workerBusyOf(conflict) !== null ? (
+              <Box sx={{ mt: 1.5 }}>
+                <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+              </Box>
+            ) : (
+              <Alert severity="info" sx={{ mt: 1.5 }} onClose={() => setConflict(null)}>
+                {errorText(conflict, t)}
+              </Alert>
+            )
           ) : null}
           {quickRefusal && !quickRefusal.field ? (
             <Alert severity="error" sx={{ mt: 1.5 }}>
@@ -1789,9 +1808,13 @@ export function NewAppointmentDialog({
       {dayNotice}
 
       {conflict ? (
-        <Alert severity="info" onClose={() => setConflict(null)}>
-          {errorText(conflict, t)}
-        </Alert>
+        workerBusyOf(conflict) !== null ? (
+          <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+        ) : (
+          <Alert severity="info" onClose={() => setConflict(null)}>
+            {errorText(conflict, t)}
+          </Alert>
+        )
       ) : null}
 
       {availabilityBlock}

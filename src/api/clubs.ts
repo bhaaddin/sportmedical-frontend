@@ -231,6 +231,12 @@ export interface ClubSettings {
   releaseUnusedDaysBefore: number | null;
   /** Etapa 4 (D2): one club order may hold more than one služba. Off by default. */
   allowMultiServiceOrders: boolean;
+  /**
+   * Stage 2, R13 (`clubHold.holdUntilDaysBefore`): a club's held time that nobody filled is flagged "Hold vypršel" this many days before
+   * its day (0 = never; the server's default is 7, range 0-365). `undefined` = the server does not have the setting (an older build): the
+   * field is hidden. A PUT that leaves it out keeps the stored value.
+   */
+  holdUntilDaysBefore?: number;
   /** Owned by the palette settings; carried through untouched so a save here cannot wipe it. */
   blockPalette?: unknown;
   /**
@@ -256,6 +262,7 @@ function toClubSettings(data: unknown): ClubSettings {
     releaseUnusedDaysBefore:
       typeof r.releaseUnusedDaysBefore === 'number' && Number.isFinite(r.releaseUnusedDaysBefore) ? r.releaseUnusedDaysBefore : null,
     allowMultiServiceOrders: r.allowMultiServiceOrders === true,
+    ...(typeof r.holdUntilDaysBefore === 'number' && Number.isFinite(r.holdUntilDaysBefore) ? { holdUntilDaysBefore: r.holdUntilDaysBefore } : {}),
     payerTextClubInvoice: typeof r.payerTextClubInvoice === 'string' && r.payerTextClubInvoice.trim() !== '' ? r.payerTextClubInvoice : null,
     payerTextPerPerson: typeof r.payerTextPerPerson === 'string' && r.payerTextPerPerson.trim() !== '' ? r.payerTextPerPerson : null,
     defaultPayerTextClubInvoice: typeof r.defaultPayerTextClubInvoice === 'string' ? r.defaultPayerTextClubInvoice : '',

@@ -41,6 +41,8 @@ interface Draft {
   minimumPlayers: string;
   releaseUnusedDaysBefore: string;
   allowMultiServiceOrders: boolean;
+  /** R13: days before a club day an unfilled hold is flagged expired; '' while the server has no such setting. */
+  holdUntilDaysBefore?: string;
   /** The sentences about who pays; empty = the server's default sentence is shown to parents. */
   payerTextClubInvoice: string;
   payerTextPerPerson: string;
@@ -51,6 +53,7 @@ const toDraft = (s: ClubSettings): Draft => ({
   minimumPlayers: s.minimumPlayers === null ? '' : String(s.minimumPlayers),
   releaseUnusedDaysBefore: s.releaseUnusedDaysBefore == null ? '' : String(s.releaseUnusedDaysBefore),
   allowMultiServiceOrders: s.allowMultiServiceOrders === true,
+  holdUntilDaysBefore: s.holdUntilDaysBefore === undefined ? '' : String(s.holdUntilDaysBefore),
   payerTextClubInvoice: s.payerTextClubInvoice ?? '',
   payerTextPerPerson: s.payerTextPerPerson ?? '',
 });
@@ -68,6 +71,11 @@ export function validateClubSettings(draft: Draft): Partial<Record<keyof Draft, 
     const release = wholeNumber(draft.releaseUnusedDaysBefore);
     if (release === null) errors.releaseUnusedDaysBefore = 'Zadejte celý počet dní (0 a víc), nebo pole nechte prázdné.';
     else if (release > 3650) errors.releaseUnusedDaysBefore = 'Víc než deset let je nejspíš překlep.';
+  }
+  /* R13: 0 = never expires, 7 by default, at most a year (the server refuses more with `settings.invalid`). */
+  if ((draft.holdUntilDaysBefore ?? '') !== '') {
+    const hold = wholeNumber(draft.holdUntilDaysBefore ?? '');
+    if (hold === null || hold > 365) errors.holdUntilDaysBefore = 'Zadejte celý počet dní od 0 do 365 (0 = držení nikdy nevyprší).';
   }
   const days = wholeNumber(draft.registrationLinkValidityDays);
   if (days === null) errors.registrationLinkValidityDays = 'Zadejte celý počet dní.';
@@ -145,6 +153,8 @@ export default function ClubSettingsPage() {
       releaseUnusedDaysBefore:
         draft.releaseUnusedDaysBefore.trim() === '' ? null : (wholeNumber(draft.releaseUnusedDaysBefore) as number),
       allowMultiServiceOrders: draft.allowMultiServiceOrders,
+      /* a server that has no hold setting is never sent one */
+      ...(saved.holdUntilDaysBefore !== undefined && (draft.holdUntilDaysBefore ?? '') !== '' ? { holdUntilDaysBefore: wholeNumber(draft.holdUntilDaysBefore ?? '') as number } : {}),
       /* Sent only when changed. "" clears a sentence (the default shows again); null would KEEP the stored one. */
       ...changedPayerTexts(saved, draft),
     });
@@ -159,7 +169,7 @@ export default function ClubSettingsPage() {
 
   const edit = <K extends keyof Draft>(field: K, value: Draft[K]) => {
     setEdits((e) => ({
-      ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '', releaseUnusedDaysBefore: '', allowMultiServiceOrders: false, payerTextClubInvoice: '', payerTextPerPerson: '' })),
+      ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '', releaseUnusedDaysBefore: '', allowMultiServiceOrders: false, holdUntilDaysBefore: '', payerTextClubInvoice: '', payerTextPerPerson: '' })),
       [field]: value,
     }));
     setServerErrors((e) => ({ ...e, [field]: '', [field.charAt(0).toUpperCase() + field.slice(1)]: '' }));
@@ -239,6 +249,25 @@ export default function ClubSettingsPage() {
                   input: { endAdornment: <InputAdornment position="end">dní</InputAdornment> },
                 }}
               />
+              {saved?.holdUntilDaysBefore !== undefined ? (
+                <TextField
+                  label="Držet čas klubu do X dní před termínem"
+                  value={draft.holdUntilDaysBefore ?? ''}
+                  onChange={(e) => edit('holdUntilDaysBefore', e.target.value)}
+                  error={fieldError('holdUntilDaysBefore') !== undefined}
+                  helperText={
+                    fieldError('holdUntilDaysBefore') ??
+                    'Klubem zadržený čas, který hráči zatím nevyplnili, se tolik dní před termínem označí „Hold vypršel“ a jde ho uvolnit. Výchozí 7 dní, 0 = nikdy. Nic se neruší samo, uvolnění potvrzuje recepce; zapsaní hráči se nikdy nemění.'
+                  }
+                  size={phone ? 'medium' : 'small'}
+                  fullWidth
+                  data-testid="club-hold-days"
+                  slotProps={{
+                    htmlInput: { inputMode: 'numeric' },
+                    input: { endAdornment: <InputAdornment position="end">dní</InputAdornment> },
+                  }}
+                />
+              ) : null}
               <Box>
                 <FormControlLabel
                   control={

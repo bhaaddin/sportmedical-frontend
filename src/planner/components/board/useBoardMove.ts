@@ -129,6 +129,11 @@ export interface UseBoardMoveArgs {
   onNotice: (notice: BoardNotice) => void;
   /** The server's sentence (Czech) for a rejected move. */
   describeError: (error: unknown) => string;
+  /**
+   * R4: a refusal the board answers itself (the shared-worker clash opens its override dialog). Return true when it did; the card is
+   * back in its old place either way.
+   */
+  onRefused?: (error: unknown, request: GridMoveRequest) => boolean;
   /** A press that became a drag closes whatever summary / selection was open. */
   onDragStart: () => void;
 }
@@ -292,6 +297,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
       },
       (error: unknown) => {
         releaseOverride(id);
+        if (args.onRefused?.(error, request) === true) return;
         args.onNotice({ text: args.describeError(error), tone: 'error' });
       },
     );

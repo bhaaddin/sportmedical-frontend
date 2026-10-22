@@ -21,6 +21,7 @@ import { drawnBlocksOfDay } from '../../../components/booking/grid/clubWindows';
 import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
 import { inFilter } from '../../model/services';
 import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
+import { workerClashes, type RosterWorker, type WorkerClashModel } from './workerClash';
 import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
@@ -220,6 +221,8 @@ export interface BoardCalendarInput {
   split?: readonly string[] | null;
   /** R2: calendar id -> the calendar whose column it is drawn in (a služba's extra calendars ride in its primary's column). */
   alias?: ReadonlyMap<string, string>;
+  /** R4: the shared-worker rule (see `BoardCalendarData.workerRule`); absent or off = no clash is drawn. */
+  workerRule?: { on: boolean; exceptions: ReadonlySet<string>; workerOf: (calendarId: string, day: string) => RosterWorker | null };
   /** Does this calendar work that day? Absent = it does. A closed one is hatched in its own sub-column while the day is open. */
   isOpen?: (calendarId: string, day: IsoDate) => boolean;
 }
@@ -234,6 +237,8 @@ export interface BoardModel {
   shades: DayShadeModel[];
   /** Per-calendar hatching of a split week; empty otherwise. */
   calendarShades: CalendarShadeModel[];
+  /** R4: slots a worker is busy in another column, locked with the reason; empty unless the rule is on and two services are side by side. */
+  clashes: WorkerClashModel[];
   /** The calendars the days are split into, in column order; empty when the week is one column per day. */
   columns: Calendar[];
   nowLine: NowLineModel | null;
@@ -671,6 +676,20 @@ export function buildBoardModel(input: BuildBoardInput): BoardModel {
     windows,
     shades: dayShades(days, dayMarks, g, input.dayMarkColors?.holiday, hiddenOn),
     calendarShades: split && calendar ? calendarShades(days, dayMarks, columns, calendar.isOpen) : [],
+    clashes:
+      split && calendar?.workerRule?.on
+        ? workerClashes({
+            days,
+            split,
+            alias: calendar.alias,
+            calendars: calendar.calendars,
+            appointments: calendar.appointments.filter((a) => !lockedDays.has(pragueDateKey(a.startUtc))),
+            blocksByCalendar: calendar.blocksByCalendar,
+            workerOf: (id, day) => (lockedDays.has(day) ? null : calendar.workerRule!.workerOf(id, day)),
+            exceptions: calendar.workerRule.exceptions,
+            geometry: g,
+          })
+        : [],
     columns,
     nowLine: nowLineModel(days, dayMarks, g, ctx.today, input.nowMinute),
   };
