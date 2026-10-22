@@ -65,6 +65,8 @@ export interface ClubDayItem {
   orderCode: string | null;
   orderId: string | null;
   hold: HoldState | null;
+  /** R16b: the činnosti inside the club's frame on this day (distinct, in time order); empty when the server named none. */
+  activities: { id: string; name: string; colour: string }[];
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

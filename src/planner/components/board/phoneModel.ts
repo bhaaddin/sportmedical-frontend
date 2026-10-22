@@ -15,6 +15,8 @@ import { dayOfWeekOf } from '../../../utils/time';
 import type { DayMark, IsoDate, WeekHeadModel } from '../../model';
 import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
+import { distinctActivities, frameSubs } from './clubFrame';
+import { EMPTY_CATALOGUE, type Catalogue } from '../../../components/booking/calendar/model';
 import { clubColourOf, clubItemText, holdLabel, holdStateOf, type ClubDayItem } from './clubHold';
 import { lockedDayLook, type LockedDayLook } from '../../../colors/dayLock';
 import { agendaSlotLabel } from '../../model';
@@ -42,6 +44,8 @@ export interface PhoneEntry {
   colour: string | null;
   /** The window a club / block entry stands for (a tap opens the club's popover or the block). */
   window: BoardWindowModel | null;
+  /** R16b: the činnosti inside a club's frame (a club entry only). */
+  acts: { id: string; name: string; colour: string }[];
   /** A činnost with several bookings / terms on the day, folded into this one entry (reviewer 2.2): the entries behind it. */
   members: PhoneEntry[] | null;
 }
@@ -60,6 +64,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
     priceText: r.priceText,
     colour: r.colour,
     window: null,
+    acts: [],
     members: null,
   });
   /* A činnost with several bookings (or terms) is ONE entry that opens to the rows behind it. */
@@ -79,6 +84,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       priceText: null,
       colour: g.colour,
       window: null,
+      acts: [],
       members: g.rows.map(entryOf),
     };
   });
@@ -97,6 +103,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       priceText: null,
       colour: club ? w.colour : null,
       window: w,
+      acts: club ? distinctActivities(w.frame) : [],
       members: null,
     });
   }
@@ -187,6 +194,7 @@ export function clubItemsByDay(
   /** The lunch break of a day (a club's window across it is one window). */
   lunchOf: (day: IsoDate) => MinuteRange | null,
   excludeClubBlockIds?: ReadonlySet<string>,
+  catalogue: Catalogue = EMPTY_CATALOGUE,
 ): Map<IsoDate, ClubDayItem[]> {
   const out = new Map<IsoDate, ClubDayItem[]>();
   for (const day of days) {
@@ -194,7 +202,7 @@ export function clubItemsByDay(
     const lines: ClubDayItem[] = [];
     for (const id of calendarIds) {
       const blocks = (blocksByCalendar.get(id) ?? []).filter((b) => b.kind === 'club' && touchesDay(b.startUtc, b.endUtc, day));
-      for (const { block, span } of drawnBlocksOfDay([...blocks], day, lunchOf(day))) {
+      for (const { block, span, parts } of drawnBlocksOfDay([...blocks], day, lunchOf(day))) {
         if (block.clubBlockId && excludeClubBlockIds?.has(block.clubBlockId)) continue;
         const key = `${block.clubBlockId ?? block.id}|${span.start}|${span.end}`;
         if (seen.has(key)) continue;
@@ -207,6 +215,7 @@ export function clubItemsByDay(
           orderCode: block.orderCode ?? null,
           orderId: block.clubOrderId ?? null,
           hold: holdStateOf(block),
+          activities: distinctActivities(frameSubs(parts, day, catalogue)),
         });
       }
     }
@@ -237,6 +246,8 @@ export interface PhoneMonthRow {
   /** "Poptávka · Dukla, Slavia" */
   inquiry: string | null;
   clubs: string[];
+  /** R16b: the činnosti inside the clubs' frames that day (distinct). */
+  clubActs: { id: string; name: string; colour: string }[];
   /** The day by činnost: "Komplexní prohlídka ×10 · 10 slotů" - one line each, never one per booking. */
   activities: string[];
   /** The day by calendar when the week splits per calendar (reviewer 2.4): "Ordinace 1 3 · Diagnostika 5"; null otherwise. */
@@ -263,6 +274,7 @@ export function phoneMonthRows(
       blocked: t.blocked,
       inquiry: t.inquiries.length ? inquiryTileLabel(t.inquiries) : null,
       clubs: clubLines.get(t.date) ?? [],
+      clubActs: distinctActivities(t.clubItems.map((c) => ({ activities: c.activities }))),
       activities: t.activities.map((a) => `${a.name}${a.count > 1 ? ` ×${a.count}` : ''} · ${a.slots} ${agendaSlotLabel(a.slots)}`),
       calendarLine: t.calendars.some((c) => c.count > 0) ? t.calendars.map((c) => `${c.name} ${c.count}`).join(' · ') : null,
     }));

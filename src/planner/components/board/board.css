@@ -748,3 +748,25 @@
   .sm-planner.is-compact .calendar-chip { flex-direction: column; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px; border-radius: 12px; min-width: 44px; }
   .sm-planner.is-compact .calendar-chip > span { max-width: 100%; font-size: 11px; line-height: 1.15; }
 }
+
+/* ---- R16b: a club's day is ONE framed block - a continuous frame in the club's colour, the činnosti inside it ---- */
+.sm-planner .board-window.is-club { border-style: solid; border-width: 2px; border-left-width: 4px; border-color: var(--win-line); border-left-color: inherit; }
+.sm-planner .board-window.is-club[data-hold='expired'] { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
+.sm-planner .board-window .win-frame { position: absolute; inset: 0; pointer-events: none; }
+.sm-planner .board-window .win-sub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-repeat: no-repeat;
+  border-top: 1px solid var(--sub-line);
+  border-bottom: 1px solid var(--sub-line);
+}
+.sm-planner .board-window .board-sticky { position: sticky; z-index: 1; text-shadow: 0 1px 2px rgba(0, 12, 20, 0.85); }
+.sm-planner .board-window .win-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; max-width: 100%; }
+.sm-planner .board-window .win-acts small { display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 650; padding: 1px 5px; border-radius: 99px; background: rgba(0, 20, 33, 0.72); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-planner .board-window .win-acts i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--act); }
+/* R16b: the month tile's club bar is a closed frame; the činnosti inside it are a row of colour segments (words in the title) */
+.sm-planner .month-tile .tile-club.is-held { flex-wrap: wrap; border: 2px solid var(--club, #6e91a5); border-left-width: 3px; }
+.sm-planner .month-tile .tile-club.is-held[data-hold='expired'] { border-style: dashed; border-left-style: solid; }
+.sm-planner .month-tile .tile-club-acts { flex: 1 0 100%; display: flex; gap: 2px; height: 6px; margin: 0; padding: 0; font-style: normal; }
+.sm-planner .month-tile .tile-club-acts i { flex: 1 1 0; min-width: 0; border-radius: 2px; }

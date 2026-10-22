@@ -113,7 +113,11 @@ export function MiniDayButton({
         ) : null}
         {clubs.length > 0 ? (
           <span className="mini-clubs" data-testid={`mini-clubs-${model.date}`} aria-hidden="true">
-            {clubs.slice(0, 3).map((c) => <i key={c.key} data-hold={c.hold ?? undefined} style={{ '--club': c.colour } as React.CSSProperties} />)}
+            {clubs.slice(0, 3).map((c) => (
+              <i key={c.key} data-hold={c.hold ?? undefined} data-framed={c.activities.length > 0 ? '' : undefined} style={{ '--club': c.colour } as React.CSSProperties}>
+                {c.activities.slice(0, 3).map((a) => <b key={a.id} style={{ background: a.colour }} />)}
+              </i>
+            ))}
           </span>
         ) : null}
         <span

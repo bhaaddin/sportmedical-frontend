@@ -211,6 +211,11 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
                     <small key={c.key} className="tile-club is-held" data-testid={`tile-club-${t.date}`} data-hold={c.hold ?? undefined} title={t.clubs.join(' · ')} style={{ '--club': c.colour } as CSSProperties}>
                       <Icon name="lock" />
                       <span>{clubItemText(c)}</span>
+                      {c.activities.length > 0 ? (
+                        <em className="tile-club-acts" data-testid="tile-club-acts" title={c.activities.map((a) => a.name).join(', ')}>
+                          {c.activities.slice(0, 4).map((a) => <i key={a.id} style={{ background: a.colour }} />)}
+                        </em>
+                      ) : null}
                     </small>
                   ))
                 : t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}

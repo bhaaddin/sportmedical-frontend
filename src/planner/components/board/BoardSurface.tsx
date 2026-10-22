@@ -799,8 +799,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthClubItems = useMemo(
-    () => (calendar && view === 'month' && !phone ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
-    [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
+    () => (calendar && view === 'month' ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds, calendar.catalogue) : undefined),
+    [calendar, view, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthTiles = useMemo(
     () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: namedColumns, holidayColor: catalogue?.dayMarkColors.holiday, ...(monthClubLines ? { clubLines: monthClubLines } : {}), ...(monthClubItems ? { clubItems: monthClubItems } : {}) }),

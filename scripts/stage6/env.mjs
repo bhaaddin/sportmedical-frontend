@@ -1,0 +1,3 @@
+/* Imported first by lib.mjs so the club-planning helpers read these defaults (ES imports are hoisted). */
+process.env.BASE ??= 'http://localhost:3011';
+process.env.OUT ??= 'design/stage6';

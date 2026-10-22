@@ -36,8 +36,8 @@ describe('the mini calendar day', () => {
       <MiniDayButton
         {...base}
         clubs={[
-          { key: 'k1', club: 'FK Slaný', colour: '#2E7D6B', orderCode: 'KO-12AB34CD', hold: 'waiting' },
-          { key: 'k2', club: 'Dukla', colour: '#7C3AED', orderCode: null, hold: null },
+          { key: 'k1', club: 'FK Slaný', colour: '#2E7D6B', orderCode: 'KO-12AB34CD', hold: 'waiting', activities: [{ id: 'a1', name: 'Spiroergometrie', colour: '#22C55E' }, { id: 'a2', name: 'Komplexní prohlídka', colour: '#F59E0B' }] },
+          { key: 'k2', club: 'Dukla', colour: '#7C3AED', orderCode: null, hold: null, activities: [] },
         ]}
       />,
     );
