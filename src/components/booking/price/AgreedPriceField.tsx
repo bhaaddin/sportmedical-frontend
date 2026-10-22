@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Box, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material';
 import { SectionLabel } from '../../ui';
 import { amountText, priceView, PRICE_TEXT, type PriceState } from './agreedPrice';
@@ -19,6 +20,7 @@ export function AgreedPriceField({
   testId = 'agreed-price',
   reason,
   onReasonChange,
+  extras,
 }: {
   value: PriceState;
   onChange: (typed: string | null) => void;
@@ -28,6 +30,8 @@ export function AgreedPriceField({
   /** R15a: why the amount differs from the list (optional). Shown only while it differs and the owner can carry it. */
   reason?: string;
   onReasonChange?: (reason: string) => void;
+  /** R15c (a): what sits under the caption - the discount presets (they only fill `value`; "Vrátit ceník" resets them). */
+  extras?: ReactNode;
 }) {
   const view = priceView(value);
   const shown = value.typed ?? amountText(value.listPriceCzk);
@@ -74,6 +78,7 @@ export function AgreedPriceField({
           </Link>
         ) : null}
       </Stack>
+      {extras}
       {onReasonChange && view.adjusted && !view.invalid ? (
         <TextField
           fullWidth

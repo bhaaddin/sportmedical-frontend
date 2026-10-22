@@ -6,6 +6,8 @@
  */
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import type { DayMark, IsoDate } from '../../model';
+import type { Catalogue } from '../../../components/booking/calendar/model';
+import { frameActivities, type FrameActivity } from '../board/clubFrame';
 import { clubColourOf, holdStateOf, type HoldState } from '../board/clubHold';
 
 export interface MiniClubMark {
@@ -14,9 +16,11 @@ export interface MiniClubMark {
   colour: string;
   orderCode: string | null;
   hold: HoldState | null;
+  /** R16b: the činnosti inside the club's frame that day (from the block's `activityIds`), empty when none are named. */
+  activities: FrameActivity[];
 }
 
-export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockView[], marks: Readonly<Record<string, DayMark>>): Map<IsoDate, MiniClubMark[]> {
+export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockView[], marks: Readonly<Record<string, DayMark>>, catalogue?: Catalogue): Map<IsoDate, MiniClubMark[]> {
   const out = new Map<IsoDate, MiniClubMark[]>();
   for (const day of days) {
     if (marks[day]?.closed) continue;
@@ -27,6 +31,7 @@ export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockV
         club: b.clubName || 'Klub',
         colour: clubColourOf(b.colorHex),
         orderCode: b.orderCode ?? null,
+        activities: catalogue ? frameActivities(b.activityIds, catalogue) : [],
         hold: holdStateOf({
           kind: 'club',
           playersMissing: b.playersMissing ?? null,

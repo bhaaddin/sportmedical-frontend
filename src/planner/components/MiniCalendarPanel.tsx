@@ -29,6 +29,8 @@ import { selectActivePreview } from '../state/selectors';
 import { Icon } from './Icons';
 import { useQuery } from '@tanstack/react-query';
 import { clubBlocksApi } from '../../api/clubBlocks';
+import { activitiesApi } from '../../api/activities';
+import { activityInfoOf, type Catalogue } from '../../components/booking/calendar/model';
 import { clubDaysOf } from './left/miniClubs';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../colors/dayLock';
 import { usePlannerCtx, usePlannerModelState } from './context';
@@ -99,7 +101,13 @@ export function MiniCalendarPanel() {
     staleTime: 60_000,
     retry: false,
   });
-  const clubsByDay = useMemo(() => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks), [cells, clubBlocks.data, dayMarks]);
+  /* R16b: the činnosti inside a club's frame are named by id on the block; their colours come from the same catalogue the board reads */
+  const activitiesQ = useQuery({ queryKey: ['activities'], queryFn: () => activitiesApi.list(), enabled: clubsOn, staleTime: 5 * 60 * 1000, retry: false });
+  const bookingCatalogue = useMemo<Catalogue>(
+    () => ({ activities: new Map((activitiesQ.data?.activities ?? []).map((a) => [a.id, activityInfoOf(a)])), services: new Map() }),
+    [activitiesQ.data],
+  );
+  const clubsByDay = useMemo(() => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks, bookingCatalogue), [cells, clubBlocks.data, dayMarks, bookingCatalogue]);
 
   /* R20: the liquid only moves while the days are on screen and the tab is visible (a closed drawer / sheet is off screen) */
   const daysRef = useRef<HTMLDivElement | null>(null);

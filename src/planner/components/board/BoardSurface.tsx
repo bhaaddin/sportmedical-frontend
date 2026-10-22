@@ -39,7 +39,7 @@ import { editSessionFor } from '../../../components/clubs/order/editSession';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { DESIGN, accentLiteral } from '../../../theme';
-import { pragueDateKey } from '../../../utils/time';
+import { addDaysToDateOnly, pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
 import { addDays, monthCells, normalizeFilter, usesServiceFilter, weekHeadModel, type IsoDate } from '../../model';
 import { blockableRanges } from '../../model/daySelect';
@@ -83,6 +83,9 @@ import {
 } from './boardModel';
 import { boardSettings, useBoardSettings } from './boardSettings';
 import { useBoardMove, type BoardNotice } from './useBoardMove';
+import { cancelUndoable } from './undoRules';
+import type { UndoOp } from './undoState';
+import type { Appointment } from '../../../api/bookingContracts';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
 import { DaysBlockDialog } from './month/DaysBlockDialog';
@@ -106,6 +109,10 @@ import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDa
 import './board.css';
 
 /* R4 (and R17 / R13): new pop-outs are loaded when first needed, so the planner chunk keeps its budget */
+/* R15c: the undo bar and the keyboard shortcuts load on first use / after the first paint, not with the planner */
+const ShortcutsHelp = lazy(() => import('./ShortcutsHelp').then((m) => ({ default: m.ShortcutsHelp })));
+const BoardUndo = lazy(() => import('./BoardUndo').then((m) => ({ default: m.BoardUndo })));
+const BoardShortcuts = lazy(() => import('./BoardShortcuts').then((m) => ({ default: m.BoardShortcuts })));
 const ClubBlockPopover = lazy(() => import('../../../components/booking/calendar/ClubBlockPopover').then((m) => ({ default: m.ClubBlockPopover })));
 /* R17 / R4: the lunch controls and the clash drawing are layers of their own, loaded only when a Stage 2 server and the setting ask for them */
 /* The appointment's detail opens on a click: loaded then (as `useRecordOpener` already does for the reservation drawer) */
@@ -265,6 +272,20 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     refreshPlanner();
   }, [queryClient, refreshPlanner]);
 
+  /* R15c (d): a move and a cancel can be taken back for 30 s (the last one only); see undoState.ts for what a cancel can and cannot give back */
+  const [undoEntry, setUndoEntry] = useState<{ op: UndoOp; seq: number } | null>(null);
+  const armUndo = useCallback((op: UndoOp) => setUndoEntry((prev) => ({ op, seq: (prev?.seq ?? 0) + 1 })), []);
+  const armCancelUndo = useCallback(
+    (a: Appointment) => {
+      if (!cancelUndoable(a)) {
+        showNotice({ text: 'Rezervace zrušena. Tohle zrušení už nejde vrátit zpět (klubový termín, nedokončená rychlá registrace nebo host bez jména) - vytvořte rezervaci znovu.', tone: 'info' });
+        return;
+      }
+      armUndo({ kind: 'cancel', calendarId: a.calendarId, activityId: a.activityId, startUtc: a.startUtc, patientId: a.patientId || null, name: a.unregisteredName ?? null, phone: a.unregisteredPhone ?? null, note: a.note ?? null, agreedPriceCzk: a.agreedPriceCzk ?? null });
+    },
+    [armUndo, showNotice],
+  );
+
   /* ---- a selected card shows its summary; the click goes on to the detail ---- */
   const [selected, setSelected] = useState<{ card: BookingCardModel; element: HTMLElement } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -273,10 +294,11 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const commitMove = useCallback(
     async (move: GridMoveRequest) => {
       const notice = await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient });
+      armUndo({ kind: 'move', calendarId: move.calendarId, appointmentId: move.appointment.id, fromStartUtc: move.appointment.startUtc, notifyPatient: move.notifyPatient });
       await refreshCalendar();
       return notice;
     },
-    [refreshCalendar],
+    [refreshCalendar, armUndo],
   );
   const move = useBoardMove({
     boardRef,
@@ -308,6 +330,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       setBusyMove({ ...current, working: true });
       try {
         await appointmentsApi.reschedule(current.request.calendarId, current.request.appointment.id, current.request.startUtc, reason, { notifyPatient: current.request.notifyPatient });
+        armUndo({ kind: 'move', calendarId: current.request.calendarId, appointmentId: current.request.appointment.id, fromStartUtc: current.request.appointment.startUtc, notifyPatient: current.request.notifyPatient });
         await refreshCalendar();
         setBusyMove(null);
         showNotice({ text: 'Termín přesunut. Výjimka je zapsaná v historii rezervace.', tone: 'info' });
@@ -319,7 +342,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         }
       }
     },
-    [busyMove, refreshCalendar, showNotice, t],
+    [busyMove, refreshCalendar, showNotice, t, armUndo],
   );
 
   /* ---- the model ---- */
@@ -659,6 +682,23 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const newAppointmentKey = typeof handoff?.newAppointment === 'number' ? handoff.newAppointment : null;
   const landingPatient = typeof handoff?.patientId === 'string' ? handoff.patientId : undefined;
   const mayBook = calendar?.mayBook ?? false;
+  /* R15c (e): the main calendar's keyboard shortcuts (never on a club's own screen, never while typing) */
+  const [helpOpen, setHelpOpen] = useState(false);
+  const onClubScreenForKeys = useClubPlanner() !== null;
+  const shortcutsOn = calendar !== null && config.mode === 'standard' && !onClubScreenForKeys;
+  const shortcutHandlers = {
+    new: () => {
+      if (!mayBook) showNotice({ text: 'Nemáte oprávnění vytvářet rezervace.', tone: 'error' });
+      else void bookNextFree();
+    },
+    today: () => act.today(ctx.today),
+    prev: () => (view === 'month' ? act.previousMonth() : view === 'day' ? act.selectDay(addDaysToDateOnly(selectedDate, -1)) : act.previousWeek()),
+    next: () => (view === 'month' ? act.nextMonth() : view === 'day' ? act.selectDay(addDaysToDateOnly(selectedDate, 1)) : act.nextWeek()),
+    day: () => act.setView('day'),
+    week: () => act.setView('week'),
+    month: () => act.setView('month'),
+    help: () => setHelpOpen((open) => !open),
+  };
   const calendarReady = calendar !== null && calendar.ready && calendar.calendars.length > 0;
   useEffect(() => {
     if (!config.realCalendar || newAppointmentKey === null || handled.current.newAppointment === newAppointmentKey) return;
@@ -799,8 +839,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthClubItems = useMemo(
-    () => (calendar && view === 'month' && !phone ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
-    [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
+    () => (calendar && view === 'month' ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds, calendar.catalogue) : undefined),
+    [calendar, view, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthTiles = useMemo(
     () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: namedColumns, holidayColor: catalogue?.dayMarkColors.holiday, ...(monthClubLines ? { clubLines: monthClubLines } : {}), ...(monthClubItems ? { clubItems: monthClubItems } : {}) }),
@@ -1514,7 +1554,24 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             open
             onClose={() => setOpenId(null)}
             onChanged={() => void refreshCalendar()}
+            onCancelled={armCancelUndo}
           />
+        </Suspense>
+      ) : null}
+
+      {undoEntry !== null ? (
+        <Suspense fallback={null}>
+          <BoardUndo entry={undoEntry} refresh={refreshCalendar} notify={showNotice} describeError={(error) => errorText(error, t)} />
+        </Suspense>
+      ) : null}
+      {shortcutsOn ? (
+        <Suspense fallback={null}>
+          <BoardShortcuts handlers={shortcutHandlers} />
+        </Suspense>
+      ) : null}
+      {helpOpen ? (
+        <Suspense fallback={null}>
+          <ShortcutsHelp onClose={() => setHelpOpen(false)} />
         </Suspense>
       ) : null}
     </section>
