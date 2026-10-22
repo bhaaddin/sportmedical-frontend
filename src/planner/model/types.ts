@@ -438,8 +438,10 @@ export interface DayMark {
   kind?: 'holiday' | 'closed';
   /** Working hours of the clinic that day; null = no hours known. */
   hours?: { from: ClockTime; to: ClockTime } | null;
-  /** Lunch break; null = none. */
-  lunch?: { from: ClockTime; to: ClockTime } | null;
+  /** Lunch break; null = none. `moved` / `original` (R17): this day's lunch is a one-day exception of the weekly one. */
+  lunch?: { from: ClockTime; to: ClockTime; moved?: boolean; original?: { from: ClockTime; to: ClockTime } } | null;
+  /** R17: the lunch of this day was removed for this day only; where it used to be (the band can be brought back). */
+  lunchRemoved?: { from: ClockTime; to: ClockTime } | null;
 }
 
 export interface DayMarkColors {

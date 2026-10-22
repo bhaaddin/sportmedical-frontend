@@ -54,12 +54,12 @@ import { DESIGN_TIMELINE_HEIGHT, useBoardMetrics } from '../PlannerMetrics';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { DayList, MonthMatrix } from './AlternateView';
 import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
-import { clubLinesByDay, lunchOfMarks, phoneEntries, phoneMonthRows, weekStripModel } from './phoneModel';
+import { clubItemsByDay, clubLinesByDay, lunchOfMarks, phoneEntries, phoneMonthRows, weekStripModel } from './phoneModel';
 import { BookingCard, SessionCard, WindowBlock } from './BoardCards';
 import { BoardToolbar } from './BoardToolbar';
 import type { BoardCalendarData } from './boardCalendar';
 import { useBoardConfig } from './boardConfig';
-import { boardGeometry, hourLabels, STANDARD_TIMELINE_HEIGHT, stepLineHeight, widenWindow, yOfMinute } from './boardGeometry';
+import { boardGeometry, boxOfSpan, hourLabels, STANDARD_TIMELINE_HEIGHT, stepLineHeight, widenWindow, yOfMinute } from './boardGeometry';
 import {
   clampZoom,
   focusMinuteFor,
@@ -100,11 +100,16 @@ import { useSafeNavigate } from './useSafeNavigate';
 import { calendarColumns, calendarOfColumn, columnChips } from './calendarColumns';
 import { CalendarStrip } from './CalendarStrip';
 import { Icon } from '../Icons';
+import { clubHolding, clubReservedText } from './clubHold';
+import { useLunch } from './useLunch';
+import { LUNCH_TEXT, clockOf } from './lunchModel';
+import { LunchBandEl } from './BoardCards';
 import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../model/dayLock';
 import './board.css';
 
 /* R4 (and R17 / R13): new pop-outs are loaded when first needed, so the planner chunk keeps its budget */
+const LunchPopover = lazy(() => import('./LunchPopover').then((m) => ({ default: m.LunchPopover })));
 const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
@@ -118,6 +123,8 @@ interface BookingPrefill {
   initialActivityId?: string;
   /** The patient's card said "Objednat termín": the dialog opens with them chosen. */
   initialPatientId?: string;
+  /** R17: booked into the lunch slot (`into-lunch`): the day's lunch goes, the booking comes. */
+  intoLunch?: boolean;
   anchor?: { x: number; y: number; width: number; height: number };
 }
 
@@ -576,7 +583,31 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     onSelect: (sel) => {
       setSelected(null);
       const cal = calendarFor(sel.day, sel.range, sel.sub);
+      /* R13: a place a club holds is not for booking, blocking or planning: say whose it is instead of opening the menu */
+      const held = cal ? clubHolding(calendar?.blocksByCalendar.get(cal.id) ?? [], sel.day, sel.range) : null;
+      if (held) {
+        showNotice({ text: clubReservedText(held), tone: 'error' });
+        return;
+      }
       setPending({ ...sel, calendarId: cal?.id ?? null, calendarName: cal?.name ?? null });
+    },
+  });
+
+  /* ---- R17: the lunch band is clickable and draggable (one-day exceptions of the weekly lunch) ---- */
+  const lunchCtl = useLunch({
+    calendar,
+    standard: config.mode === 'standard',
+    days,
+    dayMarks,
+    geometry,
+    boardRef,
+    step: snapStep,
+    calendarOpen,
+    paused: planningOwnsPointer || pinching || move.moving !== null,
+    notify: showNotice,
+    refresh: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['grid-preview'] });
+      await refreshCalendar();
     },
   });
 
@@ -698,6 +729,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         clubName: w.label,
         colorHex: w.block.colorHex ?? null,
         range: w.clubDates ?? { from: w.day, to: w.day },
+        block: w.block,
         x: point.x,
         y: point.y,
       });
@@ -753,6 +785,10 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   const pendingRange = selection.live ?? (pending ? { col: pending.col, sub: pending.sub, range: pending.range } : null);
   const ghost = move.moving?.target ?? null;
+  const dayLabelOf = (day: IsoDate): string => {
+    const d = head.days.find((x) => x.date === day);
+    return d ? `${d.weekName} ${d.label}` : day;
+  };
   const filterActive = settings.ticked !== null || settings.serviceSet !== null || settings.employeeId !== null;
 
   const statusWord = useCallback(
@@ -777,9 +813,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     () => (calendar && view === 'month' && !phone ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
+  const monthClubItems = useMemo(
+    () => (calendar && view === 'month' && !phone ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
+    [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
+  );
   const monthTiles = useMemo(
-    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: namedColumns, holidayColor: catalogue?.dayMarkColors.holiday, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
-    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines, namedColumns, catalogue],
+    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: namedColumns, holidayColor: catalogue?.dayMarkColors.holiday, ...(monthClubLines ? { clubLines: monthClubLines } : {}), ...(monthClubItems ? { clubItems: monthClubItems } : {}) }),
+    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines, monthClubItems, namedColumns, catalogue],
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 
@@ -979,20 +1019,24 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   {s.before ? <div className="board-shade is-off" style={{ '--col': s.col, top: s.before.top, height: s.before.height } as CSSProperties} data-testid={`shade-before-${s.day}`} /> : null}
                   {s.after ? <div className="board-shade is-off" style={{ '--col': s.col, top: s.after.top, height: s.after.height } as CSSProperties} data-testid={`shade-after-${s.day}`} /> : null}
                   {s.lunch ? (
-                    <div
-                      className="board-shade is-lunch"
-                      style={{
-                        '--col': s.col,
-                        top: s.lunch.top,
-                        height: s.lunch.height,
-                        '--shade-line': withAlpha(lunch, 0.8),
-                        '--shade-hatch': hatchOf(lunch, 0.22, 0.07),
-                      } as CSSProperties}
-                      data-testid={`lunch-${s.day}`}
-                      title={`Oběd ${s.lunch.from}–${s.lunch.to}`}
-                    >
-                      Oběd
-                    </div>
+                    <LunchBandEl
+                      day={s.day}
+                      col={s.col}
+                      box={s.lunch}
+                      state={s.lunch.moved ? 'moved' : 'weekly'}
+                      colour={lunch}
+                      handlers={lunchCtl.bandHandlers({ day: s.day, from: s.lunch.from, to: s.lunch.to, state: s.lunch.moved ? 'moved' : 'weekly', original: s.lunch.original ?? null })}
+                    />
+                  ) : null}
+                  {s.lunchRemoved ? (
+                    <LunchBandEl
+                      day={s.day}
+                      col={s.col}
+                      box={s.lunchRemoved}
+                      state="removed"
+                      colour={lunch}
+                      handlers={lunchCtl.bandHandlers({ day: s.day, from: s.lunchRemoved.from, to: s.lunchRemoved.to, state: 'removed', original: null })}
+                    />
                   ) : null}
                   {s.closed && s.lock ? (
                     /* R6: ONE opaque block over the whole column - no hour lines, no hatch, no cards seen through it. */
@@ -1126,6 +1170,16 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               </div>
             ) : null}
 
+            {lunchCtl.drag ? (
+              <div
+                className={`board-shade board-lunch-ghost${lunchCtl.drag.problem ? ' is-invalid' : ''}`}
+                data-testid="lunch-drag-ghost"
+                style={{ '--col': days.indexOf(lunchCtl.drag.day), ...boxOfSpan(geometry, lunchCtl.drag.start, lunchCtl.drag.start + lunchCtl.drag.length) } as CSSProperties}
+              >
+                <span>{lunchCtl.drag.problem ?? `${LUNCH_TEXT.band} ${clockOf(lunchCtl.drag.start)}`}</span>
+              </div>
+            ) : null}
+
             {ghost ? (
               <>
                 <div className={`move-lanes board-move-lanes${ghost.refusal ? ' is-invalid' : ''}`} style={{ '--col': ghost.col, '--sub': ghost.sub, '--subs': ghost.subs } as CSSProperties} aria-hidden="true" />
@@ -1146,7 +1200,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 >
                   <div className="move-ghost-times" data-testid="move-ghost-time">{spanLabel(ghost.range)}</div>
                   <div className="move-ghost-foot">{move.moving?.appointment.patientName?.trim() || move.moving?.appointment.activityName}</div>
-                  {ghost.refusal ? <div className="move-ghost-reason">{refusalLabel(ghost.refusal)}</div> : null}
+                  {ghost.refusal ? <div className="move-ghost-reason">{ghost.refusalNote ?? refusalLabel(ghost.refusal)}</div> : null}
                 </div>
               </>
             ) : null}
@@ -1310,6 +1364,28 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         ) : null}
       </Popper>
 
+      {lunchCtl.popover ? (
+        <Suspense fallback={null}>
+          <LunchPopover
+            band={lunchCtl.popover.band}
+            dateLabel={dayLabelOf(lunchCtl.popover.band.day)}
+            targets={lunchCtl.popover.targets}
+            hours={lunchCtl.popover.hours}
+            bookings={lunchCtl.popover.bookings}
+            mayEdit={lunchCtl.mayEdit}
+            mayBook={lunchCtl.mayBook}
+            point={lunchCtl.popover.point}
+            onMove={(startTime) => lunchCtl.moveTo(lunchCtl.popover!.band.day, startTime)}
+            onRemove={() => lunchCtl.removeToday(lunchCtl.popover!.band.day)}
+            onRestore={() => lunchCtl.restore(lunchCtl.popover!.band.day)}
+            onBook={(calendarId) => {
+              const band = lunchCtl.popover!.band;
+              openBooking({ initialDate: band.day, initialCalendarId: calendarId, initialStart: `${band.day}T${band.from}`, initialEnd: `${band.day}T${band.to}`, intoLunch: true });
+            }}
+            onClose={lunchCtl.closePopover}
+          />
+        </Suspense>
+      ) : null}
       {busyMove ? (
         <Suspense fallback={null}>
           <WorkerBusyDialog
@@ -1428,6 +1504,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         onOpenOrder={goOrder}
         {...(calendar?.mayBook && nav.available ? { onEditTerms: (order: ClubOrderView) => void editTerms(order) } : {})}
         onClose={() => setClubPick(null)}
+        mayRelease={calendar?.mayBlock ?? false}
+        onReleased={() => void refreshCalendar()}
       />
 
       <ClubOrderEntry

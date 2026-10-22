@@ -15,6 +15,7 @@ import { dayOfWeekOf } from '../../../utils/time';
 import type { DayMark, IsoDate, WeekHeadModel } from '../../model';
 import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
+import { clubColourOf, clubItemText, holdLabel, holdStateOf, type ClubDayItem } from './clubHold';
 import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
 import { agendaSlotLabel } from '../../model';
 import { groupDayRows, type BoardWindowModel, type DayRowModel, type MonthTileModel } from './boardModel';
@@ -91,7 +92,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       sortStart: w.start,
       timeLabel: w.timeLabel,
       title: w.label,
-      sub: club ? null : w.calendarName,
+      sub: club ? [w.block.orderCode, holdStateOf(w.block) ? holdLabel(holdStateOf(w.block)!) : null].filter(Boolean).join(' · ') || null : w.calendarName,
       tail: null,
       priceText: null,
       colour: club ? w.colour : null,
@@ -170,14 +171,27 @@ export function clubLinesByDay(
   days: readonly IsoDate[],
   calendarIds: readonly string[],
   blocksByCalendar: ReadonlyMap<string, readonly TimeBlock[]>,
-  /** The lunch break of a day (a club's window across it is one window). */
   lunchOf: (day: IsoDate) => MinuteRange | null,
   excludeClubBlockIds?: ReadonlySet<string>,
 ): Map<IsoDate, string[]> {
   const out = new Map<IsoDate, string[]>();
+  for (const [day, items] of clubItemsByDay(days, calendarIds, blocksByCalendar, lunchOf, excludeClubBlockIds)) out.set(day, items.map(clubItemText));
+  return out;
+}
+
+/** The same windows, structured (R13): club, colour, order code and hold state travel with the line. */
+export function clubItemsByDay(
+  days: readonly IsoDate[],
+  calendarIds: readonly string[],
+  blocksByCalendar: ReadonlyMap<string, readonly TimeBlock[]>,
+  /** The lunch break of a day (a club's window across it is one window). */
+  lunchOf: (day: IsoDate) => MinuteRange | null,
+  excludeClubBlockIds?: ReadonlySet<string>,
+): Map<IsoDate, ClubDayItem[]> {
+  const out = new Map<IsoDate, ClubDayItem[]>();
   for (const day of days) {
     const seen = new Set<string>();
-    const lines: string[] = [];
+    const lines: ClubDayItem[] = [];
     for (const id of calendarIds) {
       const blocks = (blocksByCalendar.get(id) ?? []).filter((b) => b.kind === 'club' && touchesDay(b.startUtc, b.endUtc, day));
       for (const { block, span } of drawnBlocksOfDay([...blocks], day, lunchOf(day))) {
@@ -185,7 +199,15 @@ export function clubLinesByDay(
         const key = `${block.clubBlockId ?? block.id}|${span.start}|${span.end}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        lines.push(PLANNER_TEXT.phone.clubWindow(block.clubName ?? 'Klub', `${formatMinutes(span.start)}–${formatMinutes(span.end)}`));
+        lines.push({
+          key,
+          club: block.clubName ?? 'Klub',
+          colour: clubColourOf(block.colorHex),
+          range: `${formatMinutes(span.start)}–${formatMinutes(span.end)}`,
+          orderCode: block.orderCode ?? null,
+          orderId: block.clubOrderId ?? null,
+          hold: holdStateOf(block),
+        });
       }
     }
     if (lines.length) out.set(day, lines);

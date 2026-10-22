@@ -405,6 +405,33 @@ describe('day marks and day budget', () => {
     expect(mark).toMatchObject({ hours: { from: '07:00', to: '18:00' }, lunch: { from: '12:15', to: '12:30' } });
   });
 
+  it('R17: a lunch moved for one day carries where it was; a removed one keeps its place for the "smazán dnes" ghost', async () => {
+    const state = fakeState({
+      previews: (_c, date) =>
+        date === '2026-11-16'
+          ? preview(date, { breakStart: '13:00:00', breakEnd: '13:30:00', lunchException: { kind: 'moved', originalStart: '12:00', originalEnd: '12:30' } })
+          : date === '2026-11-17'
+            ? preview(date, { breakStart: null, breakEnd: null, lunchException: { kind: 'removed', originalStart: '12:00', originalEnd: '12:30' } })
+            : preview(date),
+    });
+    const [moved, removed, plain] = await make(state).source.listDayMarks({ from: '2026-11-16', to: '2026-11-18' });
+    expect(moved!.lunch).toEqual({ from: '13:00', to: '13:30', moved: true, original: { from: '12:00', to: '12:30' } });
+    expect(removed).toMatchObject({ lunch: null, lunchRemoved: { from: '12:00', to: '12:30' } });
+    expect(plain!.lunch).toEqual({ from: '12:00', to: '12:30' });
+    expect(plain).not.toHaveProperty('lunchRemoved');
+  });
+
+  it('R17: an exception on only SOME of the open calendars is not claimed for the day (the old common-lunch rule stands)', async () => {
+    const state = fakeState({
+      previews: (calendarId, date) =>
+        calendarId === CAL_A
+          ? preview(date, { breakStart: '13:00:00', breakEnd: '13:30:00', lunchException: { kind: 'moved', originalStart: '12:00', originalEnd: '12:30' } })
+          : preview(date),
+    });
+    const [mark] = await make(state).source.listDayMarks({ from: '2026-11-16', to: '2026-11-16' });
+    expect(mark!.lunch?.moved).toBeUndefined(); // the two lunches share no time: no common lunch is drawn at all
+  });
+
   it('the day is closed when every calendar is shut, even without a holiday', async () => {
     const state = fakeState({ previews: (_c, date) => preview(date, { isOpen: false, closedBecause: 'notAWorkingDay', offeredActivityIds: [] }) });
     const [mark] = await make(state).source.listDayMarks({ from: '2026-11-21', to: '2026-11-21' });

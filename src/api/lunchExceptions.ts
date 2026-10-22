@@ -60,14 +60,16 @@ export const LUNCH_CODES = {
   outsideHours: 'lunch.outside_hours',
   startInvalid: 'lunch.start_invalid',
   overlapsBooking: 'lunch.overlaps_booking',
+  overlapsClub: 'lunch.overlaps_club',
   slotOutsideLunch: 'lunch.slot_outside_lunch',
 } as const;
 
 const LUNCH_TEXT: Record<string, string> = {
-  [LUNCH_CODES.notFound]: 'V tento den už žádný oběd není.',
+  [LUNCH_CODES.notFound]: 'V tento den už žádný oběd není (nebo není co vracet).',
   [LUNCH_CODES.outsideHours]: 'Oběd musí zůstat v pracovní době dne.',
   [LUNCH_CODES.startInvalid]: 'Zadejte čas začátku oběda, například 13:00.',
   [LUNCH_CODES.overlapsBooking]: 'V tomto čase už je rezervace. Přesuňte nejdřív ji, nebo zvolte jiný čas oběda.',
+  [LUNCH_CODES.overlapsClub]: 'Tento čas drží klub. Zvolte jiný čas oběda.',
   [LUNCH_CODES.slotOutsideLunch]: 'Termín musí celý ležet uvnitř oběda.',
 };
 

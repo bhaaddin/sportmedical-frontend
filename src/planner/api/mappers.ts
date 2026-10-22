@@ -188,10 +188,24 @@ export function dayMarkOf(date: IsoDate, previews: Previews, holiday: ClinicHoli
       if (e > s) lunch = { from: formatMinutes(s), to: formatMinutes(e) };
     }
   }
+  /* R17: a one-day exception of the lunch, when EVERY open calendar carries the same kind (a mixed day keeps the old rule above) */
+  const exceptions = open.map((r) => r.lunchException ?? null);
+  if (open.length > 0 && !mark.closed) {
+    if (lunch !== null && exceptions.every((e) => e?.kind === 'moved')) {
+      const o = exceptions[0]!;
+      const from = o.originalStart && o.originalEnd ? { from: o.originalStart.slice(0, 5), to: o.originalEnd.slice(0, 5) } : undefined;
+      lunch = { ...lunch, moved: true, ...(from ? { original: from } : {}) };
+    }
+  }
+  let lunchRemoved: DayMark['lunchRemoved'] = null;
+  if (open.length > 0 && !mark.closed && exceptions.every((e) => e?.kind === 'removed')) {
+    const o = exceptions[0]!;
+    if (o.originalStart && o.originalEnd) lunchRemoved = { from: o.originalStart.slice(0, 5), to: o.originalEnd.slice(0, 5) };
+  }
   const label = mark.closed ? (mark.detail || mark.label || null) : null;
   /* R6: a day with a holiday of its own (statutory or the clinic's closure) is red; a weekend / day off is grey. */
   const kind: DayMark['kind'] = mark.redNumber ? 'holiday' : 'closed';
-  return { date, closed: mark.closed, ...(mark.closed ? { kind } : {}), label, hours, lunch };
+  return { date, closed: mark.closed, ...(mark.closed ? { kind } : {}), label, hours, lunch, ...(lunchRemoved ? { lunchRemoved } : {}) };
 }
 
 /**

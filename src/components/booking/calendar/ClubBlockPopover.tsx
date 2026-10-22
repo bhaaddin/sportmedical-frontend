@@ -1,8 +1,11 @@
-import { Box, Button, Popover, Skeleton, Typography } from "@mui/material";
+import { Alert, Box, Button, Popover, Skeleton, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { clubBlocksApi } from "../../../api/clubBlocks";
-import { clubOrdersApi, type ClubOrderView } from "../../../api/clubOrders";
+import { clubOrdersApi, type ClubOrderView, type ReleaseUnfilledResult } from "../../../api/clubOrders";
+import type { TimeBlock } from "../../../api/bookingContracts";
+import { HOLD_TEXT, holdLabel, holdStateOf, releaseFailedText, releaseSummary, seatsLabel } from "../../../planner/components/board/clubHold";
 import { DESIGN } from "../../../theme";
 import { orderCode } from "../../clubs/order/orderFormat";
 import { orderWindows, shortSplit, termsWord } from "../../clubs/orders/orderWindows";
@@ -24,6 +27,8 @@ export interface ClubBlockPick {
   clubName: string;
   colorHex: string | null;
   range: DayRange;
+  /** R13: the block as the server sent it (order, seats, hold state), when the click came from the main board. */
+  block?: TimeBlock | undefined;
   /** Where on screen it was clicked. */
   x: number;
   y: number;
@@ -36,6 +41,8 @@ export function ClubBlockPopover({
   onOpenOrder,
   onEditTerms,
   onClose,
+  mayRelease = false,
+  onReleased,
 }: {
   pick: ClubBlockPick | null;
   /** yyyy-MM-dd, the clinic's today. */
@@ -45,8 +52,17 @@ export function ClubBlockPopover({
   /** Present only for a user who may change orders: the calendar opens in pick mode on this order. */
   onEditTerms?: (order: ClubOrderView) => void;
   onClose: () => void;
+  /** R13: the user may give back the unfilled part of the hold (bookings.edit). */
+  mayRelease?: boolean;
+  /** R13: the hold was released - the board reads its blocks again. */
+  onReleased?: () => void;
 }) {
   const colour = cleanHex(pick?.colorHex) ?? DESIGN.faint;
+  const holdBlock = pick?.block ?? null;
+  const hold = holdBlock ? holdStateOf(holdBlock) : null;
+  const [released, setReleased] = useState<ReleaseUnfilledResult | null>(null);
+  const [confirming, setConfirming] = useState<'all' | 'expired' | null>(null);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
 
   /* The calendar's block row carries no order: the block (cheap) says which order it belongs to. */
   const blockQuery = useQuery({
@@ -67,12 +83,29 @@ export function ClubBlockPopover({
   const order = orderQuery.data;
   const loading = pick !== null && (blockQuery.isLoading || (orderId !== null && orderId !== "" && orderQuery.isLoading));
   const ownedByOrder = orderId !== null && orderId !== "";
+  /* the block of the main board carries its order itself (stage 2); older servers need the block read above */
+  const effectiveOrderId = holdBlock?.clubOrderId || orderId || '';
+  const release = useMutation({
+    mutationFn: (onlyExpired: boolean) => clubOrdersApi.releaseUnfilled(effectiveOrderId, { onlyExpired }),
+    onSuccess: (result) => {
+      setReleased(result);
+      setConfirming(null);
+      setReleaseError(null);
+      onReleased?.();
+    },
+    onError: (error) => {
+      setConfirming(null);
+      setReleaseError(releaseFailedText(error));
+    },
+  });
+  /* the action exists where the server told us about the hold (a Stage 2 server), for a confirmed order, for who may edit bookings */
+  const canRelease = mayRelease && hold !== null && effectiveOrderId !== '' && released === null;
 
   const windows = order === undefined ? [] : orderWindows(order);
   const title = !pick
     ? ""
     : ownedByOrder
-      ? CAL_TEXT.clubPopover.orderTitle(orderCode(orderId), pick.clubName)
+      ? CAL_TEXT.clubPopover.orderTitle(holdBlock?.orderCode || orderCode(orderId), pick.clubName)
       : loading
         ? pick.clubName
         : `${CAL_TEXT.clubPopover.title(pick.clubName)} · ${rangeDates(pick.range)}`;
@@ -110,6 +143,11 @@ export function ClubBlockPopover({
             }}
           >
             <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, overflowWrap: "anywhere" }}>{title}</Typography>
+            {hold !== null && holdBlock !== null ? (
+              <Typography data-testid="club-popover-hold" data-hold={hold} sx={{ fontSize: 12.5, fontWeight: 700, mt: 0.5 }}>
+                {[holdLabel(hold), seatsLabel(holdBlock)].filter(Boolean).join(" · ")}
+              </Typography>
+            ) : null}
             {loading ? (
               <Skeleton variant="text" width="70%" aria-label={CAL_TEXT.clubPopover.loading} sx={{ mt: 0.5 }} />
             ) : ownedByOrder ? (
@@ -129,10 +167,45 @@ export function ClubBlockPopover({
               <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>{CAL_TEXT.clubPopover.hint}</Typography>
             )}
           </Box>
+          {released !== null ? (
+            <Alert severity="success" sx={{ m: 1.25, mb: 0 }} data-testid="club-popover-released">
+              {releaseSummary(released)}
+            </Alert>
+          ) : null}
+          {releaseError !== null ? (
+            <Alert severity="error" sx={{ m: 1.25, mb: 0 }} data-testid="club-popover-release-error">
+              {releaseError}
+            </Alert>
+          ) : null}
+          {confirming !== null ? (
+            <Box data-testid="club-popover-release-confirm" sx={{ m: 1.25, mb: 0, p: 1.25, border: "1px solid", borderColor: "warning.main", borderRadius: 2 }}>
+              <Typography sx={{ fontSize: 13 }}>{HOLD_TEXT.releaseConfirm(confirming === "expired")}</Typography>
+              <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
+                <Button onClick={() => setConfirming(null)} disabled={release.isPending} sx={{ minHeight: 44 }}>
+                  {HOLD_TEXT.back}
+                </Button>
+                <Button color="warning" variant="contained" disabled={release.isPending} onClick={() => release.mutate(confirming === "expired")} sx={{ minHeight: 44 }}>
+                  {HOLD_TEXT.releaseGo}
+                </Button>
+              </Box>
+            </Box>
+          ) : null}
           <Box sx={{ display: "flex", gap: 1, p: 1.25, justifyContent: "flex-end", flexWrap: "wrap" }}>
             <Button onClick={onClose} sx={{ minHeight: 44 }}>
               {CAL_TEXT.clubPopover.close}
             </Button>
+            {canRelease && confirming === null ? (
+              <>
+                {hold === "expired" ? (
+                  <Button variant="outlined" color="warning" onClick={() => setConfirming("expired")} sx={{ minHeight: 44 }} data-testid="club-release-expired">
+                    {HOLD_TEXT.releaseExpired}
+                  </Button>
+                ) : null}
+                <Button variant="outlined" color="warning" onClick={() => setConfirming("all")} sx={{ minHeight: 44 }} data-testid="club-release">
+                  {HOLD_TEXT.release}
+                </Button>
+              </>
+            ) : null}
             {ownedByOrder ? (
               <>
                 {order !== undefined && order.status === "Confirmed" && onEditTerms !== undefined ? (

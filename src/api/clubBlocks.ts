@@ -95,6 +95,12 @@ export interface ClubBlockView {
   athletes: ClubBlockAthlete[];
   /** Seats per činnost; `[]` (or absent) on a server that only knows the single headcount. */
   activitySeats?: ActivitySeatView[];
+  /** Stage 2, R13 (contract): the order's code and how far its hold has got; absent on an older server. */
+  orderCode?: string;
+  playersMissing?: boolean;
+  holdUntilUtc?: string;
+  holdExpired?: boolean;
+  expiredWindowCount?: number;
 }
 
 export interface ClubBlockInput {
@@ -327,6 +333,11 @@ export function toBlock(raw: unknown): ClubBlockView {
     createdAtUtc: str(r.createdAtUtc),
     athletes: toAthletes(r.athletes),
     activitySeats: toActivitySeats(r.activitySeats),
+    ...(typeof r.orderCode === 'string' && r.orderCode !== '' ? { orderCode: r.orderCode } : {}),
+    ...(typeof r.playersMissing === 'boolean' ? { playersMissing: r.playersMissing } : {}),
+    ...(typeof r.holdUntilUtc === 'string' && r.holdUntilUtc !== '' ? { holdUntilUtc: r.holdUntilUtc } : {}),
+    ...(typeof r.holdExpired === 'boolean' ? { holdExpired: r.holdExpired } : {}),
+    ...(typeof r.expiredWindowCount === 'number' ? { expiredWindowCount: r.expiredWindowCount } : {}),
   };
 }
 

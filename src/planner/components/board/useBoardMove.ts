@@ -43,6 +43,7 @@ import { pragueDateKey } from '../../../utils/time';
 import type { DayMark, IsoDate } from '../../model';
 import type { BoardCalendarData } from './boardCalendar';
 import { cellAtFraction, type BoardGeometry } from './boardGeometry';
+import { clubHolding, clubReservedText } from './clubHold';
 import type { BookingCardModel } from './boardModel';
 
 export interface MoveTarget {
@@ -55,6 +56,8 @@ export interface MoveTarget {
   range: MinuteRange;
   /** `null`: the card may land here. */
   refusal: MoveRefusal | null;
+  /** R13: when the place is a club's held time, "Rezervováno pro klub X" (said instead of the general "busy"). */
+  refusalNote?: string;
 }
 
 export interface MovingState {
@@ -263,7 +266,9 @@ export function useBoardMove(args: UseBoardMoveArgs) {
       ),
       capacity: activity?.parallelCapacity ?? 1,
     });
-    return { col, sub, subs, day, calendarId: fromCalendarId, range, refusal };
+    /* R13: a place a club holds says whose it is, not just "busy" */
+    const club = refusal === 'busy' ? clubHolding(cal.blocksByCalendar.get(fromCalendarId) ?? [], day, range) : null;
+    return { col, sub, subs, day, calendarId: fromCalendarId, range, refusal, ...(club ? { refusalNote: clubReservedText(club) } : {}) };
   };
 
   const toMoveRequest = (appointment: DayAppointment, target: MoveTarget): GridMoveRequest => {
@@ -369,7 +374,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
     if (target === null) return;
     if (samePlace(current.appointment, target.day, target.range, target.calendarId, current.fromCalendarId)) return;
     if (target.refusal !== null) {
-      args.onNotice({ text: `${GRID_TEXT.moveRefused} · ${refusalText(target.refusal)}`, tone: 'error' });
+      args.onNotice({ text: `${GRID_TEXT.moveRefused} · ${target.refusalNote ?? refusalText(target.refusal)}`, tone: 'error' });
       return;
     }
     const request = toMoveRequest(current.appointment, target);

@@ -27,6 +27,9 @@ import {
 import { usePlannerActions, usePlannerSelector, usePlannerStore } from '../state/PlannerStoreProvider';
 import { selectActivePreview } from '../state/selectors';
 import { Icon } from './Icons';
+import { useQuery } from '@tanstack/react-query';
+import { clubBlocksApi } from '../../api/clubBlocks';
+import { clubDaysOf } from './left/miniClubs';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../model/dayLock';
 import { usePlannerCtx, usePlannerModelState } from './context';
 import { MiniDayButton } from './left/MiniDayButton';
@@ -53,6 +56,19 @@ export function MiniCalendarPanel() {
   const holidayColor = effectiveHolidayColor(catalogue?.dayMarkColors.holiday ?? FALLBACK_HOLIDAY_COLOR);
   const holidayLook = lockedDayLook({ kind: 'holiday', label: null }, holidayColor);
   const closedLook = lockedDayLook({ kind: 'closed', label: null }, holidayColor);
+
+  /* R13: the days a club holds time on, from ONE read per shown month (the main planner only; the club planner and the demo draw none) */
+  const clubsOn = catalogue?.capabilities.mode === 'standard' && catalogue.capabilities.simulateBookings === false;
+  const firstCell = cells[0] ?? '';
+  const lastCell = cells[cells.length - 1] ?? '';
+  const clubBlocks = useQuery({
+    queryKey: ['mini-club-days', firstCell, lastCell],
+    queryFn: () => clubBlocksApi.list({ from: firstCell, to: lastCell, status: 'Active' }),
+    enabled: clubsOn && firstCell !== '',
+    staleTime: 60_000,
+    retry: false,
+  });
+  const clubsByDay = useMemo(() => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks), [cells, clubBlocks.data, dayMarks]);
 
   const [focusedDate, setFocusedDate] = useState<IsoDate | null>(null);
   const pendingFocus = useRef<IsoDate | null>(null);
@@ -180,6 +196,7 @@ export function MiniCalendarPanel() {
               otherMonth={!sameMonth(dateOf(date), monthDate)}
               previewing={!!preview && preview.date === date}
               today={date === ctx.today}
+              clubs={clubsByDay.get(date) ?? []}
               closed={mark?.closed
                 ? mark.kind === 'holiday'
                   ? { label: mark.label ?? null, color: holidayColor, kind: 'holiday', fill: holidayLook.fill, ink: holidayLook.ink }

@@ -5,6 +5,8 @@
  * The model (`miniCellModel`) computed the figures; this only draws them.
  */
 import type { MiniCellModel, MiniCellFlags } from '../../model';
+import { holdLabel } from '../board/clubHold';
+import type { MiniClubMark } from './miniClubs';
 
 export interface MiniDayButtonProps {
   model: MiniCellModel;
@@ -14,6 +16,8 @@ export interface MiniDayButtonProps {
   previewing: boolean;
   today: boolean;
   /** The day is closed (holiday, closure, absence) and in which colour its number is drawn. */
+  /** R13: the clubs that hold time on this day (a hatched mark in the club's colour; the words are in the label / title). */
+  clubs?: readonly MiniClubMark[];
   closed: { label: string | null; color: string; kind?: 'holiday' | 'closed'; fill?: string; ink?: string } | null;
   tabbable: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -26,7 +30,7 @@ export interface MiniDayButtonProps {
 const fixed = (n: number): string => n.toFixed(2);
 
 export function MiniDayButton({
-  model, flags, otherMonth, previewing, today, closed, tabbable,
+  model, flags, otherMonth, previewing, today, closed, tabbable, clubs = [],
   onClick, onEnter, onLeave, onFocus, onBlur,
 }: MiniDayButtonProps) {
   const classes = ['day-cell', 'spectrum-day'];
@@ -38,9 +42,12 @@ export function MiniDayButton({
   if (flags.focused) classes.push('is-focus-target', 'zoom-focus-target');
   if (today) classes.push('is-today');
   if (closed) classes.push('is-closed');
-  const ariaLabel = closed
+  const closedLabel = closed
     ? `${model.ariaLabel} · ${closed.kind === 'holiday' ? 'Svátek' : 'Zavřeno'}${closed.label ? `: ${closed.label}` : ''}`
     : model.ariaLabel;
+  /* R13: "Klub FK Slaný, Čeká na hráče" in the day's name, so the mark is not colour alone */
+  const clubWords = clubs.map((c) => ['Klub ' + c.club, c.orderCode, c.hold ? holdLabel(c.hold) : null].filter(Boolean).join(', '));
+  const ariaLabel = clubWords.length > 0 ? `${closedLabel} · ${clubWords.join(' · ')}` : closedLabel;
   const { ring } = model;
   return (
     <button
@@ -83,6 +90,11 @@ export function MiniDayButton({
               <span className="liquid-glint" />
             </span>
           </>
+        ) : null}
+        {clubs.length > 0 ? (
+          <span className="mini-clubs" data-testid={`mini-clubs-${model.date}`} aria-hidden="true">
+            {clubs.slice(0, 3).map((c) => <i key={c.key} data-hold={c.hold ?? undefined} style={{ '--club': c.colour } as React.CSSProperties} />)}
+          </span>
         ) : null}
         <span
           className="day-number"

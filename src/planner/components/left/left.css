@@ -84,3 +84,15 @@
 
 /* R6: with a holiday AND a closed day in view the legend has four entries: it wraps instead of clipping the last one */
 .sm-planner .spectrum-legend { flex-wrap: wrap; row-gap: 4px; justify-content: flex-start; column-gap: 12px; }
+
+/* R13: a day a club holds time on carries a short hatched bar in the club's colour under the number (the day's label says which club) */
+.sm-planner .day-cell .mini-clubs { position: absolute; left: 50%; bottom: 3px; display: flex; gap: 2px; transform: translateX(-50%); z-index: 6; pointer-events: none; }
+.sm-planner .day-cell .mini-clubs i {
+  width: 9px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: #002133;
+  background-image: repeating-linear-gradient(135deg, var(--club, #6e91a5) 0 2px, transparent 2px 4px);
+  outline: 1px solid var(--club, #6e91a5);
+}
+.sm-planner .day-cell .mini-clubs i[data-hold='expired'] { outline-style: dashed; }

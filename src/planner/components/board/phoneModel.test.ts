@@ -64,7 +64,7 @@ describe('the week strip', () => {
 
 describe('the month list', () => {
   const tile = (date: string, over: Partial<MonthTileModel> = {}): MonthTileModel => ({
-    date, dayNumber: Number(date.slice(8, 10)), otherMonth: false, count: 0, countLabel: null, flag: null, lock: null, inquiries: [], blocked: false, clubs: [], activities: [], calendars: [], ...over,
+    date, dayNumber: Number(date.slice(8, 10)), otherMonth: false, count: 0, countLabel: null, flag: null, lock: null, inquiries: [], blocked: false, clubs: [], clubItems: [], activities: [], calendars: [], ...over,
   });
 
   it('is one row per day of the month, with the figures written out', () => {

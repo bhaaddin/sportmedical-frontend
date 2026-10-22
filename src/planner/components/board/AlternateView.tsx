@@ -9,6 +9,7 @@ import { inRange, rangePill } from '../../../components/booking/calendar/model';
 import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
 import { Icon } from '../Icons';
+import { clubItemText } from './clubHold';
 import { groupDayRows, type DayListModel, type DayRowGroup, type DayRowModel, type MonthListModel } from './boardModel';
 import { agendaSlotLabel } from '../../model';
 import './month/month.css';
@@ -204,7 +205,15 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
                   {t.lock.reason ? <em>{t.lock.reason}</em> : null}
                 </small>
               ) : t.flag ? <small className="tile-flag">{t.flag}</small> : null}
-              {t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}
+              {t.clubItems.length > 0
+                ? t.clubItems.slice(0, 2).map((c) => (
+                    /* R13: a club's day is a hatched, locked bar in the club's colour - name, order code and the hold state in words */
+                    <small key={c.key} className="tile-club is-held" data-testid={`tile-club-${t.date}`} data-hold={c.hold ?? undefined} title={t.clubs.join(' · ')} style={{ '--club': c.colour } as CSSProperties}>
+                      <Icon name="lock" />
+                      <span>{clubItemText(c)}</span>
+                    </small>
+                  ))
+                : t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}
               {t.clubs.length > 2 ? <small className="tile-club tile-club-more" title={t.clubs.join(' · ')}>{`+${t.clubs.length - 2}`}</small> : null}
               {t.calendars.length > 0 ? (
                 <span className="tile-calendars" data-testid={`tile-calendars-${t.date}`} aria-label={t.calendars.map((c) => `${c.name}: ${c.count}`).join(', ')}>

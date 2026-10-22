@@ -5,6 +5,7 @@
  * own classes (`phone.css`); "Týden" stays the board with one day at a time. Every target is at least 44 px tall.
  */
 import { useRef, useState, type CSSProperties, type TouchEvent } from 'react';
+import { Icon } from '../Icons';
 import { InquiryChip } from './AlternateView';
 import { PLANNER_TEXT } from '../../text';
 import type { InquiryRef } from '../../model/inquiries';
@@ -29,8 +30,8 @@ function PhoneEntryRow({ entry, onOpenEntry, member = false }: { entry: PhoneEnt
         <span className="phone-entry-bar" style={entry.colour ? { background: entry.colour } : undefined} aria-hidden="true" />
         <span className="phone-entry-time">{entry.timeLabel}</span>
         <span className="phone-entry-main">
-          <strong>{entry.title}</strong>
-          {entry.sub ? <small>{entry.sub}</small> : null}
+          <strong>{entry.kind === 'club' ? <Icon name="lock" /> : null}{entry.title}</strong>
+          {entry.sub ? <small data-testid={entry.kind === 'club' ? 'phone-club-sub' : undefined}>{entry.sub}</small> : null}
         </span>
         <span className="phone-entry-tail">
           {entry.tail ? <span>{entry.tail}{folded ? <span aria-hidden="true"> {open ? '▴' : '▾'}</span> : null}</span> : null}

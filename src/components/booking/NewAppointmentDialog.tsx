@@ -30,6 +30,7 @@ import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
 import { isOverrideForbidden, workerBusyOf } from "../../api/workerBusy";
+import { lunchErrorText, lunchExceptionsApi } from "../../api/lunchExceptions";
 import { WorkerBusyNotice } from "./WorkerBusyNotice";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
@@ -268,6 +269,12 @@ interface NewAppointmentDialogProps {
    */
   initialServiceId?: string;
   /**
+   * Stage 2, R17 ("Objednat pacienta sem" on the lunch band): the chosen time is the lunch, which the offer never lists. The booking
+   * goes to `POST .../appointments/into-lunch`, which removes THAT day's lunch and books (rolled back when the booking is refused);
+   * the weekly lunch is untouched. A quick registration cannot be made this way.
+   */
+  intoLunch?: boolean;
+  /**
    * Etapa 12, "rovnou na bublinku". The box of the slot the desk clicked or
    * marked in the grid, in VIEWPORT pixels - exactly `getBoundingClientRect()`
    * of the slot element at the moment of opening:
@@ -312,6 +319,7 @@ export function NewAppointmentDialog({
   initialQuick = false,
   initialActivityId,
   initialServiceId,
+  intoLunch = false,
   onFindNextFree,
   anchor,
 }: NewAppointmentDialogProps) {
@@ -604,7 +612,8 @@ export function NewAppointmentDialog({
      here lets a start through that the server's list does not hold - a minute that is not listed gets the nearest free ones. */
   const [freeDraft, setFreeDraft] = useState("");
   const listed = isStartOffered(availabilityQuery.data, startUtc);
-  const offered = listed;
+  /* R17: a lunch slot is not in the offer by design - the into-lunch call is its own check (and the server has the last word) */
+  const offered = listed || intoLunch;
   const currentSlot = (availabilityQuery.data ?? []).find(
     (s) => startUtc !== null && Date.parse(s.startUtc) === Date.parse(startUtc),
   );
@@ -647,7 +656,18 @@ export function NewAppointmentDialog({
          checks and its warnings. An event with nobody behind it goes through
          the unregistered path. (A new caller is "Rychlá registrace" - `bookQuick`.) */
       let view: BookedView;
-      if (patient !== null) {
+      if (intoLunch) {
+        /* R17: the day's lunch goes and the booking comes, in one call that is undone as a whole when the booking is refused */
+        const booked = await lunchExceptionsApi.bookIntoLunch(effectiveCalendarId, {
+          ...(patient !== null ? { patientId: patient.id } : { name: eventName.trim() }),
+          activityId: activity?.id ?? "",
+          startUtc: startUtc ?? "",
+          note: noteOrNull,
+          agreedPriceCzk: price.agreedPriceCzk,
+          ...(input.overrideReason ? { overrideReason: input.overrideReason } : {}),
+        });
+        view = { startUtc: booked.appointment.startUtc, warnings: booked.warnings ?? [], link: null, linkFailed: false, patientId: patient?.id ?? null };
+      } else if (patient !== null) {
         const result = await appointmentsApi.create({
           patientId: patient.id,
           calendarId: effectiveCalendarId,
@@ -723,6 +743,7 @@ export function NewAppointmentDialog({
    */
   const bookQuick = useMutation({
     mutationFn: async (input: { overrideReason?: string }): Promise<QuickBookedView> => {
+      if (intoLunch) throw new QuickRegisterError("Do oběda nejde zapsat rychlou registraci. Zvolte pacienta z databáze nebo jméno.");
       const name = splitFullName(quick.name);
       const phone = normalizePhone(quick.phone);
       if (!name || !phone || !activity || !startUtc) {

@@ -20,6 +20,8 @@ import { patientsApi } from '../../../api/patients';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { DOUBLE_TAP_MS, DRAG_THRESHOLD_PX } from '../../../components/booking/grid/moveDrag';
 import { Icon } from '../Icons';
+import { holdLabel, holdStateOf, seatsLabel } from './clubHold';
+import type { LunchBandHandlers } from './useLunch';
 import { accentCss } from '../../../accent';
 import { toneVars, withAlpha, type BookingCardModel, type BoardWindowModel, type SessionCardModel } from './boardModel';
 
@@ -252,6 +254,7 @@ export function BookingCard({
 
 export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; onOpen: (w: BoardWindowModel, point: { x: number; y: number }) => void }) {
   const manual = w.kind === 'manual';
+  const hold = manual ? null : holdStateOf(w.block);
   const style = {
     left: w.left,
     width: w.width,
@@ -271,17 +274,67 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
       data-kind={w.kind}
       data-testid={`board-window-${w.block.id}-${w.day}`}
       aria-haspopup="dialog"
-      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `Blok klubu ${w.label}, ${w.timeLabel}`}
-      title={manual ? undefined : `Blok klubu · ${w.label} · ${w.timeLabel}`}
+      data-hold={hold ?? undefined}
+      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `Blok klubu ${w.label}, ${w.timeLabel}${w.block.orderCode ? `, objednávka ${w.block.orderCode}` : ''}${hold ? `, ${holdLabel(hold)}` : ''}`}
+      title={manual ? undefined : [`Blok klubu · ${w.label}`, w.block.orderCode, w.timeLabel, hold ? holdLabel(hold) : null, seatsLabel(w.block)].filter(Boolean).join(' · ')}
       onClick={(e) => {
         e.stopPropagation();
         onOpen(w, { x: e.clientX, y: e.clientY });
       }}
     >
       <span className="board-sticky">
+        {!manual ? <Icon name="lock" /> : null}
         <span className="win-label">{w.label}</span>
+        {!manual && w.block.orderCode ? <span className="win-code" data-testid="club-window-code">{w.block.orderCode}</span> : null}
         {!manual ? <span className="win-time" data-testid="club-window-time">{w.timeLabel}</span> : null}
+        {hold ? <span className="win-hold" data-testid="club-window-hold" data-hold={hold}>{holdLabel(hold)}</span> : null}
       </span>
     </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The OBĚD band (R17)                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The lunch of a day: a hatched band that says what it is ("Oběd", "Oběd · přesunut", "Oběd · smazán dnes" for the ghost of a
+ * removed one). With `handlers` (a Stage 2 server and a user who may edit) it is a button that opens the pop-out and can be dragged.
+ */
+export function LunchBandEl({
+  day,
+  col,
+  box,
+  state,
+  colour,
+  handlers,
+}: {
+  day: string;
+  col: number;
+  box: { top: number; height: number; from: string; to: string };
+  state: 'weekly' | 'moved' | 'removed';
+  colour: string;
+  handlers: LunchBandHandlers | null;
+}) {
+  const label = state === 'moved' ? 'Oběd · přesunut' : state === 'removed' ? 'Oběd · smazán dnes' : 'Oběd';
+  const props = {
+    className: `board-shade is-lunch${state === 'weekly' ? '' : ` is-${state}`}${handlers ? ' is-clickable' : ''}`,
+    style: {
+      '--col': col,
+      top: box.top,
+      height: box.height,
+      '--shade-line': withAlpha(colour, 0.8),
+      '--shade-hatch': `repeating-linear-gradient(135deg, ${withAlpha(colour, 0.22)} 0px, ${withAlpha(colour, 0.22)} 7px, ${withAlpha(colour, 0.07)} 7px, ${withAlpha(colour, 0.07)} 14px)`,
+    } as CSSProperties,
+    'data-testid': `lunch-${day}`,
+    'data-lunch': state,
+    title: `${label} ${box.from}–${box.to}`,
+  };
+  return handlers ? (
+    <button type="button" {...props} {...handlers} aria-haspopup="dialog" aria-label={`${label}, ${box.from}–${box.to}`}>
+      {label}
+    </button>
+  ) : (
+    <div {...props}>{label}</div>
   );
 }

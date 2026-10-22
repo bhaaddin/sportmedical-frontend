@@ -646,3 +646,50 @@
 .sm-planner .board-clash .icon { width: 12px; height: 12px; }
 .sm-planner .board-clash b { font-weight: 800; letter-spacing: 0.02em; }
 .sm-planner .board-clash small { font-size: 9.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+
+/* ---- R13: a club's held time says it is held: lock, order code and the hold state in words (never by colour alone) ---- */
+.sm-planner .board-window.is-club .icon { width: 12px; height: 12px; opacity: 0.9; }
+.sm-planner .board-window .win-code { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; opacity: 0.9; white-space: nowrap; }
+.sm-planner .board-window .win-hold { margin-top: 2px; padding: 1px 7px; border-radius: 99px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap; color: #e9f6fb; background: rgba(0, 20, 33, 0.78); border: 1px solid currentColor; }
+.sm-planner .board-window .win-hold[data-hold='full'] { color: #9ff2cf; }
+.sm-planner .board-window .win-hold[data-hold='waiting'] { color: #ffe08a; }
+.sm-planner .board-window .win-hold[data-hold='expired'] { color: #ffb4a8; }
+.sm-planner .board-window[data-hold='expired'] { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
+/* R13: a club's day in the month is a hatched, locked bar in the club's colour (the colour is a mark, the words say the state) */
+.sm-planner .month-tile .tile-club.is-held {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  border-left: 3px solid var(--club, #6e91a5);
+  border-radius: 4px;
+  background-color: #002133;
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--club, #6e91a5) 24%, transparent) 0 6px, color-mix(in srgb, var(--club, #6e91a5) 6%, transparent) 6px 12px);
+  color: #e9f6fb;
+}
+.sm-planner .month-tile .tile-club.is-held .icon { width: 11px; height: 11px; flex: none; }
+.sm-planner .month-tile .tile-club.is-held[data-hold='expired'] { border-top: 1px dashed #ffb4a8; border-right: 1px dashed #ffb4a8; border-bottom: 1px dashed #ffb4a8; }
+
+/* ---- R17: the OBĚD band can be clicked (pop-out) and dragged; a moved lunch says so, a removed one leaves a dashed ghost to bring back ---- */
+.sm-planner .board-shade.is-lunch.is-clickable { pointer-events: auto; cursor: pointer; font-family: inherit; touch-action: none; min-height: 22px; }
+.sm-planner .board-shade.is-lunch.is-clickable:hover { filter: brightness(1.3); }
+.sm-planner .board-shade.is-lunch.is-clickable:focus-visible { outline: 2px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); outline-offset: 1px; }
+.sm-planner .board-shade.is-lunch.is-moved { border-style: solid; letter-spacing: 0.06em; }
+.sm-planner .board-shade.is-lunch.is-removed { background-image: none; background-color: transparent; border-style: dashed; opacity: 0.85; letter-spacing: 0.06em; }
+.sm-planner .board-shade.board-lunch-ghost {
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+  z-index: 6;
+  border: 2px solid #f7e9a8;
+  border-radius: 5px;
+  background: rgba(247, 233, 168, 0.22);
+  color: #fff7d1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.sm-planner .board-shade.board-lunch-ghost.is-invalid { border-color: #ff8a80; background: rgba(255, 138, 128, 0.22); color: #ffd7d3; }

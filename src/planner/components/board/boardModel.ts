@@ -22,6 +22,7 @@ import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, span
 import { inFilter } from '../../model/services';
 import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
 import { workerClashes, type RosterWorker, type WorkerClashModel } from './workerClash';
+import type { ClubDayItem } from './clubHold';
 import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
@@ -179,7 +180,9 @@ export interface DayShadeModel {
   /** Outside working hours: above the opening and below the closing. */
   before: { top: number; height: number } | null;
   after: { top: number; height: number } | null;
-  lunch: { top: number; height: number; from: string; to: string } | null;
+  lunch: { top: number; height: number; from: string; to: string; moved?: boolean; original?: { from: string; to: string } } | null;
+  /** R17: where the lunch was before it was removed for this day only (drawn as a dashed, clickable ghost). */
+  lunchRemoved: { top: number; height: number; from: string; to: string } | null;
 }
 
 /** A calendar that does not work on a day the others do: its sub-column is hatched (reviewer 2.4). */
@@ -560,7 +563,13 @@ function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayM
     const lunchTo = minutesOfClock(mark.lunch?.to);
     const lunch =
       !mark.closed && hasHours && lunchFrom !== null && lunchTo !== null && lunchTo > lunchFrom
-        ? { ...boxOfSpan(g, lunchFrom, lunchTo), from: mark.lunch!.from, to: mark.lunch!.to }
+        ? { ...boxOfSpan(g, lunchFrom, lunchTo), from: mark.lunch!.from, to: mark.lunch!.to, ...(mark.lunch!.moved ? { moved: true } : {}), ...(mark.lunch!.original ? { original: mark.lunch!.original } : {}) }
+        : null;
+    const removedFrom = minutesOfClock(mark.lunchRemoved?.from);
+    const removedTo = minutesOfClock(mark.lunchRemoved?.to);
+    const lunchRemoved =
+      !mark.closed && hasHours && removedFrom !== null && removedTo !== null && removedTo > removedFrom
+        ? { ...boxOfSpan(g, removedFrom, removedTo), from: mark.lunchRemoved!.from, to: mark.lunchRemoved!.to }
         : null;
     const before = !mark.closed && hasHours && from! > g.startMinutes ? boxOfSpan(g, g.startMinutes, from!) : null;
     const after = !mark.closed && hasHours && to! < g.endMinutes ? boxOfSpan(g, to!, g.endMinutes) : null;
@@ -575,6 +584,7 @@ function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayM
       before,
       after,
       lunch,
+      lunchRemoved,
     });
   });
   return out;
@@ -876,6 +886,8 @@ export interface MonthTileModel {
   blocked: boolean;
   /** The windows of clubs on this day ("FK Slaný · 08:00–16:00"), one line each - the club order shows in the month. */
   clubs: string[];
+  /** R13: the same windows with the club's colour, the order code and the hold state (the tile draws them as hatched, locked bars). */
+  clubItems: ClubDayItem[];
   /** The day by činnost (reviewer 2.2): "Komplexní prohlídka ×10", not a count of terms; the order of the činnosti. */
   activities: TileActivity[];
   /** The day by calendar when the week splits per calendar (reviewer 2.4): a count under each calendar's chip; empty otherwise. */
@@ -916,6 +928,7 @@ export function monthTilesModel(
     inquiries?: ReadonlyMap<string, InquiryRef[]>;
     blockedDays?: ReadonlySet<string>;
     clubLines?: ReadonlyMap<string, string[]>;
+    clubItems?: ReadonlyMap<string, ClubDayItem[]>;
     /** R6: the holiday colour of the display settings (the default red when none). */
     holidayColor?: string | null;
     /** The calendars the days are split into (reviewer 2.4): each tile counts its bookings per calendar. */
@@ -992,6 +1005,7 @@ export function monthTilesModel(
         inquiries: extras.inquiries?.get(t.date) ?? [],
         blocked: extras.blockedDays?.has(t.date) ?? false,
         clubs: extras.clubLines?.get(t.date) ?? [],
+        clubItems: extras.clubItems?.get(t.date) ?? [],
         activities: [...(mix.get(t.date)?.values() ?? [])].sort((a, b) => order(a.categoryId) - order(b.categoryId) || a.name.localeCompare(b.name, 'cs')),
         calendars: columns
           ? columns.map((c) => ({ id: c.id, name: c.name, colour: cleanHex(c.color), count: perCalendar.get(t.date)?.get(c.id) ?? 0 }))
