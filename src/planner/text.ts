@@ -67,7 +67,7 @@ export const PLANNER_TEXT = {
       /* the week and day boards */
       board: 'Vyberte činnost dole a táhněte v kalendáři. Klepnutí na den v měsíci vezme celý den.',
       month: 'Vyberte činnost dole a klepněte na den: vezme se celý. Tažením vyberete víc dnů najednou.',
-      phone: 'Vyberte činnost dole a klepněte na den: vezme se celý. Vzít zpět jde tlačítkem Zpět.',
+      phone: 'Vyberte činnost v kartách níže a klepněte na den: vezme se celý. Vzít zpět jde tlačítkem Zpět.',
       armedBoard: 'Činnost je vybraná. Teď táhněte v kalendáři přes čas termínu.',
       armedMonth: 'Činnost je vybraná. Teď klepněte na den: vezme se celý.',
     },

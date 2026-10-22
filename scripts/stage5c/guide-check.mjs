@@ -77,6 +77,15 @@ async function startOrder(page, clubId, service, seats) {
   await page.waitForTimeout(1200);
 }
 
+/** Bring the strip into the window (the compact planner scrolls inside itself; the page never does). */
+async function showStrip(page) {
+  await page.evaluate(() => {
+    const scroller = document.querySelector('#planning-cards')?.closest('.sm-planner.is-compact');
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  });
+  await page.waitForTimeout(400);
+}
+
 async function flow(browser, size) {
   console.log(`\n=== ${size} ${SIZES[size].width}x${SIZES[size].height}`);
   const page = await newPage(browser, size);
@@ -88,7 +97,8 @@ async function flow(browser, size) {
   /* (a) an empty order: one calm hint with the real gestures */
   await page.waitForSelector('[data-testid=guide-hint]', { timeout: 20000 });
   const a = await text(page, '[data-testid=guide-hint]');
-  check(/Vyberte činnost dole/.test(a) && (size === 'phone' ? /celý/.test(a) : /táhněte v kalendáři/.test(a)), `(a) start hint: "${a.slice(0, 110)}"`);
+  check(/Vyberte činnost/.test(a) && (size === 'phone' ? /celý/.test(a) : /táhněte v kalendáři/.test(a)), `(a) start hint: "${a.slice(0, 110)}"`);
+  await showStrip(page); // the phone's strip (and the hint above it) lies below the fold
   check((await page.locator('[data-testid=guide-hint]').count()) === 1, '(a) exactly one hint');
   await snap(page, size, 'a-start');
   await inViewport(page, '[data-testid=guide-hint]', '(a) hint');
@@ -231,6 +241,7 @@ async function stripFlow(browser, size) {
   check((await page.locator('[data-testid=guide-hint]').count()) === 1, '(f) still exactly one hint');
   const t = await text(page, '[data-testid=guide-hint]');
   check(/Činností je víc, než se vejde/i.test(t) && /Ještě \d+/i.test(t), `(f) strip hint: "${t.slice(0, 140)}"`);
+  await showStrip(page);
   await snap(page, size, 'f-strip');
   await inViewport(page, '[data-testid=guide-hint]', '(f) hint');
   await targets44(page, '[data-testid=guide-hint]', '(f) hint');
