@@ -205,7 +205,7 @@ describe('ClubsPage', () => {
     expect(screen.getByRole('heading', { name: 'FK Slaný' })).toBeInTheDocument();
   });
 
-  it("opens the club's own screen, `/clubs/:clubId` - the planner in club mode, not a page of stacked cards", async () => {
+  it("opens the club's own PAGE, `/clubs/:clubId` - not the planner, not a page of stacked cards", async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
     const cards = await screen.findAllByRole('listitem');
@@ -213,7 +213,7 @@ describe('ClubsPage', () => {
 
     await user.click(cards[0]);
 
-    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/club-1');
+    expect((await screen.findByTestId('elsewhere')).textContent).toMatch(/^\/clubs\/club-1(?!\/)/);
     /* the list stays where it was: nothing of the old detail page is drawn here any more */
     expect(screen.queryByTestId('club-detail')).toBeNull();
   });
@@ -350,7 +350,7 @@ describe('ClubsPage in three layouts', () => {
     render(<Wrap><ClubsPage /></Wrap>);
     const cards = await screen.findAllByRole('listitem');
     await user.click(cards[1]);
-    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/club-2');
+    expect((await screen.findByTestId('elsewhere')).textContent).toMatch(/^\/clubs\/club-2(?!\/)/);
   });
 });
 
@@ -385,11 +385,17 @@ describe('ClubsPage with club blocks', () => {
 });
 
 describe('ClubsPage router state', () => {
-  it("sends a club window's hand-off to the club's screen, landing on that block", async () => {
+  it('sends a club (no window) to that club page', async () => {
+    render(<Wrap state={{ clubId: 'club-2' }}><ClubsPage /></Wrap>);
+    const where = await screen.findByTestId('elsewhere');
+    expect(where.textContent).toMatch(/^\/clubs\/club-2(?!\/)/);
+  });
+
+  it("sends a club window's hand-off to the club's calendar, landing on that block", async () => {
     listBlocks.mockResolvedValue([block({ id: 'b-1', clubId: 'club-2' }), block({ id: 'b-2', clubId: 'club-2', fromDate: day2, toDate: day2 })]);
     render(<Wrap state={{ clubId: 'club-2', clubBlockId: 'b-2' }}><ClubsPage /></Wrap>);
     const where = await screen.findByTestId('elsewhere');
-    expect(where).toHaveTextContent('/clubs/club-2');
+    expect(where).toHaveTextContent('/clubs/club-2/kalendar');
     expect(where).toHaveTextContent('{"clubBlockId":"b-2"}');
   });
 
@@ -397,7 +403,7 @@ describe('ClubsPage router state', () => {
     listBlocks.mockResolvedValue([block({ id: 'b-7', clubId: 'club-2' })]);
     render(<Wrap state={{ clubBlockId: 'b-7' }}><ClubsPage /></Wrap>);
     const where = await screen.findByTestId('elsewhere');
-    expect(where).toHaveTextContent('/clubs/club-2');
+    expect(where).toHaveTextContent('/clubs/club-2/kalendar');
     expect(where).toHaveTextContent('{"clubBlockId":"b-7"}');
   });
 

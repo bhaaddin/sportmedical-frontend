@@ -3,8 +3,8 @@ import type { Invoice } from '../../../api/billing';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import { toOrder, type ClubOrderView, type ClubSummary } from '../../../api/clubOrders';
 import {
-  DENIED_HINT, FAILED_HINT, MAX_METRICS, METRIC_KEYS, clubMetrics, contactLine, focusOrder, historyPath, nextTerms, orderCards, recentChanges,
-  statusLine, type MetricInput,
+  DENIED_HINT, FAILED_HINT, LOADING_HINT, MAX_METRICS, METRIC_KEYS, clubMetrics, contactLine, focusOrder, historyPath, nextTerms, orderCards, recentChanges,
+  newestOrderIds, statusLine, type MetricInput,
 } from './clubOverviewModel';
 
 const TODAY = '2026-10-22';
@@ -119,6 +119,14 @@ describe('clubMetrics', () => {
       expect(byKey(m, 'ordered').value).toBeNull();
       expect(byKey(m, 'ordered').hint).toBe(FAILED_HINT);
     });
+    it('invoices still on their way -> a dash that says so (the rest of the shelf is not held back)', () => {
+      const m = clubMetrics(base({ invoices: 'loading' }));
+      for (const k of ['invoiced', 'paid']) {
+        expect(byKey(m, k).value).toBeNull();
+        expect(byKey(m, k).hint).toBe(LOADING_HINT);
+      }
+      expect(byKey(m, 'ordered').value).toBe(1800);
+    });
     it('invoices failed or denied -> invoiced and paid unknown, each with its reason', () => {
       const failed = clubMetrics(base({ invoices: 'failed' }));
       const denied = clubMetrics(base({ invoices: 'denied' }));
@@ -174,6 +182,20 @@ describe('recentChanges', () => {
     expect(recentChanges([order(A)])).toEqual([]);
     const m = recentChanges([order(A, { history: [{ atUtc: '', user: '', text: 'bez času' }, ...history(1, 5)] })]);
     expect(m.map((c) => c.text)).toEqual(['změna 5-0', 'bez času']);
+  });
+});
+
+describe('newestOrderIds', () => {
+  it('is the orders touched last, newest first, at most three - any status', () => {
+    const orders = [
+      order(A, { createdAtUtc: '2026-01-01T00:00:00Z' }),
+      order(B, { createdAtUtc: '2026-02-01T00:00:00Z', confirmedAtUtc: '2026-10-10T00:00:00Z' }),
+      order(C, { createdAtUtc: '2026-03-01T00:00:00Z', status: 'Cancelled' }),
+      order('80e74a6c-0000-4000-8000-00000000000d', { createdAtUtc: '2026-04-01T00:00:00Z' }),
+    ];
+    expect(newestOrderIds(orders)).toEqual([B, '80e74a6c-0000-4000-8000-00000000000d', C]);
+    expect(newestOrderIds(orders, 1)).toEqual([B]);
+    expect(newestOrderIds([])).toEqual([]);
   });
 });
 

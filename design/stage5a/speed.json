@@ -1,0 +1,56 @@
+{
+  "base": "http://localhost:3009",
+  "delayMs": 80,
+  "club": "FK Slaný",
+  "runs": 3,
+  "variants": {
+    "nav": {
+      "median": {
+        "readyMs": 491,
+        "requests": 9,
+        "depth": 2
+      },
+      "runs": [
+        {
+          "readyMs": 491,
+          "requests": 9,
+          "depth": 2
+        },
+        {
+          "readyMs": 492,
+          "requests": 9,
+          "depth": 2
+        },
+        {
+          "readyMs": 490,
+          "requests": 9,
+          "depth": 2
+        }
+      ]
+    },
+    "nav-hover": {
+      "median": {
+        "readyMs": 597,
+        "requests": 9,
+        "depth": 3
+      },
+      "runs": [
+        {
+          "readyMs": 550,
+          "requests": 9,
+          "depth": 3
+        },
+        {
+          "readyMs": 612,
+          "requests": 9,
+          "depth": 3
+        },
+        {
+          "readyMs": 597,
+          "requests": 9,
+          "depth": 3
+        }
+      ]
+    }
+  }
+}

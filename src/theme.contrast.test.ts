@@ -40,6 +40,12 @@ describe('booking surfaces: text on the soft selected card (činnost card, mode 
     expect(contrastRatio(accentInkOf(theme), card)).toBeGreaterThanOrEqual(AA);
   });
 
+  it.each(['light', 'dark'] as const)('%s: secondary text reads on the PAGE background too (shelf pages draw their captions straight on it)', (mode) => {
+    const theme = buildTheme(ACCENTS[0]![1], mode);
+    const page = theme.palette.background.default;
+    expect(contrastRatio(theme.palette.text.secondary, page)).toBeGreaterThanOrEqual(AA);
+  });
+
   it('the dark theme no longer leaves ACCENT_SOFT on its light fallback', () => {
     for (const [, color] of ACCENTS) {
       const theme = buildTheme(color, 'dark');

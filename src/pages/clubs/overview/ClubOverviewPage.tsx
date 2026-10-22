@@ -17,7 +17,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Button, ButtonBase, LinearProgress, Skeleton, Typography } from '@mui/material';
 import { CalendarMonth, Edit, Add } from '@mui/icons-material';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../../../api/billing';
 import { clubBlocksApi } from '../../../api/clubBlocks';
 import { clubOrdersApi } from '../../../api/clubOrders';
@@ -34,7 +34,7 @@ import { pragueDateKey } from '../../../utils/time';
 import { EntityCard, MetricCard, PageFrame, PinButton, Shelf, TARGET_SX, MUTED_SX, rememberOpened } from '../../../ui/shelf';
 import { canBeInvoiced } from '../payerForm';
 import {
-  clubMetrics, contactLine, focusOrder, historyPath, nextTerms, orderCards, recentChanges, type InvoiceSource, type Source,
+  clubMetrics, contactLine, focusOrder, historyPath, newestOrderIds, nextTerms, orderCards, recentChanges, type InvoiceSource, type Source,
 } from './clubOverviewModel';
 
 const PayerDialog = lazy(() => import('../PayerDialog').then((m) => ({ default: m.PayerDialog })));
@@ -78,6 +78,12 @@ export default function ClubOverviewPage() {
     enabled: mayBill && clubId !== '',
     staleTime: 60_000,
     retry: false,
+  });
+
+  /* The list answers carry no history; an order's own answer does. Read the few orders touched last (the key the order panel and the history page share). */
+  const recentIds = useMemo(() => newestOrderIds(ordersQuery.data ?? []), [ordersQuery.data]);
+  const detailQueries = useQueries({
+    queries: recentIds.map((id) => ({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000, retry: false })),
   });
 
   const [editing, setEditing] = useState(false);
@@ -124,8 +130,9 @@ export default function ClubOverviewPage() {
   const orders: Source<NonNullable<typeof ordersQuery.data>> = ordersQuery.data ?? 'failed';
   const blocks: Source<NonNullable<typeof blocksQuery.data>> = blocksQuery.data !== undefined ? blocksQuery.data.filter((b) => b.clubId === clubId) : 'failed';
   const summary: Source<NonNullable<typeof summaryQuery.data>> = summaryQuery.data ?? 'failed';
-  const invoices: InvoiceSource = !mayBill ? 'denied' : invoicesQuery.data !== undefined ? invoicesQuery.data : 'failed';
-  const coreLoading = ordersLoading || blocksQuery.isLoading || summaryQuery.isLoading || (mayBill && invoicesQuery.isLoading);
+  const invoices: InvoiceSource = !mayBill ? 'denied' : invoicesQuery.data !== undefined ? invoicesQuery.data : invoicesQuery.isLoading ? 'loading' : 'failed';
+  /* the invoices are read behind the rest: their two cards say "Načítám…" instead of holding the shelf back */
+  const coreLoading = ordersLoading || blocksQuery.isLoading || summaryQuery.isLoading;
   const allCoreFailed = orders === 'failed' && blocks === 'failed' && summary === 'failed';
   const retryCore = () => {
     void ordersQuery.refetch();
@@ -138,7 +145,10 @@ export default function ClubOverviewPage() {
   const metrics = clubMetrics({ clubId, today, orders, blocks, summary, invoices });
   const cards = orderCards(orderList);
   const terms = nextTerms(blocks === 'failed' ? [] : blocks, orderList, today);
-  const changes = recentChanges(orderList);
+  const detailsLoading = detailQueries.some((q) => q.isLoading);
+  const detailsFailed = detailQueries.length > 0 && detailQueries.every((q) => q.isError);
+  const someDetailsFailed = !detailsFailed && detailQueries.some((q) => q.isError);
+  const changes = recentChanges(detailQueries.flatMap((q) => (q.data !== undefined ? [q.data] : [])));
   const focus = orders === 'failed' ? null : focusOrder(orderList, blocks === 'failed' ? [] : blocks, today);
   const linkOrder = focus !== null && focus.status !== 'Cancelled' ? focus : null;
   const invoiceable = canBeInvoiced(club);
@@ -259,12 +269,13 @@ export default function ClubOverviewPage() {
         <Shelf
           id="club-changes"
           title="Poslední změny"
-          count={orders === 'failed' ? undefined : changes.length}
+          hint={someDetailsFailed ? 'Část historie se nepodařilo načíst.' : orderList.length > 0 ? `Z ${Math.min(orderList.length, recentIds.length)} naposledy změněných objednávek` : undefined}
+          count={orders === 'failed' || detailsFailed ? undefined : changes.length}
           layout="list"
           maxHeight="min(40dvh, 360px)"
-          loading={ordersLoading}
-          error={orders === 'failed' ? 'Historii klubu se nepodařilo načíst.' : false}
-          onRetry={() => void ordersQuery.refetch()}
+          loading={ordersLoading || detailsLoading}
+          error={orders === 'failed' ? 'Historii klubu se nepodařilo načíst.' : detailsFailed ? 'Historii objednávek se nepodařilo načíst.' : false}
+          onRetry={() => { void ordersQuery.refetch(); detailQueries.forEach((q) => void q.refetch()); }}
           empty={changes.length === 0}
           emptyState={{ text: 'Zatím se nic nezměnilo.' }}
           viewAll={focus !== null ? { to: historyPath(focus.id), label: 'Celá historie' } : undefined}

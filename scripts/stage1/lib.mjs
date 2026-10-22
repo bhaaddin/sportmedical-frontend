@@ -6,7 +6,7 @@ import { api as _api, waitPlanner as _wait, BASE as _BASE } from '../club-planni
 
 /** Like startClubOrder, but the služba is chosen by (part of) its name and the činnosti are an array [name, seats]. */
 export async function startOrderIn(page, clubId, serviceName, seats) {
-  await page.goto(`${_BASE}/clubs/${clubId}`);
+  await page.goto(`${_BASE}/clubs/${clubId}/kalendar`);
   await _wait(page);
   await page.click('[data-testid=ov-new-order], [data-testid=deck-empty-new]');
   await page.click('[data-testid=entry-phone]');

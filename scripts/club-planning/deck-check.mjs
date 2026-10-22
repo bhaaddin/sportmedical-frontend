@@ -59,7 +59,7 @@ async function findOrMakeClub(page) {
 
 /** Club page -> "Nová objednávka klubu" -> "Vyplním sám" -> the service by name -> seats -> "Vybrat termíny v kalendáři". */
 async function startOrder(page, clubId, service, seats) {
-  await page.goto(`${BASE}/clubs/${clubId}`);
+  await page.goto(`${BASE}/clubs/${clubId}/kalendar`);
   await waitPlanner(page);
   await page.click('[data-testid=ov-new-order], [data-testid=deck-empty-new]');
   await page.click('[data-testid=entry-phone]');

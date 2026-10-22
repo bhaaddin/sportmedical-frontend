@@ -99,7 +99,7 @@ const clubId = await page.evaluate(async () => {
   const list = r.ok ? await r.json() : [];
   return Array.isArray(list) ? (list[0]?.clubId ?? null) : null;
 });
-if (clubId) PAGES.push({ name: 'club screen', shot: 'clubscreen', url: `/clubs/${clubId}`, club: true });
+if (clubId) PAGES.push({ name: 'club screen', shot: 'clubscreen', url: `/clubs/${clubId}/kalendar`, club: true });
 
 const open = async (url) => {
   for (let attempt = 0; ; attempt++) {

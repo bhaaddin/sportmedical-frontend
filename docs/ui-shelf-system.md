@@ -367,7 +367,8 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 24 | `/clubs/hraci` | Hráči (128) | ResponsiveDataList + filters | Hráči (grow table), Chybí termín (attention) | club, order, athlete status | A4 | P2 |
 | 25 | `/clubs/statistiky` | Statistiky klubů (99) | SoftCard | metrics per club, Obsazenost (grid) | club chips | A4 | P3 |
 | 26 | `/clubs/fakturace` | Fakturace klubů (162) | KpiCard + list | K vyfakturování (attention), Faktury klubů | club, invoice, order | A4 | P2 |
-| 27 | `/clubs/:clubId` | Plánovač klubu | planner stage | **Out** - fixed layout | - | - | out |
+| 27 | `/clubs/:clubId/kalendar` | Plánovač klubu | planner stage | **Out** - fixed layout | - | - | out |
+| 27a | `/clubs/:clubId` | Stránka klubu (Stage 5a) | shelf page: Statistiky, Objednávky, Nejbližší termíny, Poslední změny, Hráči, Odkazy | **In** - `pages/clubs/overview`, `docs/stage5a-2026-10.md` | - | - | done |
 | 28 | `/nastaveni/kluby` | Nastavení klubů (302) | SettingsFrame | Výchozí hodnoty, Odkazy a platnost | clubs, orders | A4 | P3 |
 | 29 | `/vyhrazeni` | Vyhrazení partnerů (735) | FitPage + SoftCard | Aktivní vyhrazení (cards), Končí brzy (attention) | partner/club, calendar, orders | A4 | P2 |
 | 30 | `/intake-review` | Kontrola registrací (509) | FitPage + SoftCard queue | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | P1 |

@@ -427,7 +427,7 @@
      "&.Mui-selected": {
       "color": "#0D5C52"
      },
-     "color": "#67707A",
+     "color": "#626B75",
      "fontSize": 14,
      "fontWeight": 600,
      "minHeight": 44,
@@ -457,7 +457,7 @@
      "& .MuiTableCell-head": {
       "backgroundColor": "#F4F6F7",
       "borderBottom": "1px solid #E2E6EA",
-      "color": "#67707A",
+      "color": "#626B75",
       "fontSize": 11,
       "fontWeight": 700,
       "letterSpacing": "0.08em",
@@ -636,7 +636,7 @@
   "text": {
    "disabled": "#B3B9C0",
    "primary": "#1A1D21",
-   "secondary": "#67707A"
+   "secondary": "#626B75"
   },
   "tonalOffset": 0.2,
   "warning": {

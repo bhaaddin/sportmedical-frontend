@@ -1,5 +1,5 @@
 /*
- * How fast the club screen (`/clubs/:clubId`) gets ready, and what it asks the API on the way.
+ * How fast the club calendar (`/clubs/:clubId/kalendar`) gets ready, and what it asks the API on the way.
  *
  *   BASE=http://localhost:3132 LABEL=before node scripts/club-planning/speed.mjs
  *
@@ -204,7 +204,7 @@ async function runCold(browser, storageState, clubId) {
   const { context, page, net } = await newContext(browser, storageState);
   try {
     const t0 = Date.now();
-    await page.goto(`${BASE}/clubs/${clubId}`);
+    await page.goto(`${BASE}/clubs/${clubId}/kalendar`);
     await waitReady(page);
     await apiIdle(net);
     const marks = await marksOf(page);
@@ -234,12 +234,19 @@ async function runNav(browser, storageState, clubId, hover) {
     }
     const t0 = Date.now();
     await card.click();
+    /* Stage 5a: the card opens the club's PAGE; the calendar is one more click (the button warms it when the pointer rests) */
     await page.waitForURL((u) => u.pathname === `/clubs/${clubId}`);
+    await page.getByRole('heading', { level: 1 }).waitFor({ timeout: 90000 });
+    const pageMs = Date.now() - t0;
+    if (hover) { await page.getByRole('link', { name: 'Kalendář' }).hover(); await sleep(HOVER_MS); }
+    const t1 = Date.now();
+    await page.getByRole('link', { name: 'Kalendář' }).click();
+    await page.waitForURL((u) => u.pathname === `/clubs/${clubId}/kalendar`);
     await waitReady(page);
     await apiIdle(net);
     const marks = await marksOf(page);
     const cls = await page.evaluate(() => window.__cls());
-    return { ...analyse(net.all(), t0, marks), hoverLeadMs: hoverAt === null ? 0 : t0 - hoverAt, cls: Math.round(cls * 1000) / 1000, errors: page.errors };
+    return { ...analyse(net.all(), t0, marks), pageMs, calendarMs: Date.now() - t1, hoverLeadMs: hoverAt === null ? 0 : t0 - hoverAt, cls: Math.round(cls * 1000) / 1000, errors: page.errors };
   } finally {
     await context.close();
   }

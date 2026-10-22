@@ -19,7 +19,8 @@ import type { ChipTone } from '../../../components/ui/StatusChip';
 
 /** What the page knows about one source: its rows, or why it has none. */
 export type Source<T> = T | 'failed';
-export type InvoiceSource = Invoice[] | 'failed' | 'denied';
+/** The invoices are read behind the rest (and only for a person who may bill): `'loading'` is a dash that says so, not a blocked shelf. */
+export type InvoiceSource = Invoice[] | 'failed' | 'denied' | 'loading';
 
 export const MAX_METRICS = 6;
 
@@ -39,6 +40,7 @@ export interface Metric {
 
 export const FAILED_HINT = 'Nepodařilo se načíst.';
 export const DENIED_HINT = 'Bez oprávnění k fakturaci.';
+export const LOADING_HINT = 'Načítám…';
 
 /** Orders that count as ordered: everything the club has asked for and not cancelled (an invitation has no quote yet). */
 const ORDERED: readonly ClubOrderStatus[] = ['Requested', 'Confirmed', 'Completed'];
@@ -117,8 +119,8 @@ export function clubMetrics(input: MetricInput): Metric[] {
   const billingTo = '/clubs/fakturace';
   let invoiced: Metric;
   let paid: Metric;
-  if (invoices === 'failed' || invoices === 'denied') {
-    const hint = invoices === 'failed' ? FAILED_HINT : DENIED_HINT;
+  if (invoices === 'failed' || invoices === 'denied' || invoices === 'loading') {
+    const hint = invoices === 'failed' ? FAILED_HINT : invoices === 'denied' ? DENIED_HINT : LOADING_HINT;
     invoiced = { key: 'invoiced', label: 'Fakturováno', value: null, money: true, hint, tone: 'grey', to: billingTo };
     paid = { key: 'paid', label: 'Zaplaceno', value: null, money: true, hint, tone: 'grey', to: billingTo };
   } else {
@@ -176,7 +178,16 @@ export interface Change {
   text: string;
 }
 
-/** The last `limit` history entries over all the club's orders, newest first. An entry without a time sorts last. */
+/** How many orders' histories the page reads: the list answers carry NO history, only an order's own answer does. */
+export const HISTORY_ORDERS = 3;
+
+/** The ids of the orders touched last (created, submitted or confirmed latest) - the ones whose history is worth reading. */
+export function newestOrderIds(orders: readonly ClubOrderView[], limit = HISTORY_ORDERS): string[] {
+  const touched = (o: ClubOrderView): string => [o.createdAtUtc, o.submittedAtUtc ?? '', o.confirmedAtUtc ?? ''].sort().reverse()[0] ?? '';
+  return [...orders].sort((a, b) => touched(b).localeCompare(touched(a)) || a.id.localeCompare(b.id)).slice(0, limit).map((o) => o.id);
+}
+
+/** The last `limit` history entries over the given orders (their own answers), newest first. An entry without a time sorts last. */
 export function recentChanges(orders: readonly ClubOrderView[], limit = 5): Change[] {
   const all: Change[] = [];
   for (const o of orders) {

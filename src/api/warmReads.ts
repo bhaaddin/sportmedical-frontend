@@ -34,6 +34,7 @@ import { CLUB_SETTINGS_QUERY_KEY, clubSettingsApi, clubsApi, type Club } from '.
 import { CALENDAR_DISPLAY_QUERY_KEY, readCalendarDisplay } from './displaySettings';
 import { holidaysApi } from './holidays';
 import { normalizeSummary } from '../components/clubs/orders/orderLogic';
+import { newestOrderIds } from '../pages/clubs/overview/clubOverviewModel';
 
 /** How long the pointer rests on a card before it counts as an intention to open it. */
 export const HOVER_INTENT_MS = 200;
@@ -129,11 +130,14 @@ const clubSummaryKey = (clubId: string) => ['club-summary', clubId] as const;
 
 /**
  * The reads of a club's own PAGE (`/clubs/:clubId/kalendar`, pages/clubs/overview): the club, its orders and windows (taken from the
- * club list's answers when they are fresh), its summary, and the page's code. Nothing of the calendar - its code and stage
+ * club list's answers when they are fresh), its summary, the history of the orders touched last, and the page's code. Nothing of the calendar - its code and stage
  * reads start when the pointer rests on the page's "Kalendář" button (`prefetchClubScreen`).
  */
 export function prefetchClubPage(queryClient: QueryClient, clubId: string): void {
-  warmClubCore(queryClient, clubId);
+  const { orders } = warmClubCore(queryClient, clubId);
+  /* "Poslední změny": the list answers carry no history, so the few orders touched last are read one by one - started the
+     moment the orders are known, not after the page has drawn (the same key and read as the page's own). */
+  warm(orders.then((list) => Promise.all(newestOrderIds(list).map((id) => queryClient.prefetchQuery({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000 })))));
   warm(queryClient.prefetchQuery({ queryKey: clubSummaryKey(clubId), queryFn: async () => normalizeSummary(await clubOrdersApi.clubSummary(clubId)), staleTime: 60_000 }));
   warm(clubPageRoute.load());
 }
