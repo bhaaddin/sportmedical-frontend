@@ -230,7 +230,7 @@ async function stripFlow(browser, size) {
   check(gap >= 19000, `(f) the strip hint appeared ${Math.round(gap / 1000)} s after the start hint (>= 20 s)`);
   check((await page.locator('[data-testid=guide-hint]').count()) === 1, '(f) still exactly one hint');
   const t = await text(page, '[data-testid=guide-hint]');
-  check(/Činností je víc, než se vejde/.test(t) && /Ještě \d+/.test(t), `(f) strip hint: "${t.slice(0, 140)}"`);
+  check(/Činností je víc, než se vejde/i.test(t) && /Ještě \d+/i.test(t), `(f) strip hint: "${t.slice(0, 140)}"`);
   await snap(page, size, 'f-strip');
   await inViewport(page, '[data-testid=guide-hint]', '(f) hint');
   await targets44(page, '[data-testid=guide-hint]', '(f) hint');
@@ -244,8 +244,8 @@ async function stripFlow(browser, size) {
 
 const browser = await launch();
 try {
-  for (const size of sizes) await flow(browser, size);
-  if (!process.env.NO_STRIP) await stripFlow(browser, sizes.includes('desktop') ? 'desktop' : sizes[0]);
+  if (!process.env.ONLY_STRIP) for (const size of sizes) await flow(browser, size);
+  if (!process.env.NO_STRIP) for (const size of process.env.ONLY_STRIP ? sizes : [sizes.includes('desktop') ? 'desktop' : sizes[0]]) await stripFlow(browser, size);
 } finally {
   await browser.close();
   const p = await launch();

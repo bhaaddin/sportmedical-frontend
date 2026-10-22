@@ -58,6 +58,14 @@ export function wants(id: HintId, i: HintInput): boolean {
   return i.activities >= 4 && i.hiddenCards > 0 && !i.stripUsed;
 }
 
+/**
+ * Has the person already done what this hint says? Then it counts as seen even if it never showed (a saved plan opened
+ * for the first time, a page remounted in between): it must not come back for this person.
+ */
+export function settled(id: HintId, i: Pick<HintInput, 'planned' | 'stripUsed'>): boolean {
+  return id === 'start' ? i.planned > 0 : i.stripUsed;
+}
+
 export function startVariant(i: Pick<HintInput, 'view' | 'layout' | 'armed'>): string {
   if (i.layout === 'phone') return 'phone';
   if (i.view === 'month') return i.armed ? 'armedMonth' : 'month';

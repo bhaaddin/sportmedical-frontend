@@ -10,8 +10,8 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } fro
 import { createPortal } from 'react-dom';
 import { PLANNER_TEXT } from '../text';
 import {
-  chooseHint, hintKeyOf, loadMemory, markSeen, mute, saveMemory, wants,
-  NO_CLOCK, type HintClock, type HintId, type HintInput, type HintMemory,
+  chooseHint, hintKeyOf, loadMemory, markSeen, mute, saveMemory, settled,
+  HINT_IDS, NO_CLOCK, type HintClock, type HintId, type HintInput, type HintMemory,
 } from './hints';
 import './guide.css';
 
@@ -41,14 +41,15 @@ export default function GuideHost({ input }: { input: HintInput }) {
   const clock = useRef<HintClock>(NO_CLOCK);
   const choice = chooseHint(input, memory, Date.now(), clock.current);
 
-  /* Remember what happened to the hint that was on screen, and note the one that appears. */
+  /* A hint whose job the person has done is seen for good; note the hint that appears (the 20 s gap runs from it). */
   useEffect(() => {
-    const was = clock.current.shown;
-    if (was && was !== choice.hint && !wants(was, { ...input, dialogOpen: false, calloutOpen: false })) {
-      const next = markSeen(memory, was);
-      if (next !== memory) { setMemory(next); saveMemory(storageOf(), key, next); }
+    const done = HINT_IDS.filter((id) => !memory.seen[id] && settled(id, input));
+    if (done.length > 0) {
+      const next = done.reduce(markSeen, memory);
+      setMemory(next);
+      saveMemory(storageOf(), key, next);
     }
-    if (choice.hint && choice.hint !== was) lastShown = { id: choice.hint, at: Date.now() };
+    if (choice.hint && choice.hint !== clock.current.shown) lastShown = { id: choice.hint, at: Date.now() };
     clock.current = { shown: choice.hint, lastId: lastShown?.id ?? null, lastAt: lastShown?.at ?? null };
   });
   /* A hint that waits only for the 20 s gap is asked again when the gap is over. */

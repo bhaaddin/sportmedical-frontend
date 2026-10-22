@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_MEMORY, HINT_GAP_MS, HINT_KEY_PREFIX, chooseHint, hintKeyOf, loadMemory, markSeen, mute, parseMemory, saveMemory, startVariant, wants,
+  EMPTY_MEMORY, HINT_GAP_MS, settled, HINT_KEY_PREFIX, chooseHint, hintKeyOf, loadMemory, markSeen, mute, parseMemory, saveMemory, startVariant, wants,
   NO_CLOCK, type HintInput, type HintMemory,
 } from './hints';
 
@@ -86,6 +86,13 @@ describe('the hint state function · dismissal and memory', () => {
     expect(chooseHint(base, markSeen(EMPTY_MEMORY, 'start'), 0).hint).toBeNull();
     expect(chooseHint(many, mute(EMPTY_MEMORY), 0).hint).toBeNull();
     expect(markSeen(EMPTY_MEMORY, 'start')).toEqual({ seen: { start: true }, muted: false });
+  });
+
+  it('a hint whose job is done counts as seen, even if it never showed', () => {
+    expect(settled('start', { planned: 0, stripUsed: false })).toBe(false);
+    expect(settled('start', { planned: 3, stripUsed: false })).toBe(true);
+    expect(settled('strip', { planned: 3, stripUsed: false })).toBe(false);
+    expect(settled('strip', { planned: 0, stripUsed: true })).toBe(true);
   });
 
   it('round trips through a storage, per person', () => {
