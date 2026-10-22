@@ -284,6 +284,20 @@ export interface RingArc {
   offset: number;
 }
 
+/**
+ * One band of the liquid in a mini-calendar day (R16a / R20): one činnost of the day in its own colour, or "další" (the činnosti
+ * beyond the third, merged). `share` is the band's part of the liquid (0..1, the bands sum to 1), taken from the day's slots.
+ */
+export interface LiquidLayer {
+  /** The činnost's id; `LIQUID_OTHER_ID` for the merged "další" band. */
+  categoryId: CategoryId;
+  color: string;
+  share: number;
+  slots: number;
+  /** The "další" band. */
+  merged: boolean;
+}
+
 export interface MiniCellModel {
   date: IsoDate;
   dayNumber: number;
@@ -294,6 +308,8 @@ export interface MiniCellModel {
     arcs: RingArc[];
     /** Liquid orb fill in percent (0..100). */
     liquidPercent: number;
+    /** The činnost bands of the liquid, bottom first (empty when no term of the day names a činnost). */
+    layers: LiquidLayer[];
   } | null;
   percent: number;
   termCount: number;

@@ -49,6 +49,11 @@ export function MiniDayButton({
   const clubWords = clubs.map((c) => ['Klub ' + c.club, c.orderCode, c.hold ? holdLabel(c.hold) : null].filter(Boolean).join(', '));
   const ariaLabel = clubWords.length > 0 ? `${closedLabel} · ${clubWords.join(' · ')}` : closedLabel;
   const { ring } = model;
+  /* the liquid's bands: bottom first; each is drawn as the whole column up to its own top, the highest first, so a lower band's wave rides over the one above */
+  const layers = ring?.layers ?? [];
+  const drawOrder = layers
+    .map((layer, i) => ({ layer, top: layers.slice(0, i + 1).reduce((n, l) => n + l.share, 0) }))
+    .reverse();
   return (
     <button
       type="button"
@@ -86,7 +91,22 @@ export function MiniDayButton({
               ))}
             </svg>
             <span className="liquid-orb">
-              <span className="liquid-water" style={{ '--liquid-fill': `${ring.liquidPercent.toFixed(3)}%` } as React.CSSProperties} data-fill={ring.liquidPercent.toFixed(3)} />
+              <span
+                className={`liquid-water${layers.length > 0 ? ' has-layers' : ''}`}
+                style={{ '--liquid-fill': `${ring.liquidPercent.toFixed(3)}%` } as React.CSSProperties}
+                data-fill={ring.liquidPercent.toFixed(3)}
+                data-layers={layers.length}
+              >
+                {drawOrder.map(({ layer, top }, i) => (
+                  <i
+                    key={layer.categoryId}
+                    className="liquid-layer"
+                    data-category={layer.categoryId}
+                    data-merged={layer.merged ? 'true' : undefined}
+                    style={{ '--c': layer.color, '--cum': fixed(top), '--i': layers.length - 1 - i } as React.CSSProperties}
+                  />
+                ))}
+              </span>
               <span className="liquid-glint" />
             </span>
           </>

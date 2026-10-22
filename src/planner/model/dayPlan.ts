@@ -20,11 +20,48 @@ import type {
   PlannerSession,
   Preview,
   RingArc,
+  LiquidLayer,
 } from './types';
 
 /** Ring radius used by the prototype's SVG (viewBox 48, r = 21). */
 export const RING_RADIUS = 21;
 export const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+/** The most činnosti the liquid shows as their own band; the rest is one merged "další" band. */
+export const LIQUID_MAX_LAYERS = 3;
+export const LIQUID_OTHER_ID = '__other';
+/** Neutral grey-blue of the merged band (never a činnost's colour). */
+export const LIQUID_OTHER_COLOR = '#8795a3';
+
+/**
+ * The bands of a day's liquid: one per činnost of the day (the same grouping as the agenda, so a day with two Spiroergometrie
+ * and two Komplexní bookings has two bands), height = the činnost's share of the day's slots, in the činnost's own `activityColor`.
+ * At most `LIQUID_MAX_LAYERS` bands are shown - the largest ones, kept in the catalogue's order like the ring's arcs - and every
+ * other činnost is merged into one grey "další" band on top. A day without slots (every window empty) weighs by minutes.
+ */
+export function liquidLayers(
+  ctx: Pick<PlannerContext, 'categories'>,
+  entries: readonly PlannerSession[],
+  maxLayers: number = LIQUID_MAX_LAYERS,
+): LiquidLayer[] {
+  const groups = groupByActivity(ctx, entries);
+  if (groups.length === 0) return [];
+  const bySlots = groups.some((g) => g.slots > 0);
+  const weightOf = (g: { slots: number; minutes: number }): number => (bySlots ? g.slots : g.minutes);
+  const total = groups.reduce((n, g) => n + weightOf(g), 0);
+  if (total <= 0) return [];
+  const ranked = [...groups].sort((a, b) => weightOf(b) - weightOf(a));
+  const kept = new Set(ranked.slice(0, Math.max(1, maxLayers)).map((g) => g.categoryId));
+  const layers: LiquidLayer[] = groups
+    .filter((g) => kept.has(g.categoryId) && weightOf(g) > 0)
+    .map((g) => ({ categoryId: g.categoryId, color: g.tone, share: weightOf(g) / total, slots: g.slots, merged: false }));
+  const rest = groups.filter((g) => !kept.has(g.categoryId));
+  const restWeight = rest.reduce((n, g) => n + weightOf(g), 0);
+  if (restWeight > 0) {
+    layers.push({ categoryId: LIQUID_OTHER_ID, color: LIQUID_OTHER_COLOR, share: restWeight / total, slots: rest.reduce((n, g) => n + g.slots, 0), merged: true });
+  }
+  return layers;
+}
 
 const isProjectedExisting = (preview: Preview | null | undefined): preview is Extract<Preview, { kind: 'move' | 'resize' }> =>
   !!preview && (preview.kind === 'move' || preview.kind === 'resize') && !!preview.validation?.ok;
@@ -133,7 +170,7 @@ export function miniCellModel(ctx: PlannerContext, date: IsoDate, preview?: Prev
     offset += span;
     return arc;
   });
-  return { ...base, ring: { circumference: RING_CIRCUMFERENCE, arcs, liquidPercent: p.ratio * 100 } };
+  return { ...base, ring: { circumference: RING_CIRCUMFERENCE, arcs, liquidPercent: p.ratio * 100, layers: liquidLayers(ctx, p.entries) } };
 }
 
 export interface TooltipEventModel {

@@ -38,6 +38,37 @@ import './left/left.css';
 
 const FALLBACK_HOLIDAY_COLOR = DEFAULT_HOLIDAY_COLOR;
 
+/** True while `ref`'s element intersects the viewport AND the document is visible. */
+export function useLiquidLive(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [live, setLive] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let visible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    let onScreen = true;
+    const apply = () => setLive(visible && onScreen);
+    const onVisibility = () => {
+      visible = document.visibilityState !== 'hidden';
+      apply();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    const observer = typeof IntersectionObserver === 'undefined'
+      ? null
+      : new IntersectionObserver((entries) => {
+          const last = entries[entries.length - 1];
+          onScreen = last ? last.isIntersecting : true;
+          apply();
+        });
+    observer?.observe(el);
+    apply();
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer?.disconnect();
+    };
+  }, [ref]);
+  return live;
+}
+
 export function MiniCalendarPanel() {
   const ctx = usePlannerCtx();
   const { dayMarks, catalogue } = usePlannerModelState();
@@ -69,6 +100,10 @@ export function MiniCalendarPanel() {
     retry: false,
   });
   const clubsByDay = useMemo(() => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks), [cells, clubBlocks.data, dayMarks]);
+
+  /* R20: the liquid only moves while the days are on screen and the tab is visible (a closed drawer / sheet is off screen) */
+  const daysRef = useRef<HTMLDivElement | null>(null);
+  const liquidLive = useLiquidLive(daysRef);
 
   const [focusedDate, setFocusedDate] = useState<IsoDate | null>(null);
   const pendingFocus = useRef<IsoDate | null>(null);
@@ -173,6 +208,8 @@ export function MiniCalendarPanel() {
       </div>
       <div
         id="mini-days"
+        ref={daysRef}
+        data-liquid={liquidLive ? 'live' : 'paused'}
         className={[
           'mini-days',
           zoom.hasFocus ? 'has-mini-focus zoom-focus-active' : '',

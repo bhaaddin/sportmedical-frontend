@@ -96,3 +96,60 @@
   outline: 1px solid var(--club, #6e91a5);
 }
 .sm-planner .day-cell .mini-clubs i[data-hold='expired'] { outline-style: dashed; }
+
+/* ---------------------------------------------------------------------------------------------------------------------------
+   R16a / R20: the LIQUID of a mini-calendar day moves, and its činnosti are bands in their own colours.
+
+   One `<i class="liquid-layer">` per činnost (max 3 + a grey "další"), drawn highest first so a lower band's wave rides over the
+   one above it. Each band is the whole column up to its own top (`--cum` = share of the liquid up to and including it) in the
+   činnost's literal colour (`--c`, an inline value: the accent shift never touches it), with a wave crest on top. Everything
+   that moves is a `transform` (the crest slides one wave length, the water sloshes a hair): no layout, composited. Motion:
+     plné      waves + slosh, only while the calendar is on screen and the tab is visible (`[data-liquid="paused"]`)
+     omezené   the same shapes, still
+     vypnuto   the same shapes, still   (and the device's "reduce motion" always means still)
+   --------------------------------------------------------------------------------------------------------------------------- */
+.sm-planner .day-cell.spectrum-day .liquid-water.has-layers {
+  background: none;
+  box-shadow: none;
+  transition: height 0.25s cubic-bezier(0.22, 0.67, 0.22, 1);
+  transform-origin: 50% 100%;
+}
+.sm-planner .day-cell.spectrum-day .liquid-water.has-layers::before,
+.sm-planner .day-cell.spectrum-day .liquid-water.has-layers::after { content: none; animation: none; }
+.sm-planner .liquid-layer {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: -3px;
+  height: calc(var(--cum, 1) * 100% + 3px);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 82%, #fff) 0%, var(--c) 34%, color-mix(in srgb, var(--c) 74%, #000) 100%);
+}
+/* the wave crest: one sine period per orb width, twice as wide as the band, slid by exactly one period (-50%) = a seamless loop */
+.sm-planner .liquid-layer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -4px;
+  width: 200%;
+  height: 5px;
+  background: color-mix(in srgb, var(--c) 82%, #fff);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5 Q25 -1 50 5 T100 5 V10 H0Z'/%3E%3C/svg%3E") repeat-x 0 0 / 50% 100%;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5 Q25 -1 50 5 T100 5 V10 H0Z'/%3E%3C/svg%3E") repeat-x 0 0 / 50% 100%;
+  transform: translateX(calc(var(--i, 0) * -17%));
+}
+@keyframes smp-liquid-wave { from { transform: translateX(calc(var(--i, 0) * -17%)); } to { transform: translateX(calc(-50% + var(--i, 0) * -17%)); } }
+@keyframes smp-liquid-slosh {
+  0% { transform: translateY(0.5px) rotate(-3deg); }
+  50% { transform: translateY(-0.6px) rotate(2.5deg); }
+  100% { transform: translateY(0.5px) rotate(-3deg); }
+}
+html[data-motion='full'] .sm-planner .day-cell.spectrum-day .liquid-water.has-layers { animation: smp-liquid-slosh 4.6s ease-in-out infinite; }
+html[data-motion='full'] .sm-planner .liquid-layer::before { animation: smp-liquid-wave calc(2.7s + var(--i, 0) * 0.9s) linear infinite; }
+html[data-motion='full'] .sm-planner .liquid-layer:nth-child(even)::before { animation-direction: reverse; }
+/* off screen / hidden tab: nothing runs (the calendar sets data-liquid on #mini-days) */
+.sm-planner #mini-days[data-liquid='paused'] .liquid-water.has-layers,
+.sm-planner #mini-days[data-liquid='paused'] .liquid-layer::before { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .sm-planner .day-cell.spectrum-day .liquid-water.has-layers,
+  .sm-planner .liquid-layer::before { animation: none !important; }
+}
