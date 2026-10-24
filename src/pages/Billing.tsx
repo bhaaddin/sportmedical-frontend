@@ -65,8 +65,10 @@ const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = (
 
 const messageOf = (error: unknown, fallback: string): string => toBookingError(error).serverMessage ?? fallback;
 
-/** An attention card on this page shows its first three cases; the rest are one filter away. */
-const ATTENTION_ITEMS = 3;
+/*
+ * An attention card on this page is its count, its sentence and one button that applies the filter: the cases themselves
+ * are the table right under it, so listing them twice would only push the table off the screen (R18: few, strong blocks).
+ */
 
 export default function Billing() {
   const device = useDevice();
@@ -281,7 +283,7 @@ export default function Billing() {
     if (overdue !== null) groups.push({ ...overdue, action: { label: 'Zobrazit po splatnosti', to: '/billing', state: { filter: 'overdue' } } });
     const approvals = canApprove ? invoiceApprovals({ now, invoices }) : null;
     if (approvals !== null) groups.push(approvals);
-    return groups.map((g) => ({ ...g, items: g.items.slice(0, ATTENTION_ITEMS) }));
+    return groups.map((g) => ({ ...g, items: [] }));
   }, [invoices, now, canApprove]);
 
   const primaryAction = { label: 'Nový doklad', icon: <Add />, onClick: () => setFlow({ nav: null }) };

@@ -569,18 +569,24 @@ describe('shelves', () => {
     expect(screen.queryByRole('region', { name: 'Vyžaduje pozornost' })).not.toBeInTheDocument();
   });
 
-  it('an overdue case opens its invoice here, and "Zobrazit po splatnosti" applies the filter', async () => {
+  it('the overdue card says how much and applies the filter here; the cases are the table under it', async () => {
     renderPage();
     await screen.findByText('2026-0418');
     const shelf = within(screen.getByRole('region', { name: 'Vyžaduje pozornost' }));
     expect(shelf.getByText('Faktury po splatnosti')).toBeInTheDocument();
-
-    fireEvent.click(shelf.getByRole('link', { name: /Faktura 2026-0414/ }));
-    await waitFor(() => expect(screen.getByLabelText('Platby dokladu 2026-0414')).toHaveAttribute('aria-expanded', 'true'));
+    expect(shelf.getByText(/^Celkem 1\s600 Kč k zaplacení/)).toBeInTheDocument();
 
     fireEvent.click(shelf.getByRole('link', { name: 'Zobrazit po splatnosti' }));
     await waitFor(() => expect(screen.queryByText('2026-0418')).not.toBeInTheDocument());
+    expect(screen.getByText('2026-0414')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Po splatnosti' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('a link to one invoice (an attention card elsewhere) clears the filter and opens it', async () => {
+    renderPage({ invoiceId: 'a' });
+    await screen.findByText('2026-0418');
+    await waitFor(() => expect(screen.getByLabelText('Platby dokladu 2026-0418')).toHaveAttribute('aria-expanded', 'true'));
+    expect(screen.getByRole('button', { name: 'Vše' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('the approval card is there only for an approver', async () => {
