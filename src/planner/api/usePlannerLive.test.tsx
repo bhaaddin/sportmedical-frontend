@@ -59,7 +59,7 @@ describe('usePlannerLive', () => {
     expect(invalidate).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(LIVE_DEBOUNCE_MS + 10);
     const keys = invalidate.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-    expect(keys).toEqual([['day-range'], ['blocks'], ['club-blocks'], ['planner', 'api-1']]);
+    expect(keys).toEqual([['day-range'], ['blocks'], ['club-blocks'], ['club-orders'], ['planner', 'api-1']]);
     expect(announce).toHaveBeenCalledTimes(1);
   });
 

@@ -16,7 +16,7 @@ import { plannerKeys, type PlannerDataSource } from '../data/PlannerDataSource';
 export const LIVE_DEBOUNCE_MS = 300;
 
 /** The keys of the planner's reads of the calendar itself (see `defaultApiDeps`). */
-const CALENDAR_READ_KEYS = ['day-range', 'blocks', 'club-blocks'] as const;
+const CALENDAR_READ_KEYS = ['day-range', 'blocks', 'club-blocks', 'club-orders'] as const;
 
 /** Marks the calendar reads stale and the planner's own queries to run again. */
 export function refreshCalendarReads(queryClient: QueryClient, sourceId: string): Promise<unknown> {

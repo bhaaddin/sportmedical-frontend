@@ -78,6 +78,7 @@ const KIND_BY_STATUS: Record<number, BookingErrorKind> = {
   403: 'forbidden',
   404: 'notFound',
   409: 'conflict',
+  412: 'conflict',
   422: 'domainRule',
   429: 'rateLimited',
 };
