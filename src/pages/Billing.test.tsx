@@ -562,6 +562,14 @@ describe('shelves', () => {
     expect(within(invoicesShelf).getByLabelText('Počet: 3')).toBeInTheDocument();
   });
 
+  it('on a desktop the figures and the attention cards share one band', async () => {
+    renderPage();
+    await screen.findByText('2026-0418');
+    const band = (name: string) => screen.getByRole('region', { name }).parentElement;
+    expect(band('Přehled tržeb')).toBe(band('Vyžaduje pozornost'));
+    expect(band('Přehled tržeb')).not.toBe(band('Doklady'));
+  });
+
   it('has no attention shelf when nothing is overdue or waiting', async () => {
     getInvoices.mockResolvedValue([invoices[0], invoices[1]]);
     renderPage();

@@ -309,67 +309,83 @@ export default function Billing() {
     </Box>
   );
 
+  const showAttention = ready && attention.length > 0;
+  /* From 1280 the figures and the attention cards stand side by side. */
+  const besideAttention = device === 'desktop' && showAttention;
+  const metricsShelf = (
+    <Shelf
+      id="metrics"
+      title="Přehled tržeb"
+      hint={monthYear(now)}
+      layout={phone ? 'row' : 'grid'}
+      minCardWidth={besideAttention ? 160 : 180}
+      phoneWidth="min(42vw, 170px)"
+      cardHeight={104}
+      skeletons={canApprove ? 5 : 4}
+      loading={loading}
+      stagger={false}
+    >
+      <MetricCard
+        label={`Vyfakturováno ${monthIn(now)}`}
+        value={stats.invoicedThisMonth}
+        format={czk}
+        hint={doklady(stats.invoicedThisMonthCount)}
+      />
+      <MetricCard
+        label="Nezaplaceno"
+        value={stats.unpaid}
+        format={czk}
+        tone={stats.unpaid > 0 ? 'red' : 'grey'}
+        hint={`${doklady(stats.overdueCount)} po splatnosti`}
+      />
+      <MetricCard label="Hotově na místě" value={stats.cashThisMonth} format={czk} hint={`kartou ${czk(stats.cardThisMonth)}`} />
+      <MetricCard
+        label="Průměr na pacienta"
+        value={stats.averagePerPatient === null ? '—' : stats.averagePerPatient}
+        format={czk}
+        hint={monthYear(now)}
+      />
+      {canApprove && (
+        <MetricCard
+          label="Ke schválení"
+          value={stats.pendingApprovalCount}
+          tone={stats.pendingApprovalCount > 0 ? 'primary' : 'grey'}
+          hint="nad limitem ruční slevy"
+        />
+      )}
+    </Shelf>
+  );
+  const attentionShelf = (
+    <Shelf
+      id="attention"
+      title="Vyžaduje pozornost"
+      count={attention.reduce((sum, g) => sum + g.count, 0)}
+      countTone="red"
+      layout={besideAttention ? 'grid' : 'row'}
+      minCardWidth={besideAttention ? 280 : 340}
+      fill
+      stagger={false}
+    >
+      {attention.map((g) => <AttentionCard key={g.id} group={g} />)}
+    </Shelf>
+  );
+
   return (
     <PageFrame fit title="Fakturace" purpose="Doklady, platby a přehled tržeb" primaryAction={primaryAction}>
-      {/* ── The month's figures: a row that swipes on a phone (two in view), a grid from a tablet up ── */}
-      {!loadFailed && (
-        <Shelf
-          id="metrics"
-          title="Přehled tržeb"
-          hint={monthYear(now)}
-          layout={phone ? 'row' : 'grid'}
-          minCardWidth={180}
-          phoneWidth="min(42vw, 170px)"
-          cardHeight={104}
-          skeletons={canApprove ? 5 : 4}
-          loading={loading}
-          stagger={false}
-        >
-          <MetricCard
-            label={`Vyfakturováno ${monthIn(now)}`}
-            value={stats.invoicedThisMonth}
-            format={czk}
-            hint={doklady(stats.invoicedThisMonthCount)}
-          />
-          <MetricCard
-            label="Nezaplaceno"
-            value={stats.unpaid}
-            format={czk}
-            tone={stats.unpaid > 0 ? 'red' : 'grey'}
-            hint={`${doklady(stats.overdueCount)} po splatnosti`}
-          />
-          <MetricCard label="Hotově na místě" value={stats.cashThisMonth} format={czk} hint={`kartou ${czk(stats.cardThisMonth)}`} />
-          <MetricCard
-            label="Průměr na pacienta"
-            value={stats.averagePerPatient === null ? '—' : stats.averagePerPatient}
-            format={czk}
-            hint={monthYear(now)}
-          />
-          {canApprove && (
-            <MetricCard
-              label="Ke schválení"
-              value={stats.pendingApprovalCount}
-              tone={stats.pendingApprovalCount > 0 ? 'primary' : 'grey'}
-              hint="nad limitem ruční slevy"
-            />
-          )}
-        </Shelf>
-      )}
-
-      {/* ── What needs a person: drawn only when there is something ── */}
-      {ready && attention.length > 0 && (
-        <Shelf
-          id="attention"
-          title="Vyžaduje pozornost"
-          count={attention.reduce((sum, g) => sum + g.count, 0)}
-          countTone="red"
-          layout="row"
-          minCardWidth={340}
-          fill
-          stagger={false}
-        >
-          {attention.map((g) => <AttentionCard key={g.id} group={g} />)}
-        </Shelf>
+      {/*
+        * ── The month's figures (a row that swipes on a phone, a grid from a tablet up) and what needs a person (only when
+        * there is something). On a desktop they share one band, so the invoice table keeps the height of the window.
+        */}
+      {besideAttention ? (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 380px)', gap: 3, alignItems: 'start' }}>
+          {metricsShelf}
+          {attentionShelf}
+        </Box>
+      ) : (
+        <>
+          {!loadFailed && metricsShelf}
+          {showAttention && attentionShelf}
+        </>
       )}
 
       {/* ── The invoices: search, filters, the table (cards on a phone) ── */}
