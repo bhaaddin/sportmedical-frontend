@@ -1,8 +1,14 @@
 import { QueryClient } from '@tanstack/react-query';
+import { announceRemoteWrite } from '../../api/requestPolicy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { appt, calendar, CAL_A, CAL_B, clubSettings, display, preview, service, activity, A_MEDICAL } from './testSupport';
 
 const get = vi.fn();
+const session = vi.hoisted(() => ({ perms: null as string | null, listeners: new Set<() => void>() }));
+vi.mock('../../auth/localSession', async () => {
+  const actual = await vi.importActual<typeof import('../../auth/localSession')>('../../auth/localSession');
+  return { ...actual, permissionsSnapshot: () => session.perms, subscribePermissions: (l: () => void) => (session.listeners.add(l), () => session.listeners.delete(l)) };
+});
 vi.mock('../../api/client', () => ({ default: { get: (...args: unknown[]) => get(...args) }, client: {} }));
 vi.mock('../../api/activities', async () => {
   const actual = await vi.importActual<typeof import('../../api/activities')>('../../api/activities');
@@ -189,5 +195,37 @@ describe('planner screen seeder', () => {
     expect(makePlannerScreenSeeder(qc, () => []).willAsk(RANGE)).toBe(false);
     await seeder.seed(RANGE);
     expect(seeder.willAsk(RANGE)).toBe(false);
+  });
+
+  it('an answer that started before a write does not seed rows from before it', async () => {
+    let release: (v: unknown) => void = () => undefined;
+    get.mockReturnValue(new Promise((r) => (release = r)));
+    const seeder = makePlannerScreenSeeder(qc, allowed);
+    const pending = seeder.seed(RANGE);
+    await vi.waitFor(() => expect(get).toHaveBeenCalled());
+    announceRemoteWrite();
+    release({ data: screen() });
+    await pending;
+    expect(qc.getQueryData(['day-range', RANGE.from, RANGE.to, `${CAL_A},${CAL_B}`])).toBeUndefined();
+    expect(qc.getQueryData(['calendars'])).toBeUndefined();
+  });
+
+  it('an answer without a day section is not asked for again for a while', async () => {
+    get.mockResolvedValue({ data: screen({ day: failedSection }) });
+    const seeder = makePlannerScreenSeeder(qc, allowed);
+    await seeder.seed(RANGE);
+    expect(seeder.willAsk(RANGE)).toBe(false);
+    await seeder.seed(RANGE);
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new session forgets that the server had no screen', async () => {
+    get.mockRejectedValue({ response: { status: 404 } });
+    await makePlannerScreenSeeder(qc, allowed).seed(RANGE);
+    expect(plannerScreenBlocked()).toBe(true);
+    session.perms = '["x"]';
+    session.listeners.forEach((l) => l());
+    expect(plannerScreenBlocked()).toBe(false);
+    expect(window.sessionStorage.getItem('sm.plannerScreen.unsupportedUntil')).toBeNull();
   });
 });

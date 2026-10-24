@@ -23,7 +23,7 @@ import { documentsApi, type PatientDocument } from '../../api/documents';
 import { patientsApi, type Patient } from '../../api/patients';
 import { formatCzk } from '../../components/booking/grid/appointmentPrice';
 import { rangeLine } from '../../components/clubs/order/orderFormat';
-import { ALL_APPOINTMENTS_KEY, fetchAllAppointments } from '../../components/patients/appointmentsSource';
+import { ALL_APPOINTMENTS_KEY, fetchPatientAppointments } from '../../components/patients/appointmentsSource';
 import { summariseVisits, type PatientAppointment } from '../../components/patients/patientActivity';
 import type { ChipTone } from '../../components/ui';
 import { statusOf } from '../../pages/billing/invoiceView';
@@ -200,7 +200,7 @@ export async function loadPeek(ref: EntityRef, queryClient: QueryClient, now: Da
       const patient = await queryClient.fetchQuery({ queryKey: ['patient', ref.id], queryFn: () => patientsApi.getById(ref.id), staleTime: 5 * MINUTE });
       /* The visits are the same list the register and the card read; if it cannot be had the peek simply has no "next". */
       const appointments = await queryClient
-        .fetchQuery({ queryKey: [...ALL_APPOINTMENTS_KEY, ref.id], queryFn: () => fetchAllAppointments(ref.id), staleTime: MINUTE })
+        .fetchQuery({ queryKey: [...ALL_APPOINTMENTS_KEY, ref.id], queryFn: () => fetchPatientAppointments(queryClient, ref.id), staleTime: MINUTE })
         .catch(() => null);
       return patientPeek(patient, appointments, now);
     }

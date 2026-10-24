@@ -16,6 +16,7 @@
  * shape and is reported in the integrator notes rather than worked around
  * with a third request per row.
  */
+import type { QueryClient } from '@tanstack/react-query';
 import client from '../../api/client';
 import { appointmentsApi } from '../../api/appointments';
 import type { DayAppointment } from '../../api/bookingContracts';
@@ -31,6 +32,23 @@ export async function fetchAllAppointments(patientId?: string): Promise<PatientA
   const res = await client.get('/api/scheduling/appointments', patientId ? { params: { patientId } } : undefined);
   const data = res.data?.data ?? res.data?.value ?? res.data ?? [];
   return Array.isArray(data) ? (data as PatientAppointment[]) : [];
+}
+
+const SHARED_FRESH_MS = 60_000;
+
+/**
+ * One patient's visits. A clinic-wide list that is already held (and fresh) is cut down here and nothing is asked. Otherwise
+ * the server is asked with `patientId`; an older server ignores it and answers everybody (rows of other patients show it),
+ * and that answer is then kept under `ALL_APPOINTMENTS_KEY` too, so the next patient is cut from it instead of downloading
+ * the whole clinic again. Only this patient's rows are returned.
+ */
+export async function fetchPatientAppointments(queryClient: QueryClient, patientId: string): Promise<PatientAppointment[]> {
+  const mine = (rows: PatientAppointment[]) => rows.filter((a) => a.patientId === patientId);
+  const state = queryClient.getQueryState<PatientAppointment[]>(ALL_APPOINTMENTS_KEY);
+  if (state?.data !== undefined && !state.isInvalidated && Date.now() - state.dataUpdatedAt < SHARED_FRESH_MS) return mine(state.data);
+  const rows = await fetchAllAppointments(patientId);
+  if (rows.some((a) => a.patientId !== patientId)) queryClient.setQueryData(ALL_APPOINTMENTS_KEY, rows);
+  return mine(rows);
 }
 
 /** How far ahead the card looks for the next booking and its paperwork. */

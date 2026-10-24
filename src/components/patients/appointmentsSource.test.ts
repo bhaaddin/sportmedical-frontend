@@ -1,9 +1,10 @@
+import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const get = vi.fn();
 vi.mock('../../api/client', () => ({ default: { get: (...a: unknown[]) => get(...a) } }));
 
-const { fetchAllAppointments } = await import('./appointmentsSource');
+const { fetchAllAppointments, fetchPatientAppointments, ALL_APPOINTMENTS_KEY } = await import('./appointmentsSource');
 
 beforeEach(() => {
   get.mockReset();
@@ -30,5 +31,23 @@ describe('fetchAllAppointments', () => {
       ],
     });
     await expect(fetchAllAppointments('p1')).resolves.toHaveLength(2);
+  });
+});
+
+describe('fetchPatientAppointments', () => {
+  it('an older server answers everybody: the answer is also kept as the clinic list, the next patient asks nothing', async () => {
+    const qc = new QueryClient();
+    get.mockResolvedValue({ data: [{ id: 'a', patientId: 'p1' }, { id: 'b', patientId: 'p2' }] });
+    await expect(fetchPatientAppointments(qc, 'p1')).resolves.toEqual([{ id: 'a', patientId: 'p1' }]);
+    expect(qc.getQueryData(ALL_APPOINTMENTS_KEY)).toHaveLength(2);
+    await expect(fetchPatientAppointments(qc, 'p2')).resolves.toEqual([{ id: 'b', patientId: 'p2' }]);
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('a narrowed answer is not stored as the clinic list', async () => {
+    const qc = new QueryClient();
+    get.mockResolvedValue({ data: [{ id: 'a', patientId: 'p1' }] });
+    await fetchPatientAppointments(qc, 'p1');
+    expect(qc.getQueryData(ALL_APPOINTMENTS_KEY)).toBeUndefined();
   });
 });
