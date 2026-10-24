@@ -219,7 +219,7 @@ something in them, most urgent first. Each item carries `to` (+ `state`) - the p
 | Brzy skončí platnost dokladu | `checkRequired` of today's patients (max 10 calls) | `patients.view` | low | the patient's documents |
 | Poptávky klubů | club orders with `status=Requested` | - | medium | `/clubs/objednavky` (opens the order) |
 | Registrace ke kontrole | intake queue | `patients.register` | medium | `/intake-review` |
-| Neodeslané zprávy | `GET /api/system/health` `outbox.failed` | `settings.clinic.manage` | **Done (S-5)** | done |
+| Neodeslané zprávy | `GET /api/system/health` `outbox.failed` | `settings.clinic.manage` | medium | `/system-health` |
 
 `useAttention(todayAppointments, patientNames)` runs the queries (a source that fails is **said**, never turned into an all-clear).
 **Adding a rule**: a pure function `AttentionInput -> AttentionGroup | null` in `attention.ts`, an entry in `attentionGroups`, its
