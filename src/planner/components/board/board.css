@@ -841,3 +841,21 @@
 .gap-choice-btn { min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: center; }
 .gap-choice-btn.is-primary { background: hsl(from #23f2e7 var(--sm-hsl, h s l)); color: #00222b; border-color: transparent; }
 .gap-choice-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* R13: a club's held time on the desktop "Den" list - the week's hatch in the club's colour, a locked bar with words */
+.sm-planner .alt-row.is-hold {
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  border: 0;
+  border-left: 4px solid var(--club-tone, #3d7a8c);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--club-tone, #3d7a8c) 24%, transparent) 0 7px, color-mix(in srgb, var(--club-tone, #3d7a8c) 6%, transparent) 7px 14px);
+}
+.sm-planner .alt-row.is-hold .icon { width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; }
+
+/* R13: a patient who was already booked inside a club's hold sits ON the hold - the club's words stay at its top, in view, not centred under that card */
+.sm-planner .board-window.is-club { justify-content: flex-start; padding-top: 6px; }

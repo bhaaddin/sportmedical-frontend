@@ -337,6 +337,7 @@ describe('R24: bookings stand in the club way - one flow instead of "move them f
 
   async function openConflict() {
     refuse();
+    apptRange.mockResolvedValueOnce([]); /* the look BEFORE saving finds nothing; the server's own 409 is what sends the staff to the step */
     mount();
     const user = await chooseClub();
     await user.click(await screen.findByTestId('add-to-club-order-row'));
@@ -376,6 +377,44 @@ describe('R24: bookings stand in the club way - one flow instead of "move them f
     expect(apptResched.mock.calls[0]).toEqual(['cal-2', 'b1', '2026-11-05T07:30:00Z', undefined, { notifyPatient: true }]);
     expect(apptResched.mock.calls[1]).toEqual(['cal-2', 'b2', '2026-11-05T07:00:00Z', undefined, { notifyPatient: false }]);
     await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  });
+
+  describe('a server that accepts a club over a booking (it answers 200): the step comes BEFORE the save', () => {
+    async function pressConfirm() {
+      mount();
+      const user = await chooseClub();
+      await user.click(await screen.findByTestId('add-to-club-order-row'));
+      await user.click(screen.getByTestId('add-to-club-confirm'));
+      return user;
+    }
+
+    it('nobody is overlapped or moved unasked: the step opens, nothing is saved, nothing is rescheduled', async () => {
+      apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková')]);
+      apptAvail.mockResolvedValue([slot('10:00')]);
+      await pressConfirm();
+      await screen.findByTestId('club-conflict');
+      expect(screen.getByTestId('club-conflict-list')).toHaveTextContent('Jana Nováková');
+      await screen.findByTestId('club-conflict-to-b1');
+      expect(update).not.toHaveBeenCalled();
+      expect(apptResched).not.toHaveBeenCalled();
+    });
+
+    it('after "Přesunout a pokračovat" the club is placed with ONE update', async () => {
+      apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková')]);
+      apptAvail.mockResolvedValue([slot('10:00')]);
+      const user = await pressConfirm();
+      await screen.findByTestId('club-conflict-to-b1');
+      await user.click(screen.getByTestId('club-conflict-go'));
+      await waitFor(() => expect(apptResched).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    });
+
+    it('a club player (a booking that has a partner) and a booking outside the marked time are never "in the way"', async () => {
+      apptRange.mockResolvedValue([{ ...booking('club-player', '08:00', '08:30', 'Hráč Klubu'), partnerName: 'FK Slaný' }, booking('far', '12:00', '12:30', 'Mimo Čas')]);
+      await pressConfirm();
+      await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId('club-conflict')).toBeNull();
+    });
   });
 
   it('a booking with no free slot says so and blocks the step', async () => {

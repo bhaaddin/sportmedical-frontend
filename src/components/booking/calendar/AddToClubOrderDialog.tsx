@@ -236,6 +236,36 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
     }
   }
 
+  /* R24 on a server that does not refuse a club over a booking (it answers 200): look BEFORE saving, so nobody is overlapped or moved unasked.
+   * Only what the staff just marked is checked (the order's own days hold the club's players), and a club player is never "in the way". */
+  async function bookingsInTheMarkedTime(): Promise<boolean> {
+    const fresh = markedPicks(marked, calendars, allowed);
+    const freshWindows = clubWindowsOf(ordersRangesOf(fresh, today));
+    if (freshWindows.length === 0) return false;
+    const days = freshWindows.map((w) => w.day).sort();
+    try {
+      const all = await appointmentsApi.range(days[0]!, days[days.length - 1]!, pickedCalendarIds(fresh));
+      const inWay = collidingBookings(freshWindows, pickedCalendarIds(fresh), all).filter((a) => !a.partnerName);
+      if (inWay.length === 0) return false;
+      const ids = new Set(inWay.map((a) => a.id));
+      setFailure(null);
+      setConflict({ bookings: inWay, staying: all.filter((a) => !ids.has(a.id)), windows: clubWindowsOf(ranges) });
+      return true;
+    } catch {
+      return false; // the list could not be read: save as before, the server's own refusal still lands in the same step
+    }
+  }
+
+  async function submit() {
+    setMoving(true);
+    try {
+      if (await bookingsInTheMarkedTime()) return;
+    } finally {
+      setMoving(false);
+    }
+    save.mutate({ cancelAffected: affected !== null });
+  }
+
   const pending = save.isPending || moving;
 
   const chooseClub = (next: Club | null) => {
@@ -365,7 +395,7 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
         <Button
           variant="contained"
           color={affected !== null ? 'error' : 'primary'}
-          onClick={() => save.mutate({ cancelAffected: affected !== null })}
+          onClick={() => void submit()}
           disabled={pending || order === null}
           data-testid="add-to-club-confirm"
           sx={{ minHeight: 44, flex: desktop ? undefined : 2 }}
