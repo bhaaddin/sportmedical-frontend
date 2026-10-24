@@ -103,6 +103,8 @@ import { Icon } from '../Icons';
 import { DayList, MonthMatrix } from './AlternateView';
 import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
 import { clubHolding, clubReservedText, offeredHolding, HOLD_TEXT } from './clubHold';
+import { gapBusy } from './gapContext';
+import { firstGapQuestion, nextGapQuestion, type GapKind, type GapQuestion } from '../../model/gaps';
 import { LunchBandEl } from './BoardCards';
 import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../../colors/dayLock';
@@ -119,6 +121,7 @@ const ClubBlockPopover = lazy(() => import('../../../components/booking/calendar
 const AppointmentDetail = lazy(() => import('../../../components/booking/AppointmentDetail').then((m) => ({ default: m.AppointmentDetail })));
 const LunchLayer = lazy(() => import('./LunchLayer'));
 const ClashLayer = lazy(() => import('./ClashLayer'));
+const GapChoice = lazy(() => import('./GapChoice'));
 const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
@@ -641,17 +644,58 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     return r ? { x: r.left, y: r.top, width: r.width, height: r.height } : { x: pending?.x ?? 0, y: pending?.y ?? 0, width: 0, height: 0 };
   };
 
-  const chooseBook = () => {
-    if (!pending || !pending.calendarId) return;
-    const anchor = selectionAnchor();
+  /* R23: a click that leaves a hole shorter than a slot before (or the board step after) asks which place is meant - before the dialog opens */
+  const [gapAsk, setGapAsk] = useState<{ q: GapQuestion; x: number; y: number; sel: PendingSelection; anchor: { x: number; y: number; width: number; height: number } } | null>(null);
+  const bookAt = (sel: PendingSelection, range: MinuteRange, anchor: { x: number; y: number; width: number; height: number }) => {
     openBooking({
-      initialDate: pending.day,
-      initialCalendarId: pending.calendarId,
-      initialStart: localDateTime(pending.day, pending.range.start),
-      initialEnd: localDateTime(pending.day, pending.range.end),
+      initialDate: sel.day,
+      initialCalendarId: sel.calendarId!,
+      initialStart: localDateTime(sel.day, range.start),
+      initialEnd: localDateTime(sel.day, range.end),
       ...(filter !== 'all' && calendar?.catalogue.activities.has(filter) ? { initialActivityId: filter } : {}),
       anchor,
     });
+    setPending(null);
+    setGapAsk(null);
+  };
+  const gapBusyOf = (sel: PendingSelection) =>
+    calendar && sel.calendarId
+      ? gapBusy({
+          calendarId: sel.calendarId,
+          day: sel.day,
+          columnCalendarIds: calendar.calendars.filter((c) => (calendar.alias.get(c.id) ?? c.id) === (calendar.alias.get(sel.calendarId!) ?? sel.calendarId)).map((c) => c.id),
+          appointments: move.appointments,
+          blocksByCalendar: calendar.blocksByCalendar,
+          previewByCalendar: calendar.previewByCalendar,
+          workerRule: calendar.workerRule,
+          allCalendarIds: calendar.calendars.map((c) => c.id),
+          today: ctx.today,
+          nowMinute,
+        })
+      : [];
+  const gapThresholds = (sel: PendingSelection): { slot: number; step: number } => {
+    const own = calendar?.calendarById.get(sel.calendarId ?? '');
+    const boardStep = own && own.displayStepMinutes > 0 ? own.displayStepMinutes : 30;
+    const activity = filter !== 'all' ? calendar?.catalogue.activities.get(filter) : undefined;
+    return { slot: activity && activity.durationMinutes > 0 ? activity.durationMinutes : boardStep, step: boardStep };
+  };
+  const answerGap = (kind: GapKind, chosen: MinuteRange) => {
+    const ask = gapAsk;
+    if (!ask) return;
+    const after = nextGapQuestion(gapBusyOf(ask.sel), kind, chosen, gapThresholds(ask.sel).step);
+    if (after) setGapAsk({ ...ask, q: after, sel: { ...ask.sel, range: chosen } });
+    else bookAt(ask.sel, chosen, ask.anchor);
+  };
+  const chooseBook = () => {
+    if (!pending || !pending.calendarId) return;
+    const anchor = selectionAnchor();
+    const { slot, step: boardStep } = gapThresholds(pending);
+    const q = firstGapQuestion(gapBusyOf(pending), pending.range, slot, boardStep);
+    if (!q) {
+      bookAt(pending, pending.range, anchor);
+      return;
+    }
+    setGapAsk({ q, x: pending.x, y: pending.y, sel: pending, anchor });
     setPending(null);
   };
   const chooseBlock = () => {
@@ -1427,6 +1471,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           onClose={move.cancelProposal}
           onConfirm={move.confirmProposal}
         />
+      ) : null}
+
+      {gapAsk ? (
+        <Suspense fallback={null}>
+          <GapChoice question={gapAsk.q} x={gapAsk.x} y={gapAsk.y} onChoose={(range) => answerGap(gapAsk.q.kind, range)} onClose={() => setGapAsk(null)} />
+        </Suspense>
       ) : null}
 
       <Popover

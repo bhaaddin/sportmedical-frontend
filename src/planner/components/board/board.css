@@ -834,3 +834,10 @@
 /* R22: an OFFERED day only warns, it does not refuse - a press on the free part of it marks time as everywhere else (and asks first); only the label opens the order */
 .sm-planner .board-window.is-offered { pointer-events: none; }
 .sm-planner .board-window.is-offered .board-sticky { pointer-events: auto; cursor: pointer; }
+
+/* R23 - the gap pop-out at the click (rendered in a portal, so not scoped to .sm-planner): two 44 px buttons */
+.gap-choice p { margin: 6px 0 10px; font-size: 13px; line-height: 1.35; }
+.gap-choice-actions { display: flex; flex-direction: column; gap: 6px; }
+.gap-choice-btn { min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: center; }
+.gap-choice-btn.is-primary { background: var(--gap-accent, #0fead6); color: #00222b; border-color: transparent; }
+.gap-choice-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
