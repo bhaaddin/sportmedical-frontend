@@ -1,0 +1,12 @@
+[
+  {
+    "name": "found-zz-test-with-row",
+    "status": "PASS",
+    "detail": "count=1"
+  },
+  {
+    "name": "resetpw-dialog-text",
+    "status": "INFO",
+    "detail": "shows password directly"
+  }
+]

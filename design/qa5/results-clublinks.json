@@ -1,0 +1,27 @@
+[
+  {
+    "name": "login",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "name": "club-link-extracted",
+    "status": "PASS",
+    "detail": "http://localhost:3127/klub-objednavka/0zskgGNMGakmNKNfo55pkDjSeCemSFvX3ndOvDm9il4"
+  },
+  {
+    "name": "old-link-works-before-rotate",
+    "status": "PASS",
+    "detail": "SportMedical\nDIAGNOSTICS\nO nás\nSlužby\nCeník\nPro kluby\nDokumenty\nKontakt\nMůj portál\nObjednat termín\nObchodní podmínky\nOchrana osobních údajů\nStorno a r"
+  },
+  {
+    "name": "club-link-rotated",
+    "status": "PASS",
+    "detail": "http://localhost:3127/klub-objednavka/iz051mvRMytAtCqqn1wtpQ7yy1YKuI7Js-ah8MjULHg"
+  },
+  {
+    "name": "old-link-answers-unknown-after-rotate",
+    "status": "INFO",
+    "detail": "status=200 bodyStart=\"SportMedical DIAGNOSTICS O nás Služby Ceník Pro kluby Dokumenty Kontakt Můj portál Objednat termín Odkaz neplatí  Tento odkaz neplatí. Zkontrolujte, ž\""
+  }
+]

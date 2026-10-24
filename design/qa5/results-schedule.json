@@ -1,0 +1,32 @@
+[
+  {
+    "name": "login",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "name": "friday-row-inputs",
+    "status": "PASS",
+    "detail": "count=4"
+  },
+  {
+    "name": "save-button-visible",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "name": "wh-impact-dialog-or-saved",
+    "status": "INFO",
+    "detail": "no dialog, saved directly"
+  },
+  {
+    "name": "wh-save-network",
+    "status": "PASS",
+    "detail": "200 PUT /api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/working-hours/01a0fee3-1894-7241-beca-6239901771d3 | 200 GET /api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/periods | 200 GET /api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/periods/01a0fee3-17cb-7d67-acc3-4d4d7085681e/working-hours"
+  },
+  {
+    "name": "wh-persists-after-reload",
+    "status": "PASS",
+    "detail": "found 19:00"
+  }
+]

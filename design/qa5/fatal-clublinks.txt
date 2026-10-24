@@ -1,0 +1,9 @@
+locator.click: Error: strict mode violation: getByText('KO-85C14899') resolved to 3 elements:
+    1) <span class="MuiTypography-root MuiTypography-body1 css-1fquiif-MuiTypography-root">KO-85C14899</span> aka getByRole('link', { name: 'Objednávka KO-85C14899: Čeká' })
+    2) <p class="MuiTypography-root MuiTypography-body1 css-116gaq9-MuiTypography-root">22. 10. 2026 16:59 · MUDr. Jan Novák · KO-85C14899</p> aka getByText('22. 10. 2026 16:59 · MUDr.')
+    3) <p class="MuiTypography-root MuiTypography-body2 css-1155eju-MuiTypography-root">Objednávka KO-85C14899</p> aka getByText('Objednávka KO-85C14899')
+
+Call log:
+[2m  - waiting for getByText('KO-85C14899')[22m
+
+    at C:\Users\Matko\vt-tmp\qa5-clublinks.mjs:59:39

@@ -1,0 +1,127 @@
+[
+  {
+    "name": "login",
+    "status": "PASS",
+    "detail": "landed on http://localhost:3127/prehled"
+  },
+  {
+    "name": "load:clubs",
+    "status": "PASS",
+    "detail": "/clubs -> h1=\"Kluby a týmy\""
+  },
+  {
+    "name": "load:clubs-objednavky",
+    "status": "PASS",
+    "detail": "/clubs/objednavky -> h1=\"Objednávky klubů\""
+  },
+  {
+    "name": "load:clubs-hraci",
+    "status": "PASS",
+    "detail": "/clubs/hraci -> h1=\"Hráči klubů\""
+  },
+  {
+    "name": "load:clubs-statistiky",
+    "status": "PASS",
+    "detail": "/clubs/statistiky -> h1=\"Statistiky klubů\""
+  },
+  {
+    "name": "load:clubs-fakturace",
+    "status": "PASS",
+    "detail": "/clubs/fakturace -> h1=\"Fakturace klubů\""
+  },
+  {
+    "name": "load:calendars",
+    "status": "PASS",
+    "detail": "/calendars -> h1=\"Kalendáře\""
+  },
+  {
+    "name": "load:activities",
+    "status": "PASS",
+    "detail": "/activities -> h1=\"Činnosti\""
+  },
+  {
+    "name": "load:working-hours",
+    "status": "PASS",
+    "detail": "/working-hours -> h1=\"Otevírací doba\""
+  },
+  {
+    "name": "load:exceptions",
+    "status": "PASS",
+    "detail": "/exceptions -> h1=\"Výjimky\""
+  },
+  {
+    "name": "load:svatky",
+    "status": "PASS",
+    "detail": "/svatky -> h1=\"Svátky a dovolené\""
+  },
+  {
+    "name": "load:blokovany-cas",
+    "status": "PASS",
+    "detail": "/blokovany-cas -> h1=\"Blokovaný čas\""
+  },
+  {
+    "name": "load:nepritomnosti",
+    "status": "PASS",
+    "detail": "/nepritomnosti -> h1=\"Nepřítomnost zaměstnanců\""
+  },
+  {
+    "name": "load:vyhrazeni",
+    "status": "PASS",
+    "detail": "/vyhrazeni -> h1=\"Hromadné objednávky\""
+  },
+  {
+    "name": "load:staff-management",
+    "status": "PASS",
+    "detail": "/staff-management -> h1=\"Uživatelé a práva\""
+  },
+  {
+    "name": "load:audit-log",
+    "status": "PASS",
+    "detail": "/audit-log -> h1=\"Auditní log\""
+  },
+  {
+    "name": "load:system-health",
+    "status": "PASS",
+    "detail": "/system-health -> h1=\"Zdraví systému\""
+  },
+  {
+    "name": "load:security-center",
+    "status": "PASS",
+    "detail": "/nastaveni/zabezpeceni-a-zalohy -> h1=\"Zabezpečení a zálohy\""
+  },
+  {
+    "name": "load:zabezpeceni-2fa",
+    "status": "PASS",
+    "detail": "/nastaveni/zabezpeceni -> h1=\"Zabezpečení\""
+  },
+  {
+    "name": "load:settings-media-texts",
+    "status": "PASS",
+    "detail": "/nastaveni/media-a-texty -> h1=\"Média a texty\""
+  },
+  {
+    "name": "load:settings-pripominky",
+    "status": "PASS",
+    "detail": "/nastaveni/pripominky -> h1=\"Připomínky\""
+  },
+  {
+    "name": "load:settings-souhlasy",
+    "status": "PASS",
+    "detail": "/nastaveni/souhlasy -> h1=\"Souhlasy a GDPR\""
+  },
+  {
+    "name": "load:dotaznik-nastaveni",
+    "status": "PASS",
+    "detail": "/dotaznik-nastaveni -> h1=\"Vstupní dotazník\""
+  },
+  {
+    "name": "load:settings-sablony-emailu",
+    "status": "PASS",
+    "detail": "/nastaveni/sablony-emailu -> h1=\"SMS a e-maily\""
+  },
+  {
+    "name": "load:dokumenty-sablony",
+    "status": "PASS",
+    "detail": "/dokumenty-sablony -> h1=\"Dokumenty, šablony a hlavičky\""
+  }
+]

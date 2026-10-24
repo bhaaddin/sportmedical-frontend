@@ -1,0 +1,27 @@
+[
+  {
+    "name": "login",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "name": "staff-invite",
+    "status": "PASS",
+    "detail": "200 POST /api/v1/users | 200 GET /api/v1/users"
+  },
+  {
+    "name": "staff-open-permissions-dialog",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "name": "staff-deactivate",
+    "status": "PASS",
+    "detail": "200 PUT /api/v1/users/01a17006-097d-7640-8d29-0aa6aa46db1a/active | 200 GET /api/v1/users"
+  },
+  {
+    "name": "audit-log-shows-staff-event",
+    "status": "CHECK",
+    "detail": "name NOT found in audit log text"
+  }
+]

@@ -1,0 +1,28 @@
+locator.hover: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('tr').filter({ hasText: 'ZZ test staff 94610' }).getByLabel(/^Co smí/)[22m
+[2m    - locator resolved to <button tabindex="0" type="button" data-mui-internal-clone-element="true" aria-label="Co smí ZZ test staff 94610" class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeMedium css-1jl55ya-MuiButtonBase-root-MuiIconButton-root">…</button>[22m
+[2m  - attempting hover action[22m
+[2m    2 × waiting for element to be visible and stable[22m
+[2m      - element is visible and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div tabindex="-1" role="presentation" class="MuiDialog-container MuiDialog-scrollPaper css-45uc01-MuiDialog-container">…</div> from <div role="presentation" class="MuiDialog-root MuiModal-root css-1424xw8-MuiModal-root-MuiDialog-root">…</div> subtree intercepts pointer events[22m
+[2m    - retrying hover action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible and stable[22m
+[2m      - element is visible and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div tabindex="-1" role="presentation" class="MuiDialog-container MuiDialog-scrollPaper css-45uc01-MuiDialog-container">…</div> from <div role="presentation" class="MuiDialog-root MuiModal-root css-1424xw8-MuiModal-root-MuiDialog-root">…</div> subtree intercepts pointer events[22m
+[2m    - retrying hover action[22m
+[2m      - waiting 100ms[22m
+[2m    56 × waiting for element to be visible and stable[22m
+[2m       - element is visible and stable[22m
+[2m       - scrolling into view if needed[22m
+[2m       - done scrolling[22m
+[2m       - <div tabindex="-1" role="presentation" class="MuiDialog-container MuiDialog-scrollPaper css-45uc01-MuiDialog-container">…</div> from <div role="presentation" class="MuiDialog-root MuiModal-root css-1424xw8-MuiModal-root-MuiDialog-root">…</div> subtree intercepts pointer events[22m
+[2m     - retrying hover action[22m
+[2m       - waiting 500ms[22m
+
+    at C:\Users\Matko\vt-tmp\qa5-actions.mjs:56:17
