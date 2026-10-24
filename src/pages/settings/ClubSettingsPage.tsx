@@ -316,7 +316,7 @@ export default function ClubSettingsPage() {
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Horní strop počtu hráčů neexistuje — kalkulačka spočítá, kolik dní blok potřebuje.
               Slevu pro klub nastavuje administrátor v kartě klubu v sekci{' '}
-              <Box component={RouterLink} to="/clubs" sx={{ color: 'primary.main' }}>Kluby a týmy</Box>.
+              <Box component={RouterLink} to="/clubs" sx={{ color: 'primary.main', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Kluby a týmy</Box>.
             </Typography>
           </SettingsBoard>
         </Stack>
