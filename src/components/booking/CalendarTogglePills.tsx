@@ -37,6 +37,8 @@ export function CalendarTogglePills({
               borderRadius: 999,
               px: 1.75,
               minHeight: 36,
+              /* A thumb under 1280 (the shelf rule): 44 px. */
+              "@media (max-width: 1279.95px)": { minHeight: 44 },
               fontSize: 13,
               fontWeight: 600,
               gap: 1,

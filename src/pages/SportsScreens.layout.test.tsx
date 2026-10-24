@@ -98,3 +98,21 @@ describe('Dostupnost sportovců', () => {
     expect(await screen.findByText('Jan Novák')).toBeInTheDocument();
   });
 });
+
+describe('Dostupnost sportovců as a shelf page', () => {
+  it('is one shelf whose names open the patient\'s card', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+    availabilityGetAll.mockResolvedValue([avail('a1', 'Unavailable', 'Jan Novák')]);
+    renderAt('desktop', <Availability />);
+    const shelf = await screen.findByRole('region', { name: 'Sportovci' });
+    expect(within(shelf).getByRole('link', { name: 'Jan Novák' })).toHaveAttribute('href', '/patients/a1-uuid');
+    expect(screen.getByRole('heading', { level: 1, name: 'Dostupnost sportovců' })).toBeInTheDocument();
+  });
+
+  it('an empty list offers the next action, which opens the form', async () => {
+    availabilityGetAll.mockResolvedValue([]);
+    renderAt('desktop', <Availability />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Přidat sportovce' }));
+    expect(await screen.findByLabelText('ID pacienta')).toBeInTheDocument();
+  });
+});

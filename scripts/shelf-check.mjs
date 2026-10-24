@@ -192,6 +192,8 @@ const PAGE_PATH = {
   /* Phase 2, S-2 */
   /* Phase 2, S-3 */
   billing: '/billing', cashier: '/cashier', export: '/accounting-export', cenik: '/nastaveni/cenik',
+  /* Phase 2, S-1 Den na recepci (route table 33-36 and `*`); `termin` opens a real appointment (read only). */
+  dnes: '/dnes', sluzby: '/prehled-sluzeb', availability: '/availability', notfound: '/tahle-stranka-neexistuje',
   'intake-review': '/intake-review', register: '/patients/register', 'diagnostics-new': '/diagnostics/new', feedback: '/hodnoceni-pacientu',
 };
 /* The patient's own pages: `patient` + the suffix after `/patients/{id}`. */
@@ -200,8 +202,24 @@ const PATIENT_PAGE = {
 };
 const isPatientPage = (name) => Object.hasOwn(PATIENT_PAGE, name);
 
+/** An appointment to open (its own page, route 36): the first one the API lists from today on. */
+async function appointmentPath(page) {
+  await page.goto(`${BASE}/dnes`);
+  await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
+  return page.evaluate(async () => {
+    const token = localStorage.getItem('token');
+    const day = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(d);
+    const from = day(new Date());
+    const to = day(new Date(Date.now() + 40 * 864e5));
+    const res = await fetch(`/api/day?from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${token}` } });
+    const body = await res.json();
+    const rows = (body?.data ?? body ?? []).filter((r) => r.calendarId);
+    return rows.length === 0 ? null : `/kalendar/${rows[0].calendarId}/termin/${rows[0].id}`;
+  });
+}
+
 async function openPage(page, name, patientHref) {
-  const path = isPatientPage(name) ? `${patientHref}${PATIENT_PAGE[name]}` : PAGE_PATH[name];
+  const path = name === 'termin' ? patientHref : isPatientPage(name) ? `${patientHref}${PATIENT_PAGE[name]}` : PAGE_PATH[name];
   await page.goto(`${BASE}${path}`);
   await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
   /* let the data arrive, the cascade finish and the count-ups settle */
@@ -230,13 +248,18 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   const page = await ctx.newPage();
   const problems = [];
   watch(page, problems);
-  const href = isPatientPage(name) ? await patientPath(page) : null;
-  if (isPatientPage(name) && href === null) {
-    fail(where, 'no patient to open');
+  const href = isPatientPage(name) ? await patientPath(page) : name === 'termin' ? await appointmentPath(page) : null;
+  if ((isPatientPage(name) || name === 'termin') && href === null) {
+    fail(where, `no ${name === 'termin' ? 'appointment' : 'patient'} to open`);
     await ctx.close();
     return;
   }
   await openPage(page, name, href);
+  /* The appointment's page opens with its detail dialog: close it to see (and measure) the page behind. */
+  if (name === 'termin') {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+  }
 
   const shot = join(OUT, `${name}${label}${MODE === 'dark' ? '-dark' : ''}-${vp.label}.jpg`);
   /* Privacy: nothing shaped like a birth number or an insurance number reaches a screenshot (text or a field's value). */

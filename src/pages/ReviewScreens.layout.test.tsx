@@ -271,13 +271,17 @@ describe('Přihlášení', () => {
 /* ───────── 404 ───────── */
 describe('Stránka nenalezena', () => {
   describe.each(WIDTHS)('at %s', (width) => {
-    it('is a kit card with a 44 px way back to the overview', () => {
+    it('is a shelf page with one way back to the overview and where to go next', () => {
       const { container } = renderAt(width, <NotFound />);
       expect(container.querySelectorAll('[data-layout="not-found"]')).toHaveLength(1);
       expect(screen.getByRole('heading', { level: 1, name: 'Stránka nenalezena' })).toBeInTheDocument();
-      const back = screen.getByRole('link', { name: 'Zpět na přehled' });
-      expect(back).toHaveAttribute('href', '/prehled');
-      expect(back).toHaveStyle({ minHeight: '44px' });
+      const back = screen.getAllByRole('link', { name: 'Zpět na přehled' });
+      expect(back).toHaveLength(1);
+      expect(back[0]).toHaveAttribute('href', '/prehled');
+      /* On a phone the way back is pinned at the bottom (44 px is measured in the real browser: jsdom has no media queries). */
+      if (width === 'phone') expect(back[0].closest('[data-pinned="true"]')).not.toBeNull();
+      const next = screen.getByRole('region', { name: 'Kam dál' });
+      expect(next.querySelectorAll('[role="listitem"]').length).toBeGreaterThanOrEqual(3);
     });
   });
 });

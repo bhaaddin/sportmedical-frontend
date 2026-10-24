@@ -319,7 +319,7 @@
     },
     "serviceOverview": {
       "title": "Přehled podle služeb",
-      "subtitle": "Kolik termínů má která činnost, kdy jsou, kdo je poskytuje a kolik je ještě volno — podle zvoleného rozsahu, kalendářů, pracovníka a služby.",
+      "subtitle": "Kolik termínů má která činnost, kdo ji dělá a kolik je ještě volno.",
       "from": "Od",
       "to": "Do",
       "thisWeek": "Tento týden",

@@ -2,15 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Grid, Button, TextField, MenuItem, Stack } from '@mui/material';
 import { PersonAdd } from '@mui/icons-material';
 import { availabilityApi, type Availability } from '../api/availability';
-import { FilterChips, KpiCard, PageHeader, StatusChip, type ChipTone } from '../components/ui';
-import { FitPage } from '../components/ui/fit';
+import { FilterChips, StatusChip, type ChipTone } from '../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
-import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
 import { FormDialog } from './sports/FormDialog';
-import { ListSkeleton, LoadError } from './sports/LoadStates';
 import { ScrollChips } from './sports/ScrollChips';
-import { useTouchSx } from './sports/touch';
+import { EntityLink, PageFrame, Shelf } from '../ui/shelf';
 import toast from 'react-hot-toast';
 
 const statusConfig: Record<string, { label: string; tone: ChipTone }> = {
@@ -24,11 +21,13 @@ type StatusFilter = 'all' | keyof typeof statusConfig;
 
 const viewOf = (a: Availability) => statusConfig[a.status] || statusConfig.Available;
 const nameOf = (a: Availability) => a.patientName || a.patientId.slice(0, 8);
+/* The athlete is a patient of the clinic: the name opens the card (plain text without the permission), with a peek. */
+const athlete = (a: Availability) =>
+  a.patientId ? <EntityLink entity={{ kind: 'patient', id: a.patientId, label: nameOf(a) }} /> : nameOf(a);
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString('cs-CZ');
 
 export default function Availability() {
   const phone = useIsPhone();
-  const touch = useTouchSx();
   const [athletes, setAthletes] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -71,7 +70,7 @@ export default function Availability() {
   const shown = filter === 'all' ? athletes : athletes.filter(a => a.status === filter);
 
   const columns: DataColumn<Availability>[] = [
-    { key: 'name', header: 'Sportovec', tablet: true, cell: (a) => <Box sx={{ fontSize: 15, fontWeight: 600 }}>{nameOf(a)}</Box> },
+    { key: 'name', header: 'Sportovec', tablet: true, cell: (a) => <Box sx={{ fontSize: 15, fontWeight: 600 }}>{athlete(a)}</Box> },
     { key: 'status', header: 'Stav', tablet: true, cell: (a) => <StatusChip tone={viewOf(a).tone}>{viewOf(a).label}</StatusChip> },
     { key: 'reason', header: 'Důvod', cell: (a) => a.reason || '—' },
     {
@@ -81,80 +80,58 @@ export default function Availability() {
     { key: 'updated', header: 'Zapsáno', cell: (a) => `${dateOf(a.date)} · ${a.updatedBy}` },
   ];
 
-  const addButton = (
-    <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setOpen(true)} sx={touch}>
-      Přidat
-    </Button>
+  /* The filter carries the counts (it used to be four figure cards above it saying the same numbers twice - R18). */
+  const filters = (
+    <Box sx={phone ? { order: 3, flexBasis: '100%' } : undefined}>
+      <ScrollChips>
+        <FilterChips<StatusFilter>
+          ariaLabel="Filtr dostupnosti"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { key: 'all', label: 'Všichni', count: athletes.length },
+            { key: 'Available', label: 'K dispozici', count: available },
+            { key: 'Modified', label: 'Omezení', count: modified },
+            { key: 'Unavailable', label: 'Nedostupní', count: unavailable },
+            { key: 'Suspended', label: 'Vyloučení', count: count('Suspended') },
+          ]}
+        />
+      </ScrollChips>
+    </Box>
   );
 
   return (
-    <FitPage>
-      <PageHeader
-        title="Dostupnost sportovců"
-        subtitle="Kdo může trénovat a závodit"
-        actions={phone ? undefined : addButton}
-      />
-
-      <Grid container spacing={2} sx={{ mb: 2.5, flexShrink: 0 }}>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="K dispozici" value={available} tone="green" />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="Nedostupní" value={unavailable} tone={unavailable > 0 ? 'red' : 'ink'} />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="Omezení" value={modified} />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="Celkem" value={athletes.length} hint="záznamů o dostupnosti" />
-        </Grid>
-      </Grid>
-
-      <Box sx={{ mb: 2, flexShrink: 0 }}>
-        <ScrollChips>
-          <FilterChips<StatusFilter>
-            ariaLabel="Filtr dostupnosti"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { key: 'all', label: 'Všichni', count: athletes.length },
-              { key: 'Available', label: 'K dispozici', count: available },
-              { key: 'Modified', label: 'Omezení', count: modified },
-              { key: 'Unavailable', label: 'Nedostupní', count: unavailable },
-              { key: 'Suspended', label: 'Vyloučení', count: count('Suspended') },
-            ]}
-          />
-        </ScrollChips>
-      </Box>
-
-      {loading ? (
-        <ListSkeleton rows={5} height={phone ? 110 : 56} />
-      ) : failed ? (
-        <LoadError what="Dostupnost sportovců" onRetry={load} />
-      ) : (
+    <PageFrame
+      fit
+      title="Dostupnost sportovců"
+      purpose="Kdo může trénovat a závodit"
+      primaryAction={{ label: 'Přidat', icon: <PersonAdd />, onClick: () => setOpen(true) }}
+    >
+      <Shelf
+        id="athletes"
+        title="Sportovci"
+        count={loading || failed ? undefined : athletes.length}
+        layout="free"
+        grow
+        controls={athletes.length > 0 ? filters : undefined}
+        loading={loading}
+        error={failed ? 'Dostupnost sportovců se nepodařilo načíst.' : false}
+        onRetry={load}
+        empty={athletes.length === 0}
+        emptyState={{ text: 'Žádné záznamy o dostupnosti', action: { label: 'Přidat sportovce', onClick: () => setOpen(true) } }}
+      >
         <ResponsiveDataList
           ariaLabel="Dostupnost sportovců"
           rows={shown}
           rowKey={(a) => a.id}
           columns={columns}
           fill
-          empty={
-            athletes.length === 0 ? (
-              <>
-                <Typography sx={{ fontWeight: 600 }}>Žádné záznamy o dostupnosti</Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                  Přidejte prvního sportovce tlačítkem „Přidat“.
-                </Typography>
-              </>
-            ) : (
-              'V tomto filtru nikdo není.'
-            )
-          }
+          empty="V tomto filtru nikdo není."
           renderCard={(a) => (
             <>
               <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography sx={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {nameOf(a)}
+                <Typography component="div" sx={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {athlete(a)}
                 </Typography>
                 <StatusChip tone={viewOf(a).tone}>{viewOf(a).label}</StatusChip>
               </Stack>
@@ -170,9 +147,7 @@ export default function Availability() {
             </>
           )}
         />
-      )}
-
-      {phone && <PinnedActionBar label="Přidat sportovce">{addButton}</PinnedActionBar>}
+      </Shelf>
 
       <FormDialog
         open={open}
@@ -199,6 +174,6 @@ export default function Availability() {
           <Grid size={{ xs: 12 }}><TextField fullWidth type="date" label="Očekávaný návrat" value={form.expectedReturnDate} onChange={e => update('expectedReturnDate', e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Grid>
         </Grid>
       </FormDialog>
-    </FitPage>
+    </PageFrame>
   );
 }
