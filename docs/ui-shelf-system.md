@@ -219,7 +219,7 @@ something in them, most urgent first. Each item carries `to` (+ `state`) - the p
 | Brzy skončí platnost dokladu | `checkRequired` of today's patients (max 10 calls) | `patients.view` | low | the patient's documents |
 | Poptávky klubů | club orders with `status=Requested` | - | medium | `/clubs/objednavky` (opens the order) |
 | Registrace ke kontrole | intake queue | `patients.register` | medium | `/intake-review` |
-| Neodeslané zprávy | `GET /api/system/health` `outbox.failed` | `settings.clinic.manage` | medium | `/system-health` |
+| Neodeslané zprávy | `GET /api/system/health` `outbox.failed` | `settings.clinic.manage` | **Done (S-5)** | done |
 
 `useAttention(todayAppointments, patientNames)` runs the queries (a source that fails is **said**, never turned into an all-clear).
 **Adding a rule**: a pure function `AttentionInput -> AttentionGroup | null` in `attention.ts`, an entry in `attentionGroups`, its
@@ -385,7 +385,7 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 37 | `/blokovany-cas` | Blokovaný čas (387) | FitPage + StackTable | Aktivní bloky (cards), Končí brzy | calendar, worker | A5 | P2 |
 | 38 | `/nastaveni/sluzby` | Služby (613) | SettingsFrame | Služby (cards: činností, kalendářů), Bez činnosti (attention) | činnosti, calendars, required documents | A5 | P2 |
 | 39 | `/nastaveni/sluzby/:serviceId` | Služba (same screen, open) | SettingsFrame | Služba (board), Činnosti (cards), Kalendáře, Potřebné dokumenty | činnost, calendar, document template | A5 | P2 |
-| 40 | `/calendars` | Kalendáře (800) | SettingsFrame + StackTable | Kalendáře (cards), Kdo vidí (board) | worker, služba, hours | A5 | P2 |
+| 40 | `/calendars` | Kalendáře (800) | **Done (S-5)** | Kalendáře (cards), Kdo vidí (board) | worker, služba, hours | A5 | done |
 | 41 | `/activities` | Činnosti (930) | SettingsFrame + StackTable | Činnosti (grouped by služba), Bez ceny / bez kalendáře (attention) | služba, price item, documents, calendar | A5 | P2 |
 | 42 | `/working-hours` | Otevírací doba (694) | SettingsFrame | Týdenní rozvrh (board), Období a cyklus | calendar, exceptions | A5 | P3 |
 | 43 | `/exceptions` | Výjimky (446) | SettingsFrame | Nadcházející (cards), Minulé | calendar, holiday | A5 | P3 |
@@ -410,9 +410,9 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 62 | `/nastaveni/historie-zmen` | Historie změn (284) | SettingsFrame + table | Změny (grow), Filtr podle autora a důvodu | the changed screen, audit log | A7 | P2 |
 | 63 | `/nastaveni/zabezpeceni` | Zabezpečení / 2FA (192) | SettingsFrame | Dvoufázové ověření (board), Aktivní relace | account | A7 | P2 |
 | 64 | `/admin` | Správa (264) | SettingsFrame | Správa účtu a kliniky (cards), Nebezpečné akce | staff, audit | A7 | P3 |
-| 65 | `/system-health` | Zdraví systému (316) | SettingsFrame + KpiCard | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | P2 |
-| 66 | `/staff-management` | Tým (608) | SettingsFrame + table | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | P2 |
-| 67 | `/audit-log` | Audit (255) | SettingsFrame + table | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | P2 |
+| 65 | `/system-health` | Zdraví systému (316) | **Done (S-5)** | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | done |
+| 66 | `/staff-management` | Tým (608) | **Done (S-5)** | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | done |
+| 67 | `/audit-log` | Audit (255) | **Done (S-5)** | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | done |
 | - | `*` | Nenalezeno (42) | SoftCard | Kam dál: recents + pages (palette) | recents, command palette | A1 | P3 |
 
 Not counted: the six retired paths (`/injuries`, `/rtp`, `/concussion`, `/training-load`, `/wellness`, `/statistiky`) redirect to `/prehled`.

@@ -15,6 +15,7 @@
  * measured to mean nothing at all before - no rule read it, so a "deleted"
  * calendar still took bookings. The state is real now.
  */
+import type { AttentionGroup } from '../../ui/shelf/attention';
 
 export interface CalendarLike {
   isActive: boolean;
@@ -69,4 +70,43 @@ export function offerDeactivateInstead(
  */
 export function inactiveAmong<T extends CalendarLike>(calendars: readonly T[]): T[] {
   return calendars.filter((c) => !c.isActive);
+}
+
+/* ───────────────────────────── the shelf look (Phase 2, S-5) ───────────────────────────── */
+
+
+/**
+ * "Vyžaduje pozornost" on Kalendáře: an ACTIVE calendar that runs no služba offers nothing on any day, and nothing else
+ * says why. Each case opens that calendar's form (`editCalendarId`). From the list the screen already reads; `null` when
+ * nothing is wrong. An inactive one is not a problem - it takes no bookings anyway.
+ */
+export function calendarsAttention(
+  calendars: readonly { id: string; name: string; isActive: boolean; clinicServiceId: string | null }[],
+): AttentionGroup | null {
+  const silent = calendars.filter((c) => c.isActive && c.clinicServiceId === null);
+  if (silent.length === 0) return null;
+  return {
+    id: 'scheduleProblems',
+    severity: 'high',
+    title: 'Kalendář bez služby',
+    count: silent.length,
+    items: silent.slice(0, 5).map((c) => ({
+      id: c.id,
+      title: `„${c.name}“ bez služby`,
+      detail: 'Pacient se do něj neobjedná. Vyberte mu službu.',
+      to: '/calendars',
+      state: { editCalendarId: c.id },
+    })),
+    summary: silent.length === 1 ? 'Jeden kalendář nenabízí žádný termín.' : `${silent.length} ${silent.length < 5 ? 'kalendáře nenabízejí' : 'kalendářů nenabízí'} žádný termín.`,
+    action: { label: 'Nastavit službu', to: '/calendars', state: { editCalendarId: silent[0].id } },
+  };
+}
+
+/** The calendar a link asks for (router state, read once): mark it (`openCalendarId`) or open its form (`editCalendarId`). */
+export function calendarDeepLink(state: unknown): { kind: 'open' | 'edit'; id: string } | null {
+  if (state === null || typeof state !== 'object') return null;
+  const s = state as Record<string, unknown>;
+  if (typeof s.editCalendarId === 'string' && s.editCalendarId !== '') return { kind: 'edit', id: s.editCalendarId };
+  if (typeof s.openCalendarId === 'string' && s.openCalendarId !== '') return { kind: 'open', id: s.openCalendarId };
+  return null;
 }

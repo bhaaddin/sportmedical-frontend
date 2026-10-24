@@ -4,7 +4,7 @@
  */
 import { Box } from '@mui/material';
 import {
-  Description, Event, Groups, ListAlt, MedicalServices, Person, ReceiptLong, Tune,
+  Badge, CalendarMonth, Description, Event, Groups, ListAlt, MedicalServices, Person, ReceiptLong, Tune,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import type { EntityKind } from './entities';
@@ -19,6 +19,8 @@ export const ENTITY_ICON: Record<EntityKind, SvgIconComponent> = {
   document: Description,
   service: MedicalServices,
   activity: Tune,
+  calendar: CalendarMonth,
+  worker: Badge,
 };
 
 /** Tones follow the board's: people green, money beige, clubs blue, the calendar the accent, the rest quiet. */
@@ -31,6 +33,8 @@ export const ENTITY_TONE: Record<EntityKind, ShelfTone> = {
   document: 'grey',
   service: 'grey',
   activity: 'grey',
+  calendar: 'primary',
+  worker: 'grey',
 };
 
 /** The round icon that says what kind a thing is. Decorative: the kind is always also in the text or the label. */

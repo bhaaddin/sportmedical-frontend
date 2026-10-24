@@ -1,10 +1,8 @@
-import { StackTable } from "../../components/ui/StackTable";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,11 +11,6 @@ import {
   IconButton,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -28,6 +21,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import EditIcon from "@mui/icons-material/Edit";
 import GroupIcon from "@mui/icons-material/Group";
+import ScheduleIcon from "@mui/icons-material/Schedule";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import MenuItem from "@mui/material/MenuItem";
@@ -35,21 +29,20 @@ import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
 import { priceRangeText, priceTooltip, servicePriceRange } from "./serviceOverview";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
-import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
+import { calendarDeepLink, calendarsAttention, hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
 import type { Calendar, CalendarInput } from "../../api/bookingContracts";
-import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { CalendarAccessDialog } from "../../components/booking/CalendarAccessDialog";
 import { SettingsScreen } from "../settings/SettingsFrame";
 import { FIELD_LIMITS, PUBLIC_NUMBER_MINIMUMS } from "../../api/fieldLimits";
 import { calendarProblems, hasCalendarProblems } from "./calendarForm";
 import { ColorSelect } from "../../components/booking/ColorSelect";
-import {
-  DEFAULT_PALETTE_ENTRY,
-  readableTextOn,
-} from "../../utils/calendarPalette";
+import { DEFAULT_PALETTE_ENTRY } from "../../utils/calendarPalette";
+import { StatusChip } from "../../components/ui/StatusChip";
+import { AttentionCard, EntityChip, MUTED_SX, Shelf, TARGET_SX, cardSurface, toneOf } from "../../ui/shelf";
+import { shelfState } from "./shelfState";
 
 /** Calendars - contract screen 5.2, stage 1 of the running order in part 8. */
 
@@ -88,6 +81,30 @@ function emptyDraft(sortOrder: number): CalendarInput {
     publicHorizonDays: null,
     publicHoldMinutes: null,
     publicCancellationHours: null,
+  };
+}
+
+function draftOf(calendar: Calendar): CalendarInput {
+  return {
+    name: calendar.name,
+    color: calendar.color,
+    location: calendar.location,
+    displayStepMinutes: calendar.displayStepMinutes,
+    isActive: calendar.isActive,
+    sortOrder: calendar.sortOrder,
+    /* Sent back as it came - `PUT` is the whole calendar, so leaving it out
+       would clear it and the calendar would go quiet. */
+    clinicServiceId: calendar.clinicServiceId,
+    /*
+     * Edited below, under "Objednavani online". They were carried and never
+     * shown while public booking was still phase 2; it is live now, and v27
+     * makes a `PUT` the whole entity, so every one of them has to be in the
+     * body whether the owner touched it or not.
+     */
+    publicMinimumNoticeMinutes: calendar.publicMinimumNoticeMinutes,
+    publicHorizonDays: calendar.publicHorizonDays,
+    publicHoldMinutes: calendar.publicHoldMinutes,
+    publicCancellationHours: calendar.publicCancellationHours,
   };
 }
 
@@ -219,27 +236,7 @@ export default function CalendarsPage() {
 
   const openEdit = (calendar: Calendar) => {
     setEditing(calendar);
-    setDraft({
-      name: calendar.name,
-      color: calendar.color,
-      location: calendar.location,
-      displayStepMinutes: calendar.displayStepMinutes,
-      isActive: calendar.isActive,
-      sortOrder: calendar.sortOrder,
-      /* Sent back as it came - `PUT` is the whole calendar, so leaving it out
-         would clear it and the calendar would go quiet. */
-      clinicServiceId: calendar.clinicServiceId,
-      /*
-       * Edited below, under "Objednavani online". They were carried and never
-       * shown while public booking was still phase 2; it is live now, and v27
-       * makes a `PUT` the whole entity, so every one of them has to be in the
-       * body whether the owner touched it or not.
-       */
-      publicMinimumNoticeMinutes: calendar.publicMinimumNoticeMinutes,
-      publicHorizonDays: calendar.publicHorizonDays,
-      publicHoldMinutes: calendar.publicHoldMinutes,
-      publicCancellationHours: calendar.publicCancellationHours,
-    });
+    setDraft(draftOf(calendar));
     save.reset();
   };
 
@@ -284,6 +281,29 @@ export default function CalendarsPage() {
      the service is his decision, and a form opened over the list would be
      this screen making it for him. */
   const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
+
+  /*
+   * Deep links (router state, ids only, read once): `openCalendarId` - a calendar chip anywhere - scrolls to that
+   * calendar and marks it (a hidden one is shown); `editCalendarId` - the attention card - opens its form.
+   */
+  const link = calendarDeepLink(location.state);
+  const [markedId, setMarkedId] = useState<string | null>(null);
+  const [linkTaken, setLinkTaken] = useState<string | null>(null);
+  const linked = link === null || !calendarsQuery.isSuccess ? undefined : allCalendars.find((c) => c.id === link.id);
+  if (link !== null && linked !== undefined && linkTaken !== `${link.kind}:${link.id}`) {
+    setLinkTaken(`${link.kind}:${link.id}`);
+    if (!linked.isActive) setShowInactive(true);
+    /* Inline, not openEdit: a mutation's reset is not something to call while drawing. */
+    if (link.kind === "edit") { setEditing(linked); setDraft(draftOf(linked)); }
+    else setMarkedId(linked.id);
+  }
+  useEffect(() => {
+    if (markedId === null) return;
+    document.querySelector(`[data-calendar-id="${CSS.escape(markedId)}"]`)?.scrollIntoView?.({ block: "center" });
+  }, [markedId]);
+
+  const listState = shelfState(calendarsQuery, t);
+  const attention = calendarsQuery.isSuccess ? calendarsAttention(allCalendars) : null;
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
   /* Measured server rules, said at the field they are about (calendarForm.ts). */
@@ -340,168 +360,133 @@ export default function CalendarsPage() {
         </Alert>
       )}
 
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.calendars.empty")}
-        emptyAction={{ label: t("booking.calendars.new"), onClick: openCreate }}
-        onRetry={() => void calendarsQuery.refetch()}
+      {/* "Vyžaduje pozornost": an active calendar that runs no služba offers nothing on any day - from the list this screen reads. */}
+      {attention !== null && (
+        <Box sx={{ mb: 3 }}>
+          <Shelf id="calendars-attention" title="Vyžaduje pozornost" count={attention.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+            <AttentionCard group={attention} />
+          </Shelf>
+        </Box>
+      )}
+
+      <Shelf
+        id="calendars"
+        title="Kalendáře"
+        count={listState.loading || listState.error !== false ? undefined : calendars.length}
+        hint={hidden > 0 && !showInactive ? `Neaktivní skryté: ${hidden}` : undefined}
+        layout="grid"
+        minCardWidth={300}
+        cardHeight={176}
+        loading={listState.loading}
+        error={listState.error}
+        onRetry={listState.onRetry}
+        empty={calendars.length === 0}
+        emptyState={{ text: t("booking.calendars.empty"), action: { label: t("booking.calendars.new"), onClick: openCreate } }}
       >
-        <StackTable>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t("booking.calendars.column.name")}</TableCell>
-                <TableCell>{t("booking.calendars.column.location")}</TableCell>
-                <TableCell>{t("booking.calendars.column.step")}</TableCell>
-                <TableCell>{t("booking.calendars.column.state")}</TableCell>
-                <TableCell align="right">
-                  {t("booking.common.actions")}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {calendars.map((calendar) => (
-                <TableRow key={calendar.id} hover>
-                  <TableCell>
-                    {/* 7.1: the colour is decoration; the name carries the meaning. */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
-                        aria-hidden
-                        sx={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: "3px",
-                          backgroundColor: calendar.color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Box>
-                        <Typography sx={{ fontWeight: 600 }}>
-                          {calendar.name}
-                        </Typography>
-                        {/*
-                          * Which služba it runs, and a warning when it runs
-                          * none - because then it offers nothing on any day,
-                          * and nothing else on any screen says why. This was
-                          * the state every calendar was in until booking's
-                          * fix: a filter with no way to set what it filtered
-                          * on.
-                          */}
-                        {calendar.clinicServiceId === null ? (
-                          <Typography variant="caption" sx={{ color: "warning.main" }}>
-                            Neprovozuje žádnou službu — nenabídne nic
-                          </Typography>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            {serviceName(calendar.clinicServiceId) ?? "Služba už neexistuje"}
-                          </Typography>
-                        )}
-                        {(() => {
-                          const prices = servicePrices(calendar.clinicServiceId);
-                          return prices === null ? null : (
-                            /* The summary in the cell; every činnost with its price in the tooltip - a phone's table cell is narrow. */
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              component="div"
-                              data-testid={`calendar-prices-${calendar.id}`}
-                              title={prices.lines}
-                              sx={{ fontVariantNumeric: "tabular-nums" }}
-                            >
-                              {prices.summary}
-                            </Typography>
-                          );
-                        })()}
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{calendar.location || "-"}</TableCell>
-                  <TableCell>
-                    {t("booking.calendars.stepValue", {
-                      minutes: calendar.displayStepMinutes,
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={
-                        calendar.isActive
-                          ? t("booking.calendars.active")
-                          : t("booking.calendars.inactive")
-                      }
-                      sx={
-                        calendar.isActive
-                          ? {
-                              backgroundColor: calendar.color,
-                              color: readableTextOn(calendar.color),
-                            }
-                          : undefined
-                      }
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Tooltip title={t("booking.access.action")}>
-                      <IconButton
-                        aria-label={t("booking.access.action")}
-                        onClick={() => setAccessFor(calendar)}
-                      >
-                        <GroupIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t("booking.common.edit")}>
-                      <IconButton
-                        aria-label={t("booking.common.edit")}
-                        onClick={() => openEdit(calendar)}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={
-                        calendar.isActive
-                          ? t("booking.calendars.deactivateAction")
-                          : t("booking.calendars.activateAction")
-                      }
+        {calendars.map((calendar) => {
+          const prices = servicePrices(calendar.clinicServiceId);
+          const service = calendar.clinicServiceId === null ? null : serviceName(calendar.clinicServiceId);
+          const marked = markedId === calendar.id;
+          const toggleLabel = calendar.isActive ? t("booking.calendars.deactivateAction") : t("booking.calendars.activateAction");
+          return (
+            <Box
+              key={calendar.id}
+              role="listitem"
+              data-card="calendar"
+              data-calendar-id={calendar.id}
+              aria-current={marked ? "true" : undefined}
+              sx={(th) => ({
+                ...cardSurface(th, false),
+                p: 1.75,
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                opacity: calendar.isActive ? 1 : 0.72,
+                /* 7.1: the colour is decoration; the name carries the meaning. The calendar's own colour is its edge. */
+                borderLeft: `4px solid ${calendar.color}`,
+                ...(marked ? { boxShadow: `0 0 0 2px ${th.palette.primary.main}` } : {}),
+              })}
+            >
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                <Typography component="h3" sx={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.3, overflowWrap: "anywhere" }}>
+                  {calendar.name}
+                </Typography>
+                <StatusChip tone={calendar.isActive ? "green" : "grey"} size="sm">
+                  {calendar.isActive ? t("booking.calendars.active") : t("booking.calendars.inactive")}
+                </StatusChip>
+              </Box>
+
+              {/*
+                * Which služba it runs, and a warning when it runs
+                * none - because then it offers nothing on any day,
+                * and nothing else on any screen says why. This was
+                * the state every calendar was in until booking's
+                * fix: a filter with no way to set what it filtered
+                * on.
+                */}
+              <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, minWidth: 0 }}>
+                {calendar.clinicServiceId === null ? (
+                  <Typography variant="body2" sx={(th) => ({ color: toneOf(th, "red").fg, fontWeight: 600 })}>
+                    Neprovozuje žádnou službu — nenabídne nic
+                  </Typography>
+                ) : service !== null ? (
+                  <EntityChip entity={{ kind: "service", id: calendar.clinicServiceId, label: service }} size="sm" />
+                ) : (
+                  <Typography variant="body2" sx={MUTED_SX}>Služba už neexistuje</Typography>
+                )}
+                {prices === null ? null : (
+                  /* The summary on the card; every činnost with its price in the tooltip. */
+                  <Typography
+                    variant="caption"
+                    component="div"
+                    data-testid={`calendar-prices-${calendar.id}`}
+                    title={prices.lines}
+                    sx={{ ...MUTED_SX, fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {prices.summary}
+                  </Typography>
+                )}
+              </Box>
+
+              <Box sx={{ display: "flex", flexWrap: "wrap", columnGap: 0.75, ...MUTED_SX, fontSize: 14 }}>
+                <span>{calendar.location || "-"}</span>
+                <span aria-hidden>·</span>
+                <span>{t("booking.calendars.stepValue", { minutes: calendar.displayStepMinutes })}</span>
+              </Box>
+
+              <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, mt: "auto", pt: 0.5 }}>
+                <Button size="small" startIcon={<EditIcon fontSize="small" />} aria-label={t("booking.common.edit")} onClick={() => openEdit(calendar)} sx={TARGET_SX}>
+                  {t("booking.common.edit")}
+                </Button>
+                <Button size="small" startIcon={<GroupIcon fontSize="small" />} aria-label={t("booking.access.action")} onClick={() => setAccessFor(calendar)} sx={TARGET_SX}>
+                  {t("booking.access.action")}
+                </Button>
+                <Button size="small" component={RouterLink} to="/working-hours" state={{ calendarId: calendar.id }} startIcon={<ScheduleIcon fontSize="small" />} sx={TARGET_SX}>
+                  Hodiny
+                </Button>
+                <Box sx={{ flex: 1 }} />
+                <Tooltip title={toggleLabel}>
+                  <span>
+                    <IconButton
+                      aria-label={`${toggleLabel} — ${calendar.name}`}
+                      disabled={setActive.isPending}
+                      onClick={() => setActive.mutate({ id: calendar.id, active: !calendar.isActive })}
+                      sx={TARGET_SX}
                     >
-                      <IconButton
-                        aria-label={`${
-                          calendar.isActive
-                            ? t("booking.calendars.deactivateAction")
-                            : t("booking.calendars.activateAction")
-                        } — ${calendar.name}`}
-                        disabled={setActive.isPending}
-                        onClick={() =>
-                          setActive.mutate({
-                            id: calendar.id,
-                            active: !calendar.isActive,
-                          })
-                        }
-                      >
-                        {calendar.isActive ? (
-                          <VisibilityOffIcon fontSize="small" />
-                        ) : (
-                          <PlayArrowIcon fontSize="small" />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t("booking.common.delete")}>
-                      <IconButton
-                        aria-label={`${t("booking.common.delete")} — ${calendar.name}`}
-                        onClick={() => setConfirmDelete(calendar)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </StackTable>
-      </AsyncSection>
+                      {calendar.isActive ? <VisibilityOffIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={t("booking.common.delete")}>
+                  <IconButton aria-label={`${t("booking.common.delete")} — ${calendar.name}`} onClick={() => setConfirmDelete(calendar)} sx={TARGET_SX}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          );
+        })}
+      </Shelf>
 
       <Dialog
         open={draft !== null}

@@ -11,6 +11,8 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 import { activitiesApi } from '../../api/activities';
+import { calendarsApi } from '../../api/calendars';
+import { userAccountsApi, ROLE_LABELS, type UserAccount } from '../../api/userAccounts';
 import { appointmentsApi } from '../../api/appointments';
 import { billingApi, type Invoice } from '../../api/billing';
 import { statusName, type Appointment } from '../../api/bookingContracts';
@@ -163,6 +165,31 @@ export function activityPeek(activity: { durationMinutes: number; priceCzk: numb
   };
 }
 
+/** A calendar: the služba it runs is the chip's neighbour, so the facts are where it is and how its day is cut. */
+export function calendarPeek(calendar: { location: string; displayStepMinutes: number; isActive: boolean; clinicServiceId: string | null }): Peek {
+  return {
+    facts: [
+      ...fact('Místo', calendar.location),
+      ...fact('Krok', `${calendar.displayStepMinutes} min`),
+      ...(calendar.clinicServiceId === null ? [{ label: 'Služba', value: 'žádná — nenabídne nic' }] : []),
+    ],
+    status: { label: calendar.isActive ? 'Aktivní' : 'Neaktivní', tone: calendar.isActive ? 'green' : 'grey' },
+  };
+}
+
+/** A staff member: the role and the last sign-in. Never the e-mail on a hover. */
+export function workerPeek(account: Pick<UserAccount, 'role' | 'isActive' | 'mustChangePassword' | 'lastLoginAtUtc'>): Peek {
+  return {
+    facts: [
+      ...fact('Role', ROLE_LABELS[account.role] ?? account.role),
+      ...fact('Naposledy přihlášen', account.lastLoginAtUtc === null ? 'zatím nikdy' : formatPragueDateTime(account.lastLoginAtUtc)),
+    ],
+    status: !account.isActive
+      ? { label: 'Vypnutý', tone: 'grey' }
+      : account.mustChangePassword ? { label: 'Čeká na první přihlášení', tone: 'beige' } : { label: 'Aktivní', tone: 'green' },
+  };
+}
+
 /* ───────────────────────────── lazy: ask the api modules ───────────────────────────── */
 
 const MINUTE = 60_000;
@@ -207,6 +234,17 @@ export async function loadPeek(ref: EntityRef, queryClient: QueryClient, now: Da
       const list = await queryClient.fetchQuery({ queryKey: PEEK_KEYS.activities, queryFn: () => activitiesApi.list(), staleTime: 5 * MINUTE });
       const activity = list.activities.find((a) => a.id === ref.id);
       return activity === undefined ? { facts: [] } : activityPeek(activity);
+    }
+    case 'calendar': {
+      /* The key Kalendáře and the booking screens read the list under. */
+      const calendars = await queryClient.fetchQuery({ queryKey: ['calendars'], queryFn: () => calendarsApi.list(), staleTime: 5 * MINUTE });
+      const calendar = calendars.find((c) => c.id === ref.id);
+      return calendar === undefined ? { facts: [] } : calendarPeek(calendar);
+    }
+    case 'worker': {
+      const accounts = await queryClient.fetchQuery({ queryKey: ['shelf', 'user-accounts'], queryFn: () => userAccountsApi.list(), staleTime: 5 * MINUTE });
+      const account = accounts.find((a) => a.userId === ref.id);
+      return account === undefined ? { facts: [] } : workerPeek(account);
     }
   }
 }

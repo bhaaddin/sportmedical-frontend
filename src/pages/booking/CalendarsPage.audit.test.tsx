@@ -95,7 +95,7 @@ describe('calendarProblems (the rules the server enforces, said at the field)', 
 describe('the list', () => {
   it('shows the stored name, place, step and service of every calendar', async () => {
     renderScreen(<CalendarsPage />, '/calendars');
-    const row = (await screen.findByText('Ordinace 1')).closest('tr') as HTMLElement;
+    const row = (await screen.findByText('Ordinace 1')).closest('[data-card="calendar"]') as HTMLElement;
     expect(within(row).getByText('Praha')).toBeInTheDocument();
     expect(within(row).getByText('15 min')).toBeInTheDocument();
     expect(within(row).getByText('Sportovní lékařské prohlídky')).toBeInTheDocument();
