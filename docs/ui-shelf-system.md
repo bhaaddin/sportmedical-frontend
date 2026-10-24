@@ -385,7 +385,7 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 37 | `/blokovany-cas` | Blokovaný čas (387) | FitPage + StackTable | Aktivní bloky (cards), Končí brzy | calendar, worker | A5 | P2 |
 | 38 | `/nastaveni/sluzby` | Služby (613) | SettingsFrame | Služby (cards: činností, kalendářů), Bez činnosti (attention) | činnosti, calendars, required documents | A5 | P2 |
 | 39 | `/nastaveni/sluzby/:serviceId` | Služba (same screen, open) | SettingsFrame | Služba (board), Činnosti (cards), Kalendáře, Potřebné dokumenty | činnost, calendar, document template | A5 | P2 |
-| 40 | `/calendars` | Kalendáře (800) | SettingsFrame + StackTable | Kalendáře (cards), Kdo vidí (board) | worker, služba, hours | A5 | P2 |
+| 40 | `/calendars` | Kalendáře (800) | **Done (S-5)** | Kalendáře (cards), Kdo vidí (board) | worker, služba, hours | A5 | done |
 | 41 | `/activities` | Činnosti (930) | SettingsFrame + StackTable | Činnosti (grouped by služba), Bez ceny / bez kalendáře (attention) | služba, price item, documents, calendar | A5 | P2 |
 | 42 | `/working-hours` | Otevírací doba (694) | SettingsFrame | Týdenní rozvrh (board), Období a cyklus | calendar, exceptions | A5 | P3 |
 | 43 | `/exceptions` | Výjimky (446) | SettingsFrame | Nadcházející (cards), Minulé | calendar, holiday | A5 | P3 |
@@ -410,9 +410,9 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 62 | `/nastaveni/historie-zmen` | Historie změn (284) | SettingsFrame + table | Změny (grow), Filtr podle autora a důvodu | the changed screen, audit log | A7 | P2 |
 | 63 | `/nastaveni/zabezpeceni` | Zabezpečení / 2FA (192) | SettingsFrame | Dvoufázové ověření (board), Aktivní relace | account | A7 | P2 |
 | 64 | `/admin` | Správa (264) | SettingsFrame | Správa účtu a kliniky (cards), Nebezpečné akce | staff, audit | A7 | P3 |
-| 65 | `/system-health` | Zdraví systému (316) | SettingsFrame + KpiCard | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | P2 |
-| 66 | `/staff-management` | Tým (608) | SettingsFrame + table | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | P2 |
-| 67 | `/audit-log` | Audit (255) | SettingsFrame + table | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | P2 |
+| 65 | `/system-health` | Zdraví systému (316) | **Done (S-5)** | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | done |
+| 66 | `/staff-management` | Tým (608) | **Done (S-5)** | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | done |
+| 67 | `/audit-log` | Audit (255) | **Done (S-5)** | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | done |
 | - | `*` | Nenalezeno (42) | SoftCard | Kam dál: recents + pages (palette) | recents, command palette | A1 | P3 |
 
 Not counted: the six retired paths (`/injuries`, `/rtp`, `/concussion`, `/training-load`, `/wellness`, `/statistiky`) redirect to `/prehled`.
@@ -494,3 +494,31 @@ added or changed hold 249 tests (`src/ui/shelf/*`, `UniversalSearch`, `Dashboard
 **Not verified**: Safari, Firefox, a real phone or touch (the pointer rules are tested with a mouse and synthetic touch events); a production build
 under load (the numbers are a dev server); the settings pages (Phase 2); a screen reader (the structure - regions, headings, `combobox` /
 `option`, named controls - is asserted, but nobody listened to it).
+
+## Phase 2 - Settings frame and hub (S-7 / S-6 hub, branch `shelf2/settings`)
+
+**One change, ~35 screens.** `src/pages/settings/SettingsFrame.tsx` (`SettingsScreen`) now has the anatomy of `PageFrame`: the
+breadcrumb "Nastavení / Skupina / Položka" (13 px quiet links; on a phone a "Zpět" button to the group), one h1 (24/28, 800), one
+line of purpose (15 muted), the actions top right (Zahodit · Uložit, live only while there is a change; pinned at the bottom on a
+phone), **the rail** under the header, the screen's content as a region named by the h1 (`data-shelf="settings"`), and the right
+column as shelves (`SettingsAsideCard` "Náhled", "Související nastavení": a 15/700 heading over one board on `cardSurface`).
+Every outlined board a screen draws inside the frame gets the shelf radius (16 px). "Poslední změny" (`components/settings/RecentChanges`)
+is a `Shelf` (`list`, with its count). Kept: `SettingsNav` (the shell's settings rail; the active chip uses `primary.contrastText`),
+search, permissions, two columns from 1280, loading/error states, rendering outside a router. New: under 1280 the column stack
+scrolls as one (before, a short form left a window-high gap above the right-hand shelves on a tablet).
+
+**The hub** (`src/pages/Settings.tsx`): a `PageFrame` with one shelf per catalogue group whose cards are the group's screens
+(name + one quiet line = the catalogue's description; "Zabezpečení a zálohy" also shows its light once the lights answered),
+"Celá skupina" to `/settings/:group`, then Osobní (Vzhled, Můj účet) as a shelf. A phone swipes each group's row; tablet and desktop
+wrap a grid. No icons on cards (R18). The search box is drawn when the shell's rail has none (tablet, phone); on a desktop the rail's
+box is the one search and drives the hub. A search shows one "Výsledky hledání" shelf (group as overline; empty state "Zrušit hledání").
+**"Vyžaduje nastavení"** (`settings/hubModel.ts`, pure, tested) is drawn only from the security lights the app already reads
+(`GET /api/system/security/lights`), only for a person who may open that screen (never requested otherwise), and only for a red or
+amber light - unknown, failed or green draw nothing. Company data / calendars without hours were not added: the hub does not read
+them. **The group page** `/settings/:group`: crumbs, `PageFrame`, one "Položky" shelf with the whole descriptions.
+
+Files: `pages/settings/SettingsFrame.tsx`, `pages/Settings.tsx`, `pages/settings/hubModel.ts` (+ test), `components/settings/RecentChanges.tsx`,
+`components/settings/SecurityStatusChip.tsx` (`useSecurityLights`, `SecurityLightChip`), tests `Settings.test.tsx`, `Settings.audit.test.tsx`,
+`Settings.shelf.test.tsx` (new), `settings/SettingsFrame.test.tsx`. `scripts/shelf-check.mjs`: settings pages in `PAGE_PATH`
+(`settings`, `settings-system`, `set-firma`, `set-hours`, `set-2fa`) and `MODE=dark|light`. Screenshots: `design/shelf2/`.
+Known: `/working-hours`' own purpose line has two inline text links (výjimkách, svátcích) under 44 px - the screen's text, not the frame.

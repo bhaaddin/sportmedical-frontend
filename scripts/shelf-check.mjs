@@ -42,6 +42,7 @@ const VIEWPORTS = (process.env.VP ?? '390x844,820x1180,1440x900,1920x1080').spli
 });
 const PAGES = (process.env.PAGES ?? 'prehled,patients,patient').split(',');
 const POPULATED = (process.env.POPULATED ?? '1') !== '0';
+const MODE = process.env.MODE;
 /* Which parts to run (default all): pages, palette, accent, motion, populated. */
 const SECTIONS = new Set((process.env.SECTIONS ?? 'pages,palette,accent,motion,populated').split(','));
 mkdirSync(OUT, { recursive: true });
@@ -155,7 +156,16 @@ async function patientPath(page) {
   return id === null ? null : `/patients/${id}`;
 }
 
-const PAGE_PATH = { prehled: '/prehled', patients: '/patients' };
+const PAGE_PATH = {
+  prehled: '/prehled',
+  patients: '/patients',
+  /* Phase 2, S-6/S-7: the settings hub, one group and three screens in the SettingsFrame. */
+  settings: '/settings',
+  'settings-system': '/settings/system',
+  'set-firma': '/nastaveni/firma-a-faktury',
+  'set-hours': '/working-hours',
+  'set-2fa': '/nastaveni/zabezpeceni',
+};
 
 async function openPage(page, name, patientHref) {
   const path = name === 'patient' ? patientHref : PAGE_PATH[name];
@@ -191,7 +201,7 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   }
   await openPage(page, name, href);
 
-  const shot = join(OUT, `${name}${label}-${vp.label}.jpg`);
+  const shot = join(OUT, `${name}${label}${MODE === 'dark' ? '-dark' : ''}-${vp.label}.jpg`);
   await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };
@@ -218,8 +228,12 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   return shot;
 }
 
-const contextFor = (extra = {}) => async (vp) =>
-  browser.newContext({ storageState: STATE, viewport: { width: vp.width, height: vp.height }, locale: 'cs-CZ', ...extra });
+const contextFor = (extra = {}) => async (vp) => {
+  const ctx = await browser.newContext({ storageState: STATE, viewport: { width: vp.width, height: vp.height }, locale: 'cs-CZ', ...extra });
+  /* MODE=dark|light: the theme the pages are photographed in (the person's own setting otherwise). */
+  if (MODE !== undefined) await ctx.addInitScript((mode) => { localStorage.setItem('sm-theme-mode-v2', mode); }, MODE);
+  return ctx;
+};
 
 if (SECTIONS.has('pages')) {
   for (const vp of VIEWPORTS) {

@@ -11,9 +11,9 @@
  */
 import type { Permission } from '../../auth/usePermission';
 
-export type EntityKind = 'patient' | 'club' | 'order' | 'appointment' | 'invoice' | 'document' | 'service' | 'activity';
+export type EntityKind = 'patient' | 'club' | 'order' | 'appointment' | 'invoice' | 'document' | 'service' | 'activity' | 'calendar' | 'worker';
 
-export const ENTITY_KINDS: readonly EntityKind[] = ['patient', 'club', 'order', 'appointment', 'invoice', 'document', 'service', 'activity'];
+export const ENTITY_KINDS: readonly EntityKind[] = ['patient', 'club', 'order', 'appointment', 'invoice', 'document', 'service', 'activity', 'calendar', 'worker'];
 
 export interface EntityRef {
   kind: EntityKind;
@@ -36,6 +36,9 @@ export const ENTITY_LABEL: Record<EntityKind, string> = {
   document: 'Dokument',
   service: 'Služba',
   activity: 'Činnost',
+  calendar: 'Kalendář',
+  /** A staff member: their login account is the employee (Uživatelé a práva). */
+  worker: 'Zaměstnanec',
 };
 
 /** The plural, for a palette group heading and a "zobrazit vše" label. */
@@ -48,6 +51,8 @@ export const ENTITY_PLURAL: Record<EntityKind, string> = {
   document: 'Dokumenty',
   service: 'Služby',
   activity: 'Činnosti',
+  calendar: 'Kalendáře',
+  worker: 'Zaměstnanci',
 };
 
 /** The permission the screen behind a kind asks for. `null`: any signed-in person. The server refuses regardless; this hides. */
@@ -60,6 +65,8 @@ export const ENTITY_PERMISSION: Record<EntityKind, Permission | null> = {
   document: 'patients.view',
   service: 'settings.clinic.manage',
   activity: 'settings.clinic.manage',
+  calendar: 'settings.clinic.manage',
+  worker: 'users.manage',
 };
 
 export interface EntityTarget {
@@ -89,6 +96,12 @@ export function entityTarget(ref: Pick<EntityRef, 'kind' | 'id' | 'calendarId' |
       return { to: `/nastaveni/sluzby/${seg(ref.id)}` };
     case 'activity':
       return { to: '/activities' };
+    case 'calendar':
+      /* Kalendáře scrolls to that calendar and marks it (`openCalendarId`, read once). */
+      return { to: '/calendars', state: { openCalendarId: ref.id } };
+    case 'worker':
+      /* Uživatelé a práva marks the account given in `?user=` (an id, never a name). */
+      return { to: `/staff-management?user=${seg(ref.id)}` };
   }
 }
 
@@ -103,6 +116,8 @@ export function entityListPath(kind: EntityKind): string {
     case 'document': return '/patients';
     case 'service': return '/nastaveni/sluzby';
     case 'activity': return '/activities';
+    case 'calendar': return '/calendars';
+    case 'worker': return '/staff-management';
   }
 }
 
@@ -121,7 +136,7 @@ export const refKey = (ref: Pick<EntityRef, 'kind' | 'id'>): string => `${ref.ki
  */
 const BIRTH_NUMBER = /(?:^|\D)\d{6}\s*\/\s*\d{3,4}(?:\D|$)/;
 const LONG_DIGITS = /\d{9,}/;
-const PERSON_KINDS: readonly EntityKind[] = ['patient', 'appointment', 'document'];
+const PERSON_KINDS: readonly EntityKind[] = ['patient', 'appointment', 'document', 'worker'];
 
 export function looksLikeIdentifier(text: string, kind?: EntityKind): boolean {
   if (BIRTH_NUMBER.test(text)) return true;

@@ -10,28 +10,33 @@
  * settings nav the shell shows in place of its own menu (one sidebar, the
  * settings one - never two side by side).
  *
- *   breadcrumb   Nastavení / Skupina / Položka    14 px, the current part black 600
- *   title        28 / 700 full ink
- *   subtitle     one sentence, 14 grey
- *   actions      top right: Zahodit · Uložit (Uložit lives only while there is a change)
- *   content      up to 1240 wide; from 1280 two columns - the form or table, and
- *                a right card with the preview and "Související nastavení"
- *   at the end   "Poslední změny": the last five changes to this page
+ * Shelf look (Phase 2, docs/ui-shelf-system.md): the anatomy of PageFrame, so
+ * the ~35 screens in this frame read as one product with Přehled and Pacienti:
+ *
+ *   breadcrumb   Nastavení / Skupina / Položka    13 px quiet links, the current part full ink 600
+ *   header       one h1 (24 / 28, 800), one line of purpose (15 muted),
+ *                actions top right: Zahodit · Uložit (live only while there is a change)
+ *   the rail     the accent hairline under the header - the screen stands on it
+ *   content      from 1280 two columns - the form or table, and on the right
+ *                shelves (a heading, one board on the shelf surface): Náhled,
+ *                Související nastavení; every board inside has the shelf radius
+ *   at the end   "Poslední změny": the last five changes to this page, a shelf
  *
  * A screen rendered outside a router - the unit tests do that - gets the
  * header and the content: the breadcrumb is a link, and links need a router.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link as RouterLink, useInRouterContext, useLocation } from 'react-router-dom';
 import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typography } from '@mui/material';
 import { ArrowBack, ChevronRight, ExpandMore, Refresh as RefreshIcon, Search as SearchIcon } from '@mui/icons-material';
 import { usePermissions } from '../../auth/usePermission';
-import { useIsPhone } from '../../layout/useDevice';
+import { useDevice, useIsPhone } from '../../layout/useDevice';
 import { FIT_SCROLL_SX } from '../../components/ui/fit';
 import { RecentChanges } from '../../components/settings/RecentChanges';
 import {
-  DESKTOP_UP, PHONE_ONLY, SETTINGS_MAX_WIDTH, TYPE, focusRing, rowSx, settingsGrey, settingsHover, settingsLine, settingsSelected,
+  DESKTOP_UP, SETTINGS_MAX_WIDTH, TYPE, focusRing, settingsGrey, settingsHover, settingsLine, settingsSelected,
 } from '../../components/settings/settingsStyle';
+import { CARD_RADIUS, MUTED_SX, TARGET_SX, cardSurface, railSx, toneOf } from '../../ui/shelf/shelfStyle';
 import {
   groupPath, scopeOf, searchSections, settingsItemAt, visibleSections,
   type SettingsItem, type SettingsSection,
@@ -242,7 +247,7 @@ export function SettingsNav({
                         borderRadius: 999,
                         border: '1px solid',
                         borderColor: active ? 'primary.main' : settingsLine,
-                        color: active ? '#FFFFFF' : 'text.primary',
+                        color: active ? 'primary.contrastText' : 'text.primary',
                         bgcolor: active ? 'primary.main' : 'background.paper',
                         fontWeight: 600,
                         ...focusRing,
@@ -291,21 +296,21 @@ export interface Crumb {
 
 /**
  * "Nastavení / Skupina / Položka" - the way back, named rather than promised.
- * Every part but the last is a link; the last is where you are, in black 600.
- * 14 px.
+ * Every part but the last is a quiet link; the last is where you are, in full ink 600. 13 px, as the shelf pages'
+ * breadcrumb (PageFrame), so a settings screen and Pacienti read the same.
  */
 export function SettingsCrumbs({ parts }: { parts: Crumb[] }) {
   return (
     <Box
       component="nav"
       aria-label="Kde jste"
-      sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, fontSize: 14, lineHeight: 1.5 }}
+      sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 0.75, fontSize: 13, lineHeight: 1.5, minWidth: 0 }}
     >
       {parts.map((part, index) => {
         const last = index === parts.length - 1;
         return (
           <Box key={index} component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-            {index > 0 && <Box component="span" aria-hidden sx={{ color: settingsGrey }}>/</Box>}
+            {index > 0 && <Box component="span" aria-hidden sx={MUTED_SX}>/</Box>}
             {last || part.to === undefined ? (
               <Box component="span" aria-current={last ? 'page' : undefined} sx={{ color: 'text.primary', fontWeight: 600 }}>
                 {part.label}
@@ -315,14 +320,14 @@ export function SettingsCrumbs({ parts }: { parts: Crumb[] }) {
                 component={RouterLink}
                 to={part.to}
                 sx={{
-                  color: 'primary.main',
+                  ...MUTED_SX,
+                  ...TARGET_SX,
                   fontWeight: 500,
                   textDecoration: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  minHeight: 32,
                   '@media (max-width: 1279.95px)': { minHeight: 44, px: 0.5 },
-                  '&:hover': { textDecoration: 'underline' },
+                  '&:hover': { color: 'text.primary', textDecoration: 'underline' },
                   ...focusRing,
                 }}
               >
@@ -337,12 +342,40 @@ export function SettingsCrumbs({ parts }: { parts: Crumb[] }) {
 }
 
 /**
+ * The line above a settings title: on a phone a "Zpět" button to the level above (the crumbs alone are a small target
+ * there), then the crumbs. Shared by the frame and the group pages of the hub.
+ */
+export function SettingsCrumbRow({ parts, back }: { parts: Crumb[]; back?: { label: string; to: string } }) {
+  const phone = useIsPhone();
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75, flexShrink: 0, minWidth: 0 }}>
+      {back !== undefined && phone && (
+        <Button
+          component={RouterLink}
+          to={back.to}
+          startIcon={<ArrowBack />}
+          aria-label={`Zpět na ${back.label}`}
+          sx={{ minHeight: 44, minWidth: 44, px: 1.5, color: 'text.primary', fontWeight: 600 }}
+        >
+          Zpět
+        </Button>
+      )}
+      <SettingsCrumbs parts={parts} />
+    </Stack>
+  );
+}
+
+/**
  * "Nastavení / Skupina / Stránka" for the address the router is on. A screen
  * that is not in the catalogue gets "Nastavení / <title>".
  */
 export function SettingsBreadcrumb({ title }: { title?: React.ReactNode }) {
   const location = useLocation();
-  const here = settingsItemAt(location.pathname);
+  return <SettingsCrumbs parts={crumbsAt(location.pathname, title)} />;
+}
+
+function crumbsAt(pathname: string, title?: React.ReactNode): Crumb[] {
+  const here = settingsItemAt(pathname);
   const parts: Crumb[] = [{ label: 'Nastavení', to: '/settings' }];
   if (here !== null) {
     parts.push({ label: here.section.label, to: groupPath(here.section.id) });
@@ -350,7 +383,7 @@ export function SettingsBreadcrumb({ title }: { title?: React.ReactNode }) {
   } else if (title !== undefined) {
     parts.push({ label: title });
   }
-  return <SettingsCrumbs parts={parts} />;
+  return parts;
 }
 
 /** A link to related settings: "Ze slev na ceník, z ceníku na činnosti." */
@@ -370,22 +403,23 @@ export interface SaveBar {
 }
 
 function SaveButtons({ save }: { save: SaveBar }) {
+  const idle = !save.dirty || save.saving === true;
   return (
     <>
       <Button
         variant="outlined"
         color="inherit"
         onClick={save.onDiscard}
-        disabled={!save.dirty || save.saving === true}
-        sx={{ minHeight: 44, color: 'text.primary', borderColor: settingsLine }}
+        disabled={idle}
+        sx={{ minHeight: 44, color: 'text.primary', borderColor: 'divider' }}
       >
         Zahodit
       </Button>
       <Button
         variant="contained"
         onClick={save.onSave}
-        disabled={!save.dirty || save.saving === true}
-        sx={{ minHeight: 44, fontWeight: 700 }}
+        disabled={idle}
+        sx={{ minHeight: 44, fontWeight: 700, whiteSpace: 'nowrap' }}
       >
         {save.saving ? 'Ukládám…' : save.saveLabel ?? 'Uložit'}
       </Button>
@@ -393,46 +427,62 @@ function SaveButtons({ save }: { save: SaveBar }) {
   );
 }
 
-/** The right-hand card: a title (18/700) and what belongs under it. */
+/**
+ * A card of the right-hand column, drawn as a shelf: a heading in the shelf's type (15/700), and under it one board on the
+ * shelf's surface - so "Náhled" beside Firma a faktury looks like a shelf on Pacienti.
+ */
 export function SettingsAsideCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const headingId = useId();
   return (
-    <Box
-      component="section"
-      aria-label={title}
-      sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper', p: 2.5 }}
-    >
-      <Typography component="h2" sx={[TYPE.sectionTitle, { mb: 1.5 }]}>{title}</Typography>
-      {children}
+    <Box component="section" aria-labelledby={headingId} data-shelf="aside" data-state="ready" sx={{ minWidth: 0 }}>
+      <Typography id={headingId} component="h2" sx={SHELF_HEADING_SX}>{title}</Typography>
+      <Box sx={(t) => ({ ...cardSurface(t, false), p: 2 })}>{children}</Box>
     </Box>
   );
 }
 
+/** The shelf's heading: what a Shelf draws over its cards. */
+const SHELF_HEADING_SX = { fontSize: 15, fontWeight: 700, letterSpacing: '0.01em', lineHeight: 1.3, mb: 1, minHeight: 24, display: 'flex', alignItems: 'center' } as const;
+
+/** "Související nastavení": the rest of the group, each a quiet row of one board, standing on the rail. */
 function RelatedCard({ links }: { links: RelatedLink[] }) {
+  const headingId = useId();
   return (
-    <SettingsAsideCard title="Související nastavení">
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 0.5 }}>
+    <Box component="section" aria-labelledby={headingId} data-shelf="related" data-state="ready" sx={{ minWidth: 0 }}>
+      <Typography id={headingId} component="h2" sx={SHELF_HEADING_SX}>Související nastavení</Typography>
+      <Box component="ul" sx={(t) => ({ ...cardSurface(t, false), listStyle: 'none', m: 0, p: 0.5, display: 'grid', gap: 0.25 })}>
         {links.map((link) => (
-          <Box key={link.to} component="li">
+          <Box key={link.to} component="li" sx={{ minWidth: 0 }}>
             <Box
               component={RouterLink}
               to={link.to}
-              sx={[
-                rowSx(false),
-                { minHeight: 44, px: 1.5, py: 1, borderRadius: 2, borderLeft: 'none', justifyContent: 'space-between' },
-              ]}
+              sx={(t) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                minHeight: 44,
+                px: 1.5,
+                py: 0.75,
+                borderRadius: `${CARD_RADIUS - 4}px`,
+                color: 'text.primary',
+                textDecoration: 'none',
+                '&:hover': { bgcolor: toneOf(t, 'primary').bg },
+                '&:focus-visible': { outline: `2px solid ${t.palette.primary.main}`, outlineOffset: -2 },
+              })}
             >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={TYPE.itemName}>{link.label}</Typography>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 650, lineHeight: 1.35 }}>{link.label}</Typography>
                 {link.description !== undefined && (
-                  <Typography sx={TYPE.caption}>{link.description}</Typography>
+                  <Typography noWrap sx={{ ...MUTED_SX, fontSize: 13, lineHeight: 1.4 }}>{link.description}</Typography>
                 )}
               </Box>
-              <ChevronRight sx={{ color: settingsGrey, flexShrink: 0 }} aria-hidden />
+              <ChevronRight sx={{ ...MUTED_SX, fontSize: 20, flexShrink: 0 }} aria-hidden />
             </Box>
           </Box>
         ))}
       </Box>
-    </SettingsAsideCard>
+      <Box aria-hidden sx={(t) => ({ ...(railSx(t) as object), mt: 1.25 })} />
+    </Box>
   );
 }
 
@@ -455,7 +505,7 @@ interface FrameProps {
 }
 
 /**
- * A settings screen: breadcrumb + title + subtitle + actions above the
+ * A settings screen: breadcrumb + title + one line + actions above the
  * content, and "Poslední změny" under it.
  *
  *  - `actions`  free-form buttons top right ("Nová …" on a screen that lists).
@@ -499,13 +549,12 @@ function RoutedFrame(props: FrameProps) {
   const location = useLocation();
   const held = usePermissions();
   const here = settingsItemAt(location.pathname);
-  const crumbs = <SettingsBreadcrumb title={props.title} />;
   const resolvedRelated = props.related === false ? false : props.related ?? relatedFor(here, held);
   const resolvedScope = props.scope === false ? null : props.scope ?? (here !== null ? scopeOf(here.item) : null);
   return (
     <FrameLayout
       {...props}
-      crumbs={crumbs}
+      crumbs={crumbsAt(location.pathname, props.title)}
       backTo={here !== null ? { label: here.section.label, to: groupPath(here.section.id) } : { label: 'Nastavení', to: '/settings' }}
       resolvedRelated={resolvedRelated}
       resolvedScope={resolvedScope}
@@ -530,12 +579,14 @@ function FrameLayout({
   error,
   onRetry,
 }: FrameProps & {
-  crumbs: React.ReactNode;
+  crumbs: Crumb[] | null;
   backTo?: { label: string; to: string };
   resolvedRelated: RelatedLink[] | false;
   resolvedScope: string | null;
 }) {
-  const phone = useIsPhone();
+  const device = useDevice();
+  const phone = device === 'phone';
+  const titleId = useId();
   const hasRelated = resolvedRelated !== false && resolvedRelated.length > 0;
   const hasAside = aside !== false && (aside !== undefined || hasRelated);
   /* A form page is centred with equal gutters beyond a comfortable width; a page that gives up its right column
@@ -544,10 +595,17 @@ function FrameLayout({
   const maxWidth = wide ? undefined : Math.max(width ?? 0, SETTINGS_MAX_WIDTH);
   const pinSave = phone && save !== undefined;
   const fit = !phone;
+  /* Two columns (desktop with a right column): each column scrolls on its own. One column under 1280: the whole stack
+     scrolls as one, so a short form is not followed by a window-high gap before the right-hand shelves. */
+  const twoColumns = hasAside && device === 'desktop';
+  const columnsScroll = fit && (twoColumns || !hasAside);
+  const hasActions = actions !== undefined || (save !== undefined && !pinSave);
 
   return (
     <Box
       data-fit-page=""
+      data-shelf-page=""
+      data-settings-frame=""
       sx={{
         minWidth: 0,
         width: '100%',
@@ -555,41 +613,38 @@ function FrameLayout({
         ...(fit ? { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' } : {}),
       }}
     >
-      {crumbs !== null && (
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-          {backTo !== undefined && (
-            <Button
-              component={RouterLink}
-              to={backTo.to}
-              startIcon={<ArrowBack />}
-              aria-label={`Zpět na ${backTo.label}`}
-              sx={{ minHeight: 44, minWidth: 44, px: 1.5, color: 'text.primary', fontWeight: 600, display: 'none', [PHONE_ONLY]: { display: 'inline-flex' } }}
-            >
-              Zpět
-            </Button>
-          )}
-          {crumbs}
-        </Stack>
-      )}
+      {crumbs !== null && <SettingsCrumbRow parts={crumbs} back={backTo} />}
 
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={{ xs: 1.5, sm: 3 }}
-        sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: { xs: 3, sm: 2 }, flexShrink: 0 }}
+      {/* The header of every shelf page (PageFrame): one h1, one line of purpose, the actions top right. */}
+      <Box
+        component="header"
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'space-between',
+          gap: 1.5,
+          flexShrink: 0,
+        }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography component="h1" sx={TYPE.pageTitle}>{title}</Typography>
+          <Typography id={titleId} variant="h4" component="h1" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+            {title}
+          </Typography>
           {subtitle !== undefined && subtitle !== null && (
-            <Typography sx={[TYPE.caption, { mt: 0.75, maxWidth: 760 }]}>{subtitle}</Typography>
+            <Typography sx={{ ...MUTED_SX, mt: 0.25, fontSize: 15, lineHeight: 1.45, maxWidth: 760 }}>{subtitle}</Typography>
           )}
         </Box>
-        {(actions !== undefined || (save !== undefined && !pinSave)) && (
+        {hasActions && (
           <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
             {actions}
             {save !== undefined && !pinSave && <SaveButtons save={save} />}
           </Stack>
         )}
-      </Stack>
+      </Box>
+
+      {/* The rail: the shelf system's one signature, under the header - the screen stands on it. */}
+      <Box aria-hidden data-rail="" sx={(t) => ({ ...(railSx(t) as object), mt: 1.5, mb: { xs: 2.5, md: 3 }, flexShrink: 0 })} />
 
       <Box
         sx={{
@@ -598,10 +653,24 @@ function FrameLayout({
           alignItems: 'start',
           gridTemplateColumns: 'minmax(0, 1fr)',
           ...(hasAside ? { [DESKTOP_UP]: { gridTemplateColumns: 'minmax(0, 1fr) clamp(300px, 22vw, 400px)' } } : {}),
-          ...(fit ? { flex: '1 1 0', minHeight: 0, alignItems: 'stretch', gridTemplateRows: 'minmax(0, 1fr)' } : {}),
+          ...(columnsScroll ? { flex: '1 1 0', minHeight: 0, alignItems: 'stretch', gridTemplateRows: 'minmax(0, 1fr)' } : {}),
+          ...(fit && !columnsScroll ? { flex: '1 1 0', alignContent: 'start', ...FIT_SCROLL_SX, pr: 0.5 } : {}),
         }}
       >
-        <Box sx={[{ minWidth: 0 }, ...(fit ? [FIT_SCROLL_SX, { pr: 0.5 }] : [])]}>
+        <Box
+          component="section"
+          aria-labelledby={titleId}
+          data-shelf="settings"
+          data-state={error !== undefined && error !== null && error !== false ? 'error' : loading === true ? 'loading' : 'ready'}
+          sx={[
+            {
+              minWidth: 0,
+              /* One radius for every board a screen draws inside the frame (SoftCard, outlined papers): the shelf's. */
+              '& .MuiPaper-outlined:not(.MuiAlert-root)': { borderRadius: `${CARD_RADIUS}px` },
+            },
+            ...(columnsScroll ? [FIT_SCROLL_SX, { pr: 0.5 }] : []),
+          ]}
+        >
           {error !== undefined && error !== null && error !== false ? (
             <Alert
               severity="error"
@@ -617,8 +686,8 @@ function FrameLayout({
             </Alert>
           ) : loading === true ? (
             <Box aria-busy="true" aria-label="Načítám">
-              <Skeleton variant="rounded" height={56} sx={{ borderRadius: 2, mb: 2 }} />
-              <Skeleton variant="rounded" height={240} sx={{ borderRadius: 3 }} />
+              <Skeleton variant="rounded" height={56} sx={{ borderRadius: `${CARD_RADIUS}px`, mb: 2 }} />
+              <Skeleton variant="rounded" height={240} sx={{ borderRadius: `${CARD_RADIUS}px` }} />
             </Box>
           ) : (
             children
@@ -626,7 +695,7 @@ function FrameLayout({
           {resolvedScope !== null && <RecentChanges scope={resolvedScope} />}
         </Box>
         {hasAside && (
-          <Stack spacing={2.5} sx={[{ minWidth: 0 }, ...(fit ? [FIT_SCROLL_SX] : [])]}>
+          <Stack spacing={3} sx={[{ minWidth: 0 }, ...(columnsScroll ? [FIT_SCROLL_SX, { pb: 0.5 }] : [])]}>
             {aside !== undefined && <SettingsAsideCard title={asideTitle}>{aside}</SettingsAsideCard>}
             {hasRelated && <RelatedCard links={resolvedRelated as RelatedLink[]} />}
           </Stack>
@@ -635,7 +704,8 @@ function FrameLayout({
 
       {pinSave && (
         <Box
-          sx={{
+          sx={(t) => ({
+            ...cardSurface(t, false),
             position: 'sticky',
             bottom: 8,
             zIndex: 5,
@@ -643,12 +713,8 @@ function FrameLayout({
             display: 'flex',
             gap: 1,
             p: 1.5,
-            bgcolor: 'background.paper',
-            border: '1px solid',
-            borderColor: settingsLine,
-            borderRadius: 3,
             '& > *': { flex: 1 },
-          }}
+          })}
         >
           <SaveButtons save={save} />
         </Box>

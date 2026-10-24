@@ -7,6 +7,7 @@
  * 100 of 100 entries carried oldValue/newValue, none carried beforeState, so no row could be
  * expanded, every chip was grey and not one of the counters ever drew.
  */
+import type { EntityKind, EntityRef } from '../ui/shelf/entities';
 
 export type ActionTone = 'green' | 'blue' | 'red' | 'beige' | 'grey' | 'primary';
 
@@ -77,4 +78,29 @@ export function topActions(entries: readonly { action: string }[], limit = 6): {
     .map(([action, count]) => ({ action, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+/* ───────────────────────────── the subject of an entry, as a connected chip ───────────────────────────── */
+
+
+/** The server's entity names that are one of the clinic's things a chip can open. Anything else stays plain text. */
+const SUBJECT_KIND: Record<string, EntityKind> = {
+  Patient: 'patient',
+  Invoice: 'invoice',
+  Club: 'club',
+  ClubOrder: 'order',
+  ClinicService: 'service',
+  Activity: 'activity',
+};
+
+/**
+ * The thing an entry is about, when it is one a chip can open: the kind from the entry's `entity`, the label the first
+ * eight characters of its id (what the row always showed - never a name the log does not carry, never an identifier of
+ * a person). `null` for a setting, an account, a session ... and for an entry without an id.
+ */
+export function auditSubject(entry: { entity?: string | null; entityId?: string | null }): EntityRef | null {
+  const kind = entry.entity ? SUBJECT_KIND[entry.entity] : undefined;
+  const id = entry.entityId?.trim() ?? '';
+  if (kind === undefined || id === '') return null;
+  return { kind, id, label: id.slice(0, 8) };
 }

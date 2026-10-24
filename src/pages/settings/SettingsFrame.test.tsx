@@ -3,7 +3,7 @@
  * Uložit, the related card and "Poslední změny" - at 390, 834 and 1440.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsNav, SettingsScreen } from './SettingsFrame';
@@ -167,5 +167,45 @@ describe('SettingsNav', () => {
 
     await userEvent.setup().type(screen.getByLabelText('Hledat v nastavení'), 'x');
     expect(screen.getByLabelText('Hledat v nastavení')).toHaveValue('x');
+  });
+});
+
+describe('the shelf look (Phase 2)', () => {
+  beforeEach(() => setViewport(VIEWPORTS.desktop));
+
+  it('has the anatomy of a shelf page: a header with one h1, the rail under it, the right column as named shelves', () => {
+    const { container } = renderFrame({ aside: <p>náhled</p> });
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.querySelector('header')).toContainElement(screen.getByRole('heading', { level: 1 }));
+    expect(container.querySelector('[data-settings-frame] [data-rail]')).not.toBeNull();
+    for (const name of ['Náhled', 'Související nastavení']) {
+      const region = screen.getByRole('region', { name });
+      expect(region).toHaveAttribute('data-shelf');
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeInTheDocument();
+    }
+    /* The screen's own content is a region named by the title. */
+    expect(screen.getByRole('region', { name: 'Otevírací doba' })).toHaveTextContent('obsah stránky');
+  });
+
+  it('draws "Poslední změny" as a shelf with its count', async () => {
+    get.mockResolvedValue({ data: { items: [
+      { at: '2026-10-03T10:00:00Z', user: 'Jana', scope: 'pracovni-doba', label: 'Úterý do', before: '17:00', after: '18:00' },
+      { at: '2026-10-02T10:00:00Z', user: 'Petr', scope: 'pracovni-doba', label: 'Oběd', before: 'ne', after: 'ano' },
+    ], total: 2 } });
+    renderFrame();
+    const shelf = await screen.findByRole('region', { name: 'Poslední změny' });
+    await waitFor(() => expect(within(shelf).getByLabelText('Počet: 2')).toBeInTheDocument());
+    expect(within(shelf).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('keeps a loading screen and a failed screen inside the frame', async () => {
+    const onRetry = vi.fn();
+    const { unmount } = renderFrame({ loading: true });
+    expect(screen.getByLabelText('Načítám')).toHaveAttribute('aria-busy', 'true');
+    unmount();
+    renderFrame({ error: 'Nepodařilo se načíst.', onRetry });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Zkusit znovu' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Otevírací doba' })).toBeInTheDocument();
   });
 });

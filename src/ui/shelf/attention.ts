@@ -74,7 +74,11 @@ export type AttentionId =
   | 'expiringDocuments'
   | 'clubInquiries'
   | 'intakeReviews'
-  | 'failedMessages';
+  | 'failedMessages'
+  /* Settings screens' own attention cards (Phase 2, S-5): built by the screen's model from what that screen reads. */
+  | 'systemProblems'
+  | 'scheduleProblems'
+  | 'offerProblems';
 
 export type Severity = 'high' | 'medium' | 'low';
 

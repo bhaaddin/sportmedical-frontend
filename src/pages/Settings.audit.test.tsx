@@ -27,7 +27,8 @@ const hold = (permissions: string[], user: Record<string, unknown> = { firstName
   localStorage.setItem('permissions', JSON.stringify(permissions));
   localStorage.setItem('user', JSON.stringify(user));
 };
-const rows = (group: string) => within(screen.getByRole('list', { name: group })).getAllByRole('link').map((a) => a.getAttribute('href'));
+/* A group page has one shelf, "Položky": its screens. */
+const rows = (_group: string) => within(screen.getByRole('list', { name: 'Položky' })).getAllByRole('link').map((a) => a.getAttribute('href'));
 
 beforeEach(() => {
   localStorage.clear();
@@ -94,7 +95,8 @@ describe('the group pages of the second half', () => {
   it('every row is a large link with its name and what is inside', async () => {
     hold(['settings.clinic.manage']);
     show('/settings/system');
-    const list = await screen.findByRole('list', { name: 'Systém' });
+    await screen.findByRole('heading', { level: 1, name: 'Systém' });
+    const list = screen.getByRole('list', { name: 'Položky' });
     const link = within(list).getByRole('link', { name: /Firma a faktury/ });
     expect(link).toHaveTextContent('Fakturační údaje firmy, bankovní účet, datová schránka a splatnost faktur');
   });
@@ -126,14 +128,16 @@ describe('search on the hub for somebody with limited rights', () => {
     hold(['settings.clinic.manage', 'users.manage', 'communication.manage', 'questionnaires.manage']);
     show('/settings');
     await userEvent.type(await screen.findByLabelText('Hledat v nastavení'), 'dokument');
-    expect(screen.getByText(/^Nalezeno \d+$/)).toBeInTheDocument();
+    const results = screen.getByRole('region', { name: 'Výsledky hledání' });
+    const count = within(results).getByLabelText(/^Počet: \d+$/);
+    expect(Number(count.textContent)).toBe(within(results).getAllByRole('listitem').length);
   });
 
   it('ignores a search of only spaces and keeps the tiles', async () => {
     hold(['settings.clinic.manage']);
     show('/settings');
     await userEvent.type(await screen.findByLabelText('Hledat v nastavení'), '   ');
-    expect(screen.getByRole('link', { name: /^Systém —/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Celá skupina: Systém' })).toBeInTheDocument();
   });
 });
 
@@ -183,8 +187,8 @@ describe.each(Object.entries(VIEWPORTS))('the hub at %s (%i px)', (_name, width)
     setViewport(width);
     hold(['settings.clinic.manage', 'users.manage']);
     show('/settings');
-    expect(await screen.findByRole('link', { name: /^Dokumenty —/ })).toHaveAttribute('href', '/settings/dokumenty');
-    expect(screen.getByRole('link', { name: /^Vzhled webu —/ })).toHaveAttribute('href', '/settings/vzhled-webu');
-    expect(screen.getByRole('link', { name: /^Systém —/ })).toHaveAttribute('href', '/settings/system');
+    expect(await screen.findByRole('link', { name: 'Celá skupina: Dokumenty' })).toHaveAttribute('href', '/settings/dokumenty');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Vzhled webu' })).toHaveAttribute('href', '/settings/vzhled-webu');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Systém' })).toHaveAttribute('href', '/settings/system');
   });
 });

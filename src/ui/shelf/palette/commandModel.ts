@@ -230,6 +230,8 @@ const GROUP_TITLE: Record<CommandGroup, string> = {
   document: ENTITY_PLURAL.document,
   service: ENTITY_PLURAL.service,
   activity: ENTITY_PLURAL.activity,
+  calendar: ENTITY_PLURAL.calendar,
+  worker: ENTITY_PLURAL.worker,
 };
 
 /** Per group, at most this many rows (the rest is behind "zobrazit vše" of the kind's own screen). */

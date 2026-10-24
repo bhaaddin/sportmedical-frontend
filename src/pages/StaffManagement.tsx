@@ -12,17 +12,22 @@
    "Smazat" archived the record while the login kept working. A dismissed
    employee is now switched off here, on the account, and the server ends
    their open sessions with it.
+
+   Shelf look (Phase 2, S-5): "Přehled" (a figure per role, the
+   switched-off accounts and the invitations nobody has used yet),
+   then "Tým" - the accounts, a table on a tablet and a desktop, a
+   stack of cards on a phone.
    ══════════════════════════════════════════════════════════════ */
-import { StackTable } from "../components/ui/StackTable";
+import { StackTable } from '../components/ui/StackTable';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, IconButton, Dialog, DialogTitle,
   DialogContent, DialogContentText, DialogActions, TextField, MenuItem, Avatar, Grid,
-  Alert, Snackbar, Skeleton, Tooltip,
+  Alert, Snackbar, Tooltip,
 } from '@mui/material';
 import {
-  Add as AddIcon, Person as PersonIcon, Refresh as RefreshIcon, LockReset as LockResetIcon,
+  Add as AddIcon, Refresh as RefreshIcon, LockReset as LockResetIcon,
   Block as BlockIcon, CheckCircle as CheckCircleIcon, Badge as BadgeIcon, Edit as EditIcon,
 } from '@mui/icons-material';
 import KeyIcon from '@mui/icons-material/VpnKey';
@@ -36,7 +41,8 @@ import {
 } from '../api/userAccounts';
 import type { UserAccount, UserAccountRole } from '../api/userAccounts';
 import { usePermission } from '../auth/usePermission';
-import { KpiCard, StatusChip, type ChipTone } from '../components/ui';
+import { StatusChip, type ChipTone } from '../components/ui';
+import { MetricCard, Shelf, TARGET_SX, toneOf } from '../ui/shelf';
 import { SettingsScreen } from './settings/SettingsFrame';
 
 /** The board's soft tones, one per role, for the chip in the table. */
@@ -46,13 +52,11 @@ const ROLE_TONES: Record<UserAccountRole, ChipTone> = {
   Staff: 'grey',
 };
 
-const ROLE_COLORS: Record<UserAccountRole, string> = {
-  Owner: '#7B1FA2',
-  Administrator: '#D32F2F',
-  Staff: '#0288D1',
-};
-/** A role's category colour (data); an unknown role gets a neutral blue-grey. */
-const roleColor = (role: string): string => (ROLE_COLORS as Record<string, string>)[role] ?? '#90A4AE';
+/** A role's tone (the avatar takes the same soft tone as the role's chip); an unknown role is grey. */
+const roleTone = (role: string): ChipTone => (ROLE_TONES as Record<string, ChipTone>)[role] ?? 'grey';
+
+/** Every icon action of a row: 44 px under 1280 (touch), the table's 40 above. */
+const ICON_SX = TARGET_SX;
 
 const nameOf = (a: UserAccount) => a.displayName || a.email;
 
@@ -237,24 +241,8 @@ export default function StaffManagement() {
     }
   };
 
-  /* Loading keeps the frame: the title and the way back are on screen while the table fills in. */
-  if (loading) {
-    return (
-      <SettingsScreen
-        title="Uživatelé a práva"
-        subtitle="Tým: kdo se přihlašuje, s jakou rolí, co smí a kde pracuje"
-        aside={false}
-        related={false}
-      >
-        <Box aria-busy="true" aria-label="Načítám zaměstnance">
-          <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3, mb: 2 }} />
-          <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
-        </Box>
-      </SettingsScreen>
-    );
-  }
-
   const active = accounts.filter((a) => a.isActive);
+  const invited = active.filter((a) => a.mustChangePassword).length;
 
   return (
     <SettingsScreen
@@ -274,40 +262,40 @@ export default function StaffManagement() {
       actions={
         <>
           <Tooltip title="Obnovit">
-            <IconButton aria-label="Obnovit" onClick={load}><RefreshIcon /></IconButton>
+            <IconButton aria-label="Obnovit" onClick={load} sx={ICON_SX}><RefreshIcon /></IconButton>
           </Tooltip>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={{ minHeight: 44, fontWeight: 700 }}>
             Přidat zaměstnance
           </Button>
         </>
       }
     >
-      {loadFailed && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={load} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
-        >
-          Seznam účtů se nepodařilo načíst.
-        </Alert>
+      <Box sx={{ display: 'grid', gap: 3 }}>
+      {/* What the team is made of: active accounts per role, the switched-off ones, the invitations not used yet. */}
+      {!loadFailed && (
+        <Shelf id="team-figures" title="Přehled" layout="grid" minCardWidth={150} cardHeight={96} skeletons={5} loading={loading} stagger={false}>
+          {USER_ACCOUNT_ROLES.map((role) => (
+            <MetricCard key={role} label={ROLE_LABELS[role]} value={active.filter((a) => a.role === role).length} />
+          ))}
+          <MetricCard label="Vypnutý přístup" value={accounts.length - active.length} />
+          <MetricCard label="Pozvánky" value={invited} tone={invited > 0 ? 'beige' : 'grey'} hint="Čekají na první přihlášení" />
+        </Shelf>
       )}
 
-      {/* Stats: active accounts per role */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {USER_ACCOUNT_ROLES.map((role) => (
-          <Grid key={role} size={{ xs: 6, sm: 3 }}>
-            <KpiCard label={ROLE_LABELS[role]} value={active.filter((a) => a.role === role).length} />
-          </Grid>
-        ))}
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="Vypnutý přístup" value={accounts.length - active.length} />
-        </Grid>
-      </Grid>
-
       {/* Accounts */}
-      <div>
+      <Shelf
+        id="team"
+        title="Tým"
+        count={loading || loadFailed ? undefined : accounts.length}
+        layout="free"
+        loading={loading}
+        error={loadFailed ? 'Seznam účtů se nepodařilo načíst.' : false}
+        onRetry={load}
+        empty={accounts.length === 0}
+        emptyState={{ text: 'Žádné účty', action: { label: 'Přidat zaměstnance', onClick: openAdd } }}
+      >
         <StackTable component={Paper}>
-          <Table>
+          <Table aria-label="Tým">
             <TableHead>
               <TableRow>
                 <TableCell>Jméno</TableCell>
@@ -319,15 +307,7 @@ export default function StaffManagement() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {accounts.length === 0 && !loadFailed ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                    <PersonIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                    <Typography color="text.secondary">Žádné účty</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                accounts.map((acc) => {
+              {accounts.map((acc) => {
                   const name = nameOf(acc);
                   return (
                     <TableRow
@@ -339,7 +319,7 @@ export default function StaffManagement() {
                     >
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ bgcolor: roleColor(acc.role), color: (t) => t.palette.getContrastText(roleColor(acc.role)), width: 36, height: 36, fontSize: 14 }}>
+                          <Avatar aria-hidden sx={(t) => { const c = toneOf(t, roleTone(acc.role)); return { bgcolor: c.bg, color: c.fg, boxShadow: `inset 0 0 0 1px ${c.line}`, width: 36, height: 36, fontSize: 14, fontWeight: 700 }; }}>
                             {initialsOf(acc)}
                           </Avatar>
                           <Typography sx={{ fontWeight: 600 }}>{name}</Typography>
@@ -365,7 +345,7 @@ export default function StaffManagement() {
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         <Tooltip title="Co smí">
-                          <IconButton
+                          <IconButton sx={ICON_SX}
                             aria-label={`Co smí ${name}`}
                             onClick={() => setPermissionsFor({ userId: acc.userId, name, isOwner: acc.role === 'Owner' })}
                           >
@@ -373,7 +353,7 @@ export default function StaffManagement() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Kde pracuje">
-                          <IconButton
+                          <IconButton sx={ICON_SX}
                             aria-label={`Kde pracuje ${name}`}
                             onClick={() => setScheduleFor({ userId: acc.userId, name })}
                           >
@@ -381,13 +361,13 @@ export default function StaffManagement() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Upravit jméno a e-mail">
-                          <IconButton aria-label={`Upravit ${name}`} onClick={() => openEdit(acc)}>
+                          <IconButton sx={ICON_SX} aria-label={`Upravit ${name}`} onClick={() => openEdit(acc)}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         {canManageAbsences ? (
                           <Tooltip title="Nepřítomnost">
-                            <IconButton
+                            <IconButton sx={ICON_SX}
                               component={RouterLink}
                               to={`/nepritomnosti?userId=${encodeURIComponent(acc.userId)}`}
                               aria-label={`Nepřítomnost ${name}`}
@@ -397,12 +377,12 @@ export default function StaffManagement() {
                           </Tooltip>
                         ) : null}
                         <Tooltip title="Změnit roli">
-                          <IconButton aria-label={`Změnit roli ${name}`} onClick={() => openRole(acc)}>
+                          <IconButton sx={ICON_SX} aria-label={`Změnit roli ${name}`} onClick={() => openRole(acc)}>
                             <BadgeIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Resetovat heslo">
-                          <IconButton
+                          <IconButton sx={ICON_SX}
                             aria-label={`Resetovat heslo pro ${acc.email}`}
                             onClick={() => setResetting(acc)}
                           >
@@ -411,7 +391,7 @@ export default function StaffManagement() {
                         </Tooltip>
                         {acc.isActive ? (
                           <Tooltip title="Vypnout přístup">
-                            <IconButton
+                            <IconButton sx={ICON_SX}
                               color="error"
                               aria-label={`Vypnout přístup ${name}`}
                               onClick={() => { setDialogError(null); setSwitchingOff(acc); }}
@@ -421,7 +401,7 @@ export default function StaffManagement() {
                           </Tooltip>
                         ) : (
                           <Tooltip title="Znovu zapnout přístup">
-                            <IconButton
+                            <IconButton sx={ICON_SX}
                               color="success"
                               aria-label={`Zapnout přístup ${name}`}
                               onClick={() => void switchOn(acc)}
@@ -433,12 +413,12 @@ export default function StaffManagement() {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
+                })}
             </TableBody>
           </Table>
         </StackTable>
-      </div>
+      </Shelf>
+      </Box>
 
       <WhereSomebodyWorksDialog
         userId={scheduleFor?.userId ?? null}

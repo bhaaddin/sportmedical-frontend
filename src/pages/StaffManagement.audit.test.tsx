@@ -200,7 +200,7 @@ describe('access and the list', () => {
   it('counts active accounts per role and the switched-off ones', async () => {
     show();
     await screen.findByText('Jana Nová');
-    const card = (label: string) => (screen.getAllByText(label).find((el) => el.classList.contains('MuiTypography-overline')) as HTMLElement).parentElement as HTMLElement;
+    const card = (label: string) => within(screen.getByRole('region', { name: 'Přehled' })).getByText(label).closest('[data-card="metric"]') as HTMLElement;
     expect(card('Vlastník')).toHaveTextContent('1');
     expect(card('Personál')).toHaveTextContent('1');
     expect(card('Vypnutý přístup')).toHaveTextContent('1');
@@ -267,5 +267,23 @@ describe('access and the list', () => {
     list.mockResolvedValue([]);
     show();
     expect(await screen.findByText('Žádné účty')).toBeInTheDocument();
+  });
+
+  it('an empty team offers Přidat zaměstnance as the next step, and it opens the form', async () => {
+    const user = userEvent.setup();
+    list.mockResolvedValue([]);
+    show();
+    await screen.findByText('Žádné účty');
+    await user.click(within(screen.getByRole('region', { name: 'Tým' })).getByRole('button', { name: 'Přidat zaměstnance' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Přidat zaměstnance');
+  });
+
+  it('draws Přehled and Tým as shelves, with the invitations nobody has used yet', async () => {
+    list.mockResolvedValue([owner, account({ mustChangePassword: true })]);
+    show();
+    await screen.findByText('Jana Nová');
+    expect(within(screen.getByRole('region', { name: 'Tým' })).getByLabelText('Počet: 2')).toBeInTheDocument();
+    const invited = within(screen.getByRole('region', { name: 'Přehled' })).getByText('Pozvánky').closest('[data-card="metric"]') as HTMLElement;
+    expect(invited).toHaveTextContent('1');
   });
 });
