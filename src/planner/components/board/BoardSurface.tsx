@@ -121,6 +121,7 @@ const ClubBlockPopover = lazy(() => import('../../../components/booking/calendar
 const AppointmentDetail = lazy(() => import('../../../components/booking/AppointmentDetail').then((m) => ({ default: m.AppointmentDetail })));
 const LunchLayer = lazy(() => import('./LunchLayer'));
 const ClashLayer = lazy(() => import('./ClashLayer'));
+const OfferedAsk = lazy(() => import('./OfferedAsk'));
 const GapChoice = lazy(() => import('./GapChoice'));
 const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
@@ -1479,48 +1480,18 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         </Suspense>
       ) : null}
 
-      <Popover
-        open={offeredAsk !== null}
-        onClose={() => setOfferedAsk(null)}
-        anchorReference="anchorPosition"
-        anchorPosition={offeredAsk ? { top: offeredAsk.y, left: offeredAsk.x } : undefined}
-        slotProps={{ paper: { sx: { width: 300, maxWidth: 'calc(100vw - 24px)', p: 1.5, borderRadius: '10px', boxShadow: DESIGN.shadow.menu } } }}
-      >
-        {offeredAsk ? (
-          <div data-testid="offered-ask" role="group" aria-label={HOLD_TEXT.offeredWarn(offeredAsk.club)} className="offered-ask">
-            <strong>{HOLD_TEXT.offeredWarn(offeredAsk.club)}</strong>
-            <p>Tento čas jsme klubu jen nabídli, klub může nabídku odmítnout. Rezervovat sem přesto?</p>
-            <div className="offered-ask-actions">
-              <Button
-                variant="contained"
-                data-testid="offered-ask-go"
-                sx={{ minHeight: 44 }}
-                onClick={() => {
-                  const go = offeredAsk.go;
-                  setOfferedAsk(null);
-                  go();
-                }}
-              >
-                Přesto rezervovat
-              </Button>
-              {offeredAsk.orderId ? (
-                <Button
-                  data-testid="offered-ask-order"
-                  sx={{ minHeight: 44 }}
-                  onClick={() => {
-                    const id = offeredAsk.orderId!;
-                    setOfferedAsk(null);
-                    goOrder(id);
-                  }}
-                >
-                  Otevřít objednávku
-                </Button>
-              ) : null}
-              <Button data-testid="offered-ask-cancel" sx={{ minHeight: 44 }} onClick={() => setOfferedAsk(null)}>Zrušit</Button>
-            </div>
-          </div>
-        ) : null}
-      </Popover>
+      {offeredAsk ? (
+        <Suspense fallback={null}>
+          <OfferedAsk
+            ask={offeredAsk}
+            onClose={() => setOfferedAsk(null)}
+            onOrder={(id) => {
+              setOfferedAsk(null);
+              goOrder(id);
+            }}
+          />
+        </Suspense>
+      ) : null}
 
       <Popover
         open={inquiryPop !== null}
