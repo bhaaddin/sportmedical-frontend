@@ -19,7 +19,9 @@ vi.mock('../../api/client', () => ({ default: { get } }));
 const listActivities = vi.fn();
 vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 
-const outletContext = { patient: { id: 'p1', firstName: 'Eva', lastName: 'Adresova' } };
+const outletContext: { patient: { id: string; firstName: string; lastName: string }; upcoming?: unknown[] } = {
+  patient: { id: 'p1', firstName: 'Eva', lastName: 'Adresova' },
+};
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useOutletContext: () => outletContext };
@@ -43,6 +45,7 @@ const appointment = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
+  delete outletContext.upcoming;
   get.mockReset().mockResolvedValue({ data: { data: [] } });
   listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'act-1', name: 'Kontrola', priceCzk: 900 }] });
 });
@@ -189,16 +192,16 @@ describe('the price on every row', () => {
     appointment({ id: 'gone', eventName: 'Neznámá činnost', status: 'Completed', startTime: '2020-01-01T08:00:00Z', endTime: '2020-01-01T08:30:00Z' }),
   ];
 
-  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]])('%s: a Cena column', async (_n, width) => {
+  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]])('%s: on the upcoming card, and a Cena column in the history', async (_n, width) => {
     setViewport(width);
     get.mockResolvedValue({ data: { data: rows() } });
 
     renderPage();
 
-    const upcoming = await screen.findByRole('table', { name: 'Nadcházející termíny' });
-    expect(within(upcoming).getByRole('columnheader', { name: 'Cena' })).toBeInTheDocument();
-    expect(within(upcoming).getByTestId('row-price')).toHaveTextContent('900 Kč');
+    const upcoming = await screen.findByRole('region', { name: 'Nadcházející' });
+    expect(within(upcoming).getByRole('listitem')).toHaveTextContent('900 Kč');
     const history = await screen.findByRole('table', { name: 'Historie termínů' });
+    expect(within(history).getByRole('columnheader', { name: 'Cena' })).toBeInTheDocument();
     expect(within(history).getByTestId('row-price')).toHaveTextContent('bez ceny');
   });
 
@@ -210,7 +213,62 @@ describe('the price on every row', () => {
 
     expect(await screen.findByText('Kontrola')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Nadcházející' })).getByRole('listitem')).toHaveTextContent('900 Kč');
     const prices = await screen.findAllByTestId('row-price');
-    expect(prices.map((p) => p.textContent?.replace(/ /g, ' '))).toEqual(['900 Kč', 'bez ceny']);
+    expect(prices.map((p) => p.textContent?.replace(/ /g, ' '))).toEqual(['bez ceny']);
+  });
+});
+
+/* The shelf page (docs/ui-shelf-system.md): Nadcházející, Minulé, Zrušené. */
+describe('the shelves', () => {
+  it('draws the upcoming and the past shelves, and no cancelled one when nothing was cancelled', async () => {
+    get.mockResolvedValue({ data: { data: [
+      appointment({ id: 'next', startTime: '2099-01-01T08:00:00Z', endTime: '2099-01-01T08:30:00Z' }),
+      appointment({ id: 'old', status: 'Completed', startTime: '2020-01-01T08:00:00Z', endTime: '2020-01-01T08:30:00Z' }),
+    ] } });
+    renderPage();
+
+    const upcoming = await screen.findByRole('region', { name: 'Nadcházející' });
+    expect(within(upcoming).getByLabelText('Počet: 1')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Minulé' })).getByLabelText('Počet: 1')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Zrušené' })).toBeNull();
+  });
+
+  it('puts cancellations and no-shows on their own shelf, out of the history', async () => {
+    get.mockResolvedValue({ data: { data: [
+      appointment({ id: 'gone', status: 'Cancelled', eventName: 'Zrušená kontrola', startTime: '2099-01-01T08:00:00Z', endTime: '2099-01-01T08:30:00Z' }),
+      appointment({ id: 'away', status: 'NoShow', startTime: '2020-01-01T08:00:00Z', endTime: '2020-01-01T08:30:00Z' }),
+    ] } });
+    renderPage();
+
+    const cancelled = await screen.findByRole('region', { name: 'Zrušené' });
+    expect(within(cancelled).getByText('Zrušená kontrola')).toBeInTheDocument();
+    expect(within(cancelled).getByLabelText('Počet: 2')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Minulé' })).getByText('Zatím tu žádný proběhlý termín není.')).toBeInTheDocument();
+  });
+
+  it('opens an upcoming booking exactly when the card knows its calendar', async () => {
+    outletContext.upcoming = [{ id: 'next', calendarId: 'cal-7' }];
+    get.mockResolvedValue({ data: { data: [
+      appointment({ id: 'next', startTime: '2099-01-01T08:00:00Z', endTime: '2099-01-01T08:30:00Z' }),
+    ] } });
+    renderPage();
+
+    const card = await within(await screen.findByRole('region', { name: 'Nadcházející' })).findByRole('link');
+    expect(card).toHaveAttribute('href', '/kalendar/cal-7/termin/next');
+  });
+
+  it('draws no second "Objednat termín" when nothing is coming (the card header has it)', async () => {
+    renderPage();
+    const upcoming = await screen.findByRole('region', { name: 'Nadcházející' });
+    expect(within(upcoming).getByText(/Eva nemá objednaný žádný termín/)).toBeInTheDocument();
+    expect(within(upcoming).queryByRole('button')).toBeNull();
+  });
+
+  it('pins nothing of its own on a phone (the card header pins "Objednat termín")', async () => {
+    setViewport(VIEWPORTS.phone);
+    renderPage();
+    await screen.findByRole('region', { name: 'Nadcházející' });
+    expect(document.querySelector('[data-pinned="true"]')).toBeNull();
   });
 });

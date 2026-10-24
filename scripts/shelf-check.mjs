@@ -118,6 +118,23 @@ const measurePage = () => {
   return out;
 };
 
+/** Replaces birth-number / long-digit shapes on the page with dots (before a screenshot); returns how many. */
+const maskIdentifiers = () => {
+  const shape = /\d{6}\s*\/\s*\d{3,4}|\d{9,}/g;
+  let n = 0;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    const text = node.nodeValue ?? '';
+    if (shape.test(text)) { node.nodeValue = text.replace(shape, '••••'); n += 1; }
+    shape.lastIndex = 0;
+  }
+  for (const input of document.querySelectorAll('input, textarea')) {
+    if (shape.test(input.value)) { input.value = input.value.replace(shape, '••••'); n += 1; }
+    shape.lastIndex = 0;
+  }
+  return n;
+};
+
 /** Every visible interactive element in the page region that is smaller than `min` px. */
 const smallTargets = (min) => {
   const region = document.getElementById('fit-region');
@@ -144,15 +161,20 @@ const smallTargets = (min) => {
 /* ------------------------------ one page, one viewport ------------------------------ */
 
 /** A patient to open, read through the real API (a phone's register draws cards, not links). */
+/* PATIENT_QUERY=... opens the first patient that query finds (a "ZZ test" one), PATIENT_ID=... exactly that one. */
+const PATIENT_QUERY = process.env.PATIENT_QUERY ?? '';
+const PATIENT_ID = process.env.PATIENT_ID ?? '';
 async function patientPath(page) {
+  if (PATIENT_ID !== '') return `/patients/${PATIENT_ID}`;
   await page.goto(`${BASE}/prehled`);
-  await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
-  const id = await page.evaluate(async () => {
+  await page.waitForSelector('section[data-shelf], h1', { timeout: 30000 });
+  const id = await page.evaluate(async (q) => {
     const token = localStorage.getItem('token');
-    const res = await fetch('/api/patients?pageSize=1', { headers: { Authorization: `Bearer ${token}` } });
+    const url = q === '' ? '/api/patients?pageSize=1' : `/api/patients?pageSize=1&query=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const body = await res.json();
     return (body?.data?.items ?? body?.items ?? [])[0]?.id ?? null;
-  });
+  }, PATIENT_QUERY);
   return id === null ? null : `/patients/${id}`;
 }
 
@@ -165,10 +187,17 @@ const PAGE_PATH = {
   'set-firma': '/nastaveni/firma-a-faktury',
   'set-hours': '/working-hours',
   'set-2fa': '/nastaveni/zabezpeceni',
+  /* Phase 2, S-2 */
+  'intake-review': '/intake-review', register: '/patients/register', 'diagnostics-new': '/diagnostics/new', feedback: '/hodnoceni-pacientu',
 };
+/* The patient's own pages: `patient` + the suffix after `/patients/{id}`. */
+const PATIENT_PAGE = {
+  patient: '', 'p-dokumenty': '/dokumenty', 'p-terminy': '/terminy', 'p-vysledky': '/vysledky', 'p-historie': '/historie', 'p-edit': '/edit',
+};
+const isPatientPage = (name) => Object.hasOwn(PATIENT_PAGE, name);
 
 async function openPage(page, name, patientHref) {
-  const path = name === 'patient' ? patientHref : PAGE_PATH[name];
+  const path = isPatientPage(name) ? `${patientHref}${PATIENT_PAGE[name]}` : PAGE_PATH[name];
   await page.goto(`${BASE}${path}`);
   await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
   /* let the data arrive, the cascade finish and the count-ups settle */
@@ -183,6 +212,9 @@ function watch(page, bucket) {
   });
   page.on('response', (r) => {
     const u = r.url();
+    /* `/@fs/.../@fontsource/...` 403: a worktree whose node_modules is a junction to another checkout - the dev server's own
+       file guard, not the page (FONT_403=1 counts them anyway). */
+    if (process.env.FONT_403 !== '1' && r.status() === 403 && /\/@fs\/.*@fontsource/.test(u)) return;
     if (u.startsWith(BASE) && r.status() >= 400 && !/\/api\/(account|v1\/account)/.test(u)) bucket.push(`http ${r.status()} ${new URL(u).pathname}`);
   });
 }
@@ -193,8 +225,8 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   const page = await ctx.newPage();
   const problems = [];
   watch(page, problems);
-  const href = name === 'patient' ? await patientPath(page) : null;
-  if (name === 'patient' && href === null) {
+  const href = isPatientPage(name) ? await patientPath(page) : null;
+  if (isPatientPage(name) && href === null) {
     fail(where, 'no patient to open');
     await ctx.close();
     return;
@@ -202,6 +234,9 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   await openPage(page, name, href);
 
   const shot = join(OUT, `${name}${label}${MODE === 'dark' ? '-dark' : ''}-${vp.label}.jpg`);
+  /* Privacy: nothing shaped like a birth number or an insurance number reaches a screenshot (text or a field's value). */
+  const masked = await page.evaluate(maskIdentifiers);
+  if (masked > 0) notes.push(`${where}: ${masked} identifier-shaped value(s) masked before the screenshot`);
   await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };
@@ -235,10 +270,22 @@ const contextFor = (extra = {}) => async (vp) => {
   return ctx;
 };
 
+/* THEMES=light,dark draws every page in both (dark through the app's own stored setting); default light only. */
+const THEMES = (process.env.THEMES ?? 'light').split(',');
+const themedContext = (mode) => async (vp) => {
+  const ctx = await contextFor()(vp);
+  await ctx.addInitScript((m) => { try { localStorage.setItem('sm-theme-mode-v2', m); } catch { /* private */ } }, mode);
+  return ctx;
+};
+
 if (SECTIONS.has('pages')) {
   for (const vp of VIEWPORTS) {
     console.log(`== ${vp.label}`);
-    for (const name of PAGES) await checkPage(contextFor(), vp, name);
+    for (const mode of THEMES) {
+      for (const name of PAGES) {
+        await checkPage(mode === 'light' && THEMES.length === 1 ? contextFor() : themedContext(mode), vp, name, mode === 'light' ? '' : `-${mode}`);
+      }
+    }
   }
 }
 

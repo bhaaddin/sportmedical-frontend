@@ -12,8 +12,10 @@
  * of the doctor's notes. "Zapsat hodnoty ručně" is the doctor's manual entry,
  * and "Upravit" opens the same form prefilled from the session (PUT).
  *
- * Three layouts: a card per measurement on a phone, a three-column table on
- * an iPad, the full table on a desktop.
+ * Shelves (docs/ui-shelf-system.md): Poslední sezení (four figures against the
+ * session before), Sezení (a card per measurement on a phone, a three-column
+ * table on an iPad, the full table on a desktop; "Zapsat hodnoty ručně" and
+ * "Nové měření" in its header).
  *
  * The session carries no "type": every one is the same diagnostic
  * measurement, so the column says that rather than inventing a classification
@@ -28,8 +30,8 @@ import {
 import { Close, EditOutlined } from '@mui/icons-material';
 import { diagnosticsApi } from '../../api/diagnostics';
 import type { DiagnosticSession } from '../../api/diagnostics';
-import { AsyncSection } from '../../components/booking/AsyncSection';
-import { SectionLabel, SoftCard, StatusChip } from '../../components/ui';
+import { StatusChip } from '../../components/ui';
+import { MetricCard, Shelf, TARGET_SX } from '../../ui/shelf';
 import { ResponsiveDataList } from '../../components/ui/ResponsiveDataList';
 import type { DataColumn } from '../../components/ui/ResponsiveDataList';
 import { usePermission } from '../../auth/usePermission';
@@ -45,6 +47,17 @@ const formatDay = (value: string): string => {
   const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   return plain !== null ? `${Number(plain[3])}. ${Number(plain[2])}. ${plain[1]}` : formatPragueDate(value);
 };
+
+/** One decimal, the Czech way ("52,5"). */
+const decimal = (n: number): string => n.toLocaleString('cs-CZ', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** "+3,2 % oproti minule", or null when there is no earlier session to compare with (or it would not be a number). */
+export function trendPct(current: number, previous: number | undefined): string | null {
+  if (!previous) return null;
+  const pct = ((current - previous) / previous) * 100;
+  if (!Number.isFinite(pct)) return null;
+  return `${pct > 0 ? '+' : ''}${decimal(pct)} % oproti minule`;
+}
 
 export default function PatientResultsPage() {
   const { id } = useParams<{ id: string }>();
@@ -116,14 +129,14 @@ export default function PatientResultsPage() {
               startIcon={<EditOutlined />}
               aria-label={`Upravit měření ${formatDay(measurementDate(s))}`}
               onClick={() => setEditing(s)}
-              sx={{ minHeight: 36 }}
+              sx={TARGET_SX}
             >
               Upravit
             </Button>
           )}
           <ExportGate>
             {(blocked) => (
-              <Button size="small" variant="outlined" disabled={blocked} onClick={() => void openReport(s)} sx={{ minHeight: 36 }}>
+              <Button size="small" variant="outlined" disabled={blocked} onClick={() => void openReport(s)} sx={TARGET_SX}>
                 Otevřít zprávu
               </Button>
             )}
@@ -169,34 +182,56 @@ export default function PatientResultsPage() {
     </Stack>
   );
 
-  return (
-    <Stack spacing={2}>
-      <SoftCard>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
-          <Box sx={{ flex: 1 }}>
-            <SectionLabel sx={{ mb: 0.25 }}>Výsledky</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Diagnostická měření tohoto pacienta, od nejnovějšího.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': { minHeight: 44, flex: { xs: 1, sm: 'none' } } }}>
-            <Button variant="outlined" onClick={() => setEntering(true)}>
-              Zapsat hodnoty ručně
-            </Button>
-            <Button variant="contained" onClick={() => navigate(`/diagnostics/new?patientId=${id}`)}>
-              Nové měření
-            </Button>
-          </Stack>
-        </Stack>
-      </SoftCard>
+  const latest = sessions[0];
+  const previous = sessions[1];
+  const newMeasurement = () => navigate(`/diagnostics/new?patientId=${id}`);
+  const actions = (
+    <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': { ...TARGET_SX, minHeight: phone ? 44 : undefined } }}>
+      <Button size="small" variant="outlined" onClick={() => setEntering(true)}>
+        Zapsat hodnoty ručně
+      </Button>
+      <Button size="small" variant="contained" onClick={newMeasurement}>
+        Nové měření
+      </Button>
+    </Stack>
+  );
 
-      <AsyncSection
-        isLoading={query.isLoading}
-        error={query.error}
-        isEmpty={sessions.length === 0}
-        isSettled={!query.isLoading}
-        emptyText="Zatím tu žádný výsledek není."
+  return (
+    <Stack spacing={3} data-shelf-section="vysledky">
+      {/* ── Poslední sezení: the four numbers a person asks for first, against the time before ── */}
+      {latest !== undefined && (
+        <Shelf
+          id="latest"
+          title="Poslední sezení"
+          hint={`Měřeno ${formatDay(measurementDate(latest))}`}
+          layout="row"
+          fill
+          minCardWidth={180}
+          phoneWidth="min(44vw, 200px)"
+          stagger={false}
+        >
+          <MetricCard label="VO₂ max" value={decimal(latest.vo2MaxMlMinKg)} hint={trendPct(latest.vo2MaxMlMinKg, previous?.vo2MaxMlMinKg) ?? 'ml/min/kg'} />
+          <MetricCard label="Klidový tep" value={`${latest.restingHeartRateBpm}`} hint={trendPct(latest.restingHeartRateBpm, previous?.restingHeartRateBpm) ?? 'úderů/min'} />
+          <MetricCard label="Krevní tlak" value={`${latest.systolicBloodPressure}/${latest.diastolicBloodPressure}`} hint="mmHg" />
+          <MetricCard label="Tělesný tuk" value={`${decimal(latest.bodyFatPercentage)} %`} hint={`Svaly ${decimal(latest.muscleMassKg)} kg`} />
+        </Shelf>
+      )}
+
+      {/* ── Sezení: every measurement, newest first; the two ways to add one sit in its header ── */}
+      <Shelf
+        id="sessions"
+        title="Sezení"
+        hint="Diagnostická měření, od nejnovějšího"
+        count={query.isLoading || query.isError ? undefined : sessions.length}
+        layout="free"
+        stagger={false}
+        controls={actions}
+        loading={query.isLoading}
+        error={query.isError ? 'Výsledky se nepodařilo načíst.' : false}
         onRetry={() => void query.refetch()}
+        empty={sessions.length === 0}
+        /* The two ways to add one are in the header, right above: not drawn twice. */
+        emptyState={{ text: 'Zatím tu žádný výsledek není.' }}
       >
         <ResponsiveDataList
           rows={sessions}
@@ -205,7 +240,7 @@ export default function PatientResultsPage() {
           renderCard={renderCard}
           ariaLabel="Výsledky měření"
         />
-      </AsyncSection>
+      </Shelf>
 
       <Dialog
         open={entering || editing !== null}

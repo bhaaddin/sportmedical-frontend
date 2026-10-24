@@ -1,0 +1,334 @@
+{
+  "base": "http://localhost:3103",
+  "at": "2026-10-24T14:21:12.675Z",
+  "pages": {
+    "1440x900 p-dokumenty": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "documents",
+          "state": "empty",
+          "heading": "Dokumenty"
+        },
+        {
+          "id": "upload",
+          "state": "ready",
+          "heading": "Nahrát dokument"
+        },
+        {
+          "id": "reports",
+          "state": "empty",
+          "heading": "Lékařské zprávy"
+        }
+      ]
+    },
+    "1440x900 p-terminy": {
+      "regionScroll": 588,
+      "shelves": [
+        {
+          "id": "upcoming",
+          "state": "empty",
+          "heading": "Nadcházející"
+        },
+        {
+          "id": "past",
+          "state": "empty",
+          "heading": "Minulé"
+        },
+        {
+          "id": "cancelled",
+          "state": "ready",
+          "heading": "Zrušené"
+        }
+      ]
+    },
+    "1440x900 p-vysledky": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "sessions",
+          "state": "empty",
+          "heading": "Sezení"
+        }
+      ]
+    },
+    "1440x900 p-historie": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "changes",
+          "state": "ready",
+          "heading": "Změny karty"
+        }
+      ]
+    },
+    "1440x900 intake-review": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čeká na rozhodnutí"
+        }
+      ]
+    },
+    "1440x900 register": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "basic",
+          "state": "ready",
+          "heading": "Základní údaje"
+        },
+        {
+          "id": "contact",
+          "state": "ready",
+          "heading": "Kontakt"
+        },
+        {
+          "id": "consents",
+          "state": "ready",
+          "heading": "Souhlasy"
+        },
+        {
+          "id": "insurance",
+          "state": "ready",
+          "heading": "Pojištění"
+        },
+        {
+          "id": "address",
+          "state": "ready",
+          "heading": "Adresa"
+        },
+        {
+          "id": "summary",
+          "state": "ready",
+          "heading": "Uloží se takto"
+        },
+        {
+          "id": "outstanding",
+          "state": "ready",
+          "heading": "Zbývá vyplnit"
+        }
+      ]
+    },
+    "1440x900 p-edit": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "basic",
+          "state": "ready",
+          "heading": "Základní údaje"
+        },
+        {
+          "id": "other",
+          "state": "ready",
+          "heading": "Ostatní"
+        },
+        {
+          "id": "identity",
+          "state": "ready",
+          "heading": "Pojištění a adresa"
+        },
+        {
+          "id": "portal",
+          "state": "ready",
+          "heading": "Portál pacienta"
+        },
+        {
+          "id": "recent-changes",
+          "state": "ready",
+          "heading": "Poslední změny"
+        }
+      ]
+    },
+    "1440x900 diagnostics-new": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "patient",
+          "state": "ready",
+          "heading": "Pacient a lékař"
+        }
+      ]
+    },
+    "1440x900 feedback": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "answers",
+          "state": "empty",
+          "heading": "Hodnocení"
+        }
+      ]
+    },
+    "1440x900 p-dokumenty-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "documents",
+          "state": "empty",
+          "heading": "Dokumenty"
+        },
+        {
+          "id": "upload",
+          "state": "ready",
+          "heading": "Nahrát dokument"
+        },
+        {
+          "id": "reports",
+          "state": "empty",
+          "heading": "Lékařské zprávy"
+        }
+      ]
+    },
+    "1440x900 p-terminy-dark": {
+      "regionScroll": 588,
+      "shelves": [
+        {
+          "id": "upcoming",
+          "state": "empty",
+          "heading": "Nadcházející"
+        },
+        {
+          "id": "past",
+          "state": "empty",
+          "heading": "Minulé"
+        },
+        {
+          "id": "cancelled",
+          "state": "ready",
+          "heading": "Zrušené"
+        }
+      ]
+    },
+    "1440x900 p-vysledky-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "sessions",
+          "state": "empty",
+          "heading": "Sezení"
+        }
+      ]
+    },
+    "1440x900 p-historie-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "changes",
+          "state": "ready",
+          "heading": "Změny karty"
+        }
+      ]
+    },
+    "1440x900 intake-review-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čeká na rozhodnutí"
+        }
+      ]
+    },
+    "1440x900 register-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "basic",
+          "state": "ready",
+          "heading": "Základní údaje"
+        },
+        {
+          "id": "contact",
+          "state": "ready",
+          "heading": "Kontakt"
+        },
+        {
+          "id": "consents",
+          "state": "ready",
+          "heading": "Souhlasy"
+        },
+        {
+          "id": "insurance",
+          "state": "ready",
+          "heading": "Pojištění"
+        },
+        {
+          "id": "address",
+          "state": "ready",
+          "heading": "Adresa"
+        },
+        {
+          "id": "summary",
+          "state": "ready",
+          "heading": "Uloží se takto"
+        },
+        {
+          "id": "outstanding",
+          "state": "ready",
+          "heading": "Zbývá vyplnit"
+        }
+      ]
+    },
+    "1440x900 p-edit-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "basic",
+          "state": "ready",
+          "heading": "Základní údaje"
+        },
+        {
+          "id": "other",
+          "state": "ready",
+          "heading": "Ostatní"
+        },
+        {
+          "id": "identity",
+          "state": "ready",
+          "heading": "Pojištění a adresa"
+        },
+        {
+          "id": "portal",
+          "state": "ready",
+          "heading": "Portál pacienta"
+        },
+        {
+          "id": "recent-changes",
+          "state": "ready",
+          "heading": "Poslední změny"
+        }
+      ]
+    },
+    "1440x900 diagnostics-new-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "patient",
+          "state": "ready",
+          "heading": "Pacient a lékař"
+        }
+      ]
+    },
+    "1440x900 feedback-dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "answers",
+          "state": "empty",
+          "heading": "Hodnocení"
+        }
+      ]
+    }
+  },
+  "timing": {},
+  "accent": {},
+  "motion": {},
+  "failures": [],
+  "notes": [
+    "1440x900 register: 4 target(s) under 32 px: input 248x27  | button 28x28 Open | input 248x27  | button 28x28 Open",
+    "1440x900 register-dark: 4 target(s) under 32 px: input 248x27  | button 28x28 Open | input 248x27  | button 28x28 Open"
+  ]
+}

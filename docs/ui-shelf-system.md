@@ -348,16 +348,16 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 1 | `/prehled` | Přehled | **Redone in Stage 4** (no shelves) | Dnes, Vyžaduje pozornost, Tento týden, Kluby k vyřízení (was: Dnes, Vyžaduje pozornost, Najít pacienta, Objednaní, Čekárna, Připnuté a nedávné, Nově v kartotéce) | patients, bookings, invoices, club orders, intake | A1 | done |
 | 2 | `/planner-lab` | Planner lab (dev, localhost only) | planner demo | **Out** - the planner's lab | - | - | out |
 | 3 | `/patients` | Pacienti | **Done (pilot)** | Čeká na vás (intake), Naposledy otevření, Kartotéka (grow) | patient chips + peek, intake queue | A2 | done |
-| 4 | `/patients/register` | Nový pacient (1576 lines) | FitPage + PageHeader + SoftCard form | PageFrame; Údaje pacienta (board), Souhlasy, Podobní pacienti (EntityCards of possible duplicates), Po uložení (ActionCards: objednat, karta) | duplicates -> patient chips; after save -> card, booking, quick link | A2 | P1 |
-| 5 | `/patients/:id/edit` | Úprava karty (990) | FitPage + form | PageFrame with the patient's chips; Osobní údaje, Kontakty, Pojištění, Poslední změny (author + reason) | patient card, audit log, recents | A2 | P2 |
+| 4 | `/patients/register` | Nový pacient (1576 lines) | **Done (S-2)** | PageFrame; Údaje pacienta (board), Souhlasy, Podobní pacienti (EntityCards of possible duplicates), Po uložení (ActionCards: objednat, karta) | duplicates -> patient chips; after save -> card, booking, quick link | A2 | done |
+| 5 | `/patients/:id/edit` | Úprava karty (990) | **Done (S-2)** | PageFrame with the patient's chips; Osobní údaje, Kontakty, Pojištění, Poslední změny (author + reason) | patient card, audit log, recents | A2 | done |
 | 6 | `/patients/:id` | Karta pacienta (layout) | **Done (pilot)** | header, banners, sticky tabs | - | A2 | done |
 | 7 | `/patients/:id` index | Přehled karty | **Done (pilot)** | Související, Osobní údaje, Historie návštěv, Výsledky, Příští termín, Upozornění | termíny, faktury, dokumenty, klub, souhlasy | A2 | done |
-| 8 | `/patients/:id/dokumenty` | Dokumenty karty (203) | SoftCard list | Co chybí (attention cards from `checkRequired`), Dokumenty (EntityCards with status), Nahrát | appointment that asks for it, template (settings), signed-by | A2 | P1 |
-| 9 | `/patients/:id/terminy` | Termíny karty (311) | ResponsiveDataList | Nadcházející (appointment cards), Minulé (list), Zrušené | booking detail, invoice per visit, činnost, club | A2 | P1 |
-| 10 | `/patients/:id/historie` | Historie karty (129) | SoftCard | Změny karty (who, when, why), Přístupy | audit log, author | A2 | P3 |
-| 11 | `/patients/:id/vysledky` | Výsledky karty (232) | ResponsiveDataList + dialog | Poslední sezení (metrics), Sezení (list), Ruční zápis | diagnostics form, PDF, trend | A2 | P2 |
+| 8 | `/patients/:id/dokumenty` | Dokumenty karty (203) | **Done (S-2)** | Co chybí (attention cards from `checkRequired`), Dokumenty (EntityCards with status), Nahrát | appointment that asks for it, template (settings), signed-by | A2 | done |
+| 9 | `/patients/:id/terminy` | Termíny karty (311) | **Done (S-2)** | Nadcházející (appointment cards), Minulé (list), Zrušené | booking detail, invoice per visit, činnost, club | A2 | done |
+| 10 | `/patients/:id/historie` | Historie karty (129) | **Done (S-2)** | Změny karty (who, when, why), Přístupy | audit log, author | A2 | done |
+| 11 | `/patients/:id/vysledky` | Výsledky karty (232) | **Done (S-2)** | Poslední sezení (metrics), Sezení (list), Ruční zápis | diagnostics form, PDF, trend | A2 | done |
 | 12 | `/patients/:id/faktury` | Faktury karty (151) | ResponsiveDataList | K úhradě (attention), Všechny faktury (invoice cards) | invoice -> Fakturace, appointment | A3 | P2 |
-| 13 | `/diagnostics/new` | Nové vyšetření (521) | PageHeader form | PageFrame with the patient chip; Měření, Poznámky, Po uložení | patient card, results, PDF | A2 | P2 |
+| 13 | `/diagnostics/new` | Nové vyšetření (521) | **Done (S-2)** | PageFrame with the patient chip; Měření, Poznámky, Po uložení | patient card, results, PDF | A2 | done |
 | 14 | `/billing` | Fakturace (493) | FitPage + KpiCard + table | metrics (Dnes, K úhradě, Po splatnosti, Ke schválení), Vyžaduje pozornost (overdue, approval), Faktury (grow); invoice detail -> `invoiceRelatedGroups` | patient, appointment, club, payments, PDF | A3 | P1 |
 | 15 | `/cashier` | Pokladna (311) | FitPage + KpiCard + list | Dnešní tržba (metrics), K zaplacení dnes (list of today's open visits), Poslední platby | patient chips, invoice, appointment | A3 | P1 |
 | 16 | `/accounting-export` | Účetní export (217) | FitPage + list | Období (board), Připraveno k exportu (metric), Poslední exporty | invoices in the range, billing | A3 | P3 |
@@ -375,8 +375,8 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 27a | `/clubs/:clubId` | Stránka klubu (Stage 5a) | shelf page: Statistiky, Objednávky, Nejbližší termíny, Poslední změny, Hráči, Odkazy | **In** - `pages/clubs/overview`, `docs/stage5a-2026-10.md` | - | - | done |
 | 28 | `/nastaveni/kluby` | Nastavení klubů (302) | SettingsFrame | Výchozí hodnoty, Odkazy a platnost | clubs, orders | A4 | P3 |
 | 29 | `/vyhrazeni` | Vyhrazení partnerů (735) | FitPage + SoftCard | Aktivní vyhrazení (cards), Končí brzy (attention) | partner/club, calendar, orders | A4 | P2 |
-| 30 | `/intake-review` | Kontrola registrací (509) | FitPage + SoftCard queue | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | P1 |
-| 31 | `/hodnoceni-pacientu` | Hodnocení pacientů (145) | SettingsFrame + KpiCard | metrics (průměr, počet), Nová hodnocení (cards), K vyřízení | patient, appointment | A2 | P2 |
+| 30 | `/intake-review` | Kontrola registrací (509) | **Done (S-2)** | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | done |
+| 31 | `/hodnoceni-pacientu` | Hodnocení pacientů (145) | **Done (S-2)** | metrics (průměr, počet), Nová hodnocení (cards), K vyřízení | patient, appointment | A2 | done |
 | 32 | `/planovani` | Kalendář | planner stage | **Out** - fixed layout | - | - | out |
 | 33 | `/dnes` | Dnešní přehled (715) | FitPage + KpiCard + StackTable | metrics, Vyžaduje pozornost (today only), per-calendar columns as shelves, Čekárna | patient, booking, činnost, invoice per visit | A1 | P1 |
 | 34 | `/prehled-sluzeb` | Přehled podle služeb (625) | FitPage + filters + table | Filtr (board), per služba shelves (booked / free), Volná kapacita (metric) | služba, činnost, calendar, bookings | A1 | P2 |

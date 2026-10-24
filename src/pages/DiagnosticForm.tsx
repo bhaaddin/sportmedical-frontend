@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, TextField, Button, Grid, Alert, CircularProgress, Divider,
+  Box, Typography, TextField, Button, Grid, Alert, CircularProgress,
   InputAdornment, Stack, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
-import { Send, ArrowBack, ArrowForward, Check } from '@mui/icons-material';
+import { Send, ArrowBack, ArrowForward, Check, Download, PersonOutlined, Science } from '@mui/icons-material';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { CreateSessionRequest, DiagnosticSession } from '../api/diagnostics';
 import { DiagnosticFormSkeleton } from '../components/SkeletonLoader';
-import { TONE_CSS, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
+import { TONE_CSS, StatusChip, type ChipTone } from '../components/ui';
+import { ActionCard, MetricCard, PageFrame, Shelf, TARGET_SX, entityTarget, safeLabel, type EntityRef } from '../ui/shelf';
+import { ExportGate } from '../components/ui/ExportGate';
+import { patientsApi } from '../api/patients';
 import toast from 'react-hot-toast';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
@@ -84,6 +87,14 @@ function toRequest(draft: SessionDraft): CreateSessionRequest | null {
 }
 
 const shown = (value: number | null, unit: string) => (value === null ? '—' : `${value} ${unit}`);
+
+/** The shelf each step stands on: its heading and the one line under it. */
+const STEP_SHELF = [
+  { id: 'patient', title: 'Pacient a lékař', hint: 'Údaje pacienta a vyšetřujícího' },
+  { id: 'cardio', title: 'Kardiovaskulární metriky', hint: 'Štítek pod polem říká, do jakého rozsahu hodnota spadá' },
+  { id: 'body', title: 'Složení těla', hint: 'Krevní tlak a složení těla' },
+  { id: 'notes', title: 'Poznámky', hint: 'Klinické poznámky, pak relaci odešlete' },
+];
 
 const steps = [
   { label: 'Pacient a lékař' },
@@ -193,11 +204,27 @@ export default function DiagnosticForm() {
   const [result, setResult] = useState<DiagnosticSession | null>(null);
   const [error, setError] = useState('');
 
+  /* The patient this was opened for (the card's "Nové vyšetření" sends `?patientId=`): their name for the chip in the header. */
+  const [urlPatient, setUrlPatient] = useState<{ id: string; name: string } | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pid = params.get('patientId');
-    if (pid) setForm(prev => ({ ...prev, patientId: pid }));
+    if (!pid) return undefined;
+    setForm(prev => ({ ...prev, patientId: pid }));
+    let live = true;
+    Promise.resolve().then(() => patientsApi.getById(pid))
+      .then((p) => {
+        const name = safeLabel(p ? `${p.firstName} ${p.lastName}` : '', 'patient');
+        if (live && name !== '') setUrlPatient({ id: pid, name });
+      })
+      .catch(() => { /* no chip: the form still works with the id */ });
+    return () => { live = false; };
   }, []);
+
+  /* The chip in the header: only for the patient whose name is known, and only while the form is still about them. */
+  const patientChip = (id: string): EntityRef[] =>
+    urlPatient !== null && urlPatient.id === id ? [{ kind: 'patient', id, label: urlPatient.name }] : [];
 
   const update = (field: 'patientId' | 'practitionerName' | 'rawPractitionerNotes', value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
@@ -249,55 +276,61 @@ export default function DiagnosticForm() {
       ['Tělesný tuk', `${result.bodyFatPercentage} %`],
       ['Svalová hmota', `${result.muscleMassKg} kg`],
     ];
+    const card = entityTarget({ kind: 'patient', id: result.patientId }).to;
     return (
-      <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
-        <PageHeader
-          title="Výsledky"
-          subtitle="Diagnostika a měření · uložená relace"
-          actions={
-            <Button variant="outlined" onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }}>
-              Vytvořit další relaci
-            </Button>
-          }
-        />
-        <SoftCard>
-          <Alert severity={result.requiresDoctorReview ? 'warning' : 'success'} sx={{ mb: 3 }}>
-            {result.requiresDoctorReview
-              ? 'Tato relace vyžaduje přezkum lékařem'
-              : 'Analýza dokončena — žádné kritické nálezy'}
-          </Alert>
-
-          {anomalies.length > 0 && (
-            <>
-              <SectionLabel>Zjištěné anomálie</SectionLabel>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-                {anomalies.map((a: any, i: number) => (
-                  <StatusChip
-                    key={i}
-                    tone={a.severity === 'Critical' ? 'red' : a.severity === 'Warning' ? 'beige' : 'blue'}
-                    dot={Boolean(a.isCritical)}
-                  >
-                    {a.metric}: {a.description}
-                  </StatusChip>
-                ))}
-              </Box>
-              <Divider sx={{ my: 3 }} />
-            </>
+      <PageFrame
+        title="Výsledky vyšetření"
+        purpose="Diagnostika a měření · uložená relace"
+        entities={patientChip(result.patientId)}
+        actions={
+          <Button variant="outlined" onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }} sx={TARGET_SX}>
+            Vytvořit další relaci
+          </Button>
+        }
+      >
+        <Alert
+          severity={result.requiresDoctorReview ? 'warning' : 'success'}
+          action={(
+            <ExportGate>
+              {(blocked) => (
+                <Button color="inherit" size="small" startIcon={<Download />} disabled={blocked} onClick={() => void diagnosticsApi.downloadPdf(result.id)} sx={TARGET_SX}>
+                  PDF report
+                </Button>
+              )}
+            </ExportGate>
           )}
+        >
+          {result.requiresDoctorReview
+            ? 'Tato relace vyžaduje přezkum lékařem'
+            : 'Analýza dokončena — žádné kritické nálezy'}
+        </Alert>
 
-          <SectionLabel>Metriky relace</SectionLabel>
-          <Grid container spacing={2}>
-            {metrics.map(([label, value]) => (
-              <Grid key={label} size={{ xs: 6, sm: 4 }}>
-                <SoftCard tone="muted" sx={{ p: 2 }}>
-                  <SectionLabel sx={{ mb: 0.5 }}>{label}</SectionLabel>
-                  <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{value}</Typography>
-                </SoftCard>
-              </Grid>
-            ))}
-          </Grid>
-        </SoftCard>
-      </Box>
+        {anomalies.length > 0 && (
+          <Shelf id="anomalies" title="Zjištěné anomálie" count={anomalies.length} countTone="red" layout="board" stagger={false}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, p: 2 }}>
+              {anomalies.map((a: any, i: number) => (
+                <StatusChip
+                  key={i}
+                  tone={a.severity === 'Critical' ? 'red' : a.severity === 'Warning' ? 'beige' : 'blue'}
+                  dot={Boolean(a.isCritical)}
+                >
+                  {a.metric}: {a.description}
+                </StatusChip>
+              ))}
+            </Box>
+          </Shelf>
+        )}
+
+        <Shelf id="metrics" title="Metriky relace" layout="grid" minCardWidth={180} stagger={false}>
+          {metrics.map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}
+        </Shelf>
+
+        {/* ── Po uložení: where this measurement now lives ── */}
+        <Shelf id="after" title="Po uložení" layout="row" fill minCardWidth={220} stagger={false}>
+          <ActionCard primary title="Výsledky pacienta" icon={<Science fontSize="small" />} to={`${card}/vysledky`} />
+          <ActionCard title="Karta pacienta" icon={<PersonOutlined fontSize="small" />} to={card} />
+        </Shelf>
+      </PageFrame>
     );
   }
 
@@ -317,44 +350,44 @@ export default function DiagnosticForm() {
 
   /* ── Manual entry: one page, typed by the doctor ── */
   if (mode === 'manual') {
-    const urlPatient = new URLSearchParams(window.location.search).get('patientId') ?? undefined;
+    const fromUrl = new URLSearchParams(window.location.search).get('patientId') ?? undefined;
     return (
-      <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
-        <PageHeader
-          title="Výsledky"
-          subtitle="Diagnostika a měření · ruční zápis naměřených hodnot"
-          actions={modeToggle}
-        />
-        <ManualResultsForm
-          patientId={urlPatient}
-          onSaved={(session) => setResult(session)}
-          onCancel={() => setMode('wizard')}
-        />
-      </Box>
+      <PageFrame
+        title="Nové vyšetření"
+        purpose="Diagnostika a měření · ruční zápis naměřených hodnot"
+        entities={fromUrl === undefined ? [] : patientChip(fromUrl)}
+        actions={modeToggle}
+      >
+        <Shelf id="manual" title="Naměřené hodnoty" hint="Opsané z protokolu přístroje" layout="free" stagger={false}>
+          <ManualResultsForm
+            patientId={fromUrl}
+            onSaved={(session) => setResult(session)}
+            onCancel={() => setMode('wizard')}
+          />
+        </Shelf>
+      </PageFrame>
     );
   }
 
   /* ── Wizard View ── */
   return (
-    <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
-      <PageHeader
-        title="Výsledky"
-        subtitle={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}
-        actions={modeToggle}
-      />
-
-      <SoftCard sx={{ mb: 2, py: 2 }}>
+    <PageFrame
+      title="Nové vyšetření"
+      purpose={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}
+      entities={patientChip(form.patientId)}
+      actions={modeToggle}
+    >
+      <Box sx={{ px: { xs: 0, sm: 0.5 } }}>
         <StepStrip active={activeStep} />
-      </SoftCard>
+      </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error">{error}</Alert>}
 
-      <SoftCard>
+      <Shelf id={STEP_SHELF[activeStep].id} title={STEP_SHELF[activeStep].title} hint={STEP_SHELF[activeStep].hint} layout="board" stagger={false}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
         {/* Step 0: Patient Info */}
         {activeStep === 0 && (
           <Box>
-            <SectionLabel>Pacient a lékař</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>Zadejte údaje pacienta a vyšetřujícího.</Typography>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth required label="ID pacienta" value={form.patientId}
@@ -371,10 +404,6 @@ export default function DiagnosticForm() {
         {/* Step 1: Cardiovascular */}
         {activeStep === 1 && (
           <Box>
-            <SectionLabel>Kardiovaskulární metriky</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
-              Zadejte naměřené hodnoty. Štítek pod polem říká, do jakého rozsahu hodnota spadá.
-            </Typography>
             <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', alignItems: 'start' }}>
             <MetricField label="Klidová srdeční frekvence" value={form.vitals.restingHeartRateBpm}
               onChange={v => updateVital('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
@@ -413,10 +442,6 @@ export default function DiagnosticForm() {
         {/* Step 2: Body Composition */}
         {activeStep === 2 && (
           <Box>
-            <SectionLabel>Složení těla</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
-              Zadejte krevní tlak a metriky složení těla.
-            </Typography>
             <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', alignItems: 'start' }}>
             <MetricField label="Systolický krevní tlak" value={form.vitals.systolicBloodPressure}
               onChange={v => updateVital('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
@@ -456,19 +481,18 @@ export default function DiagnosticForm() {
         {/* Step 3: Notes & Submit */}
         {activeStep === 3 && (
           <Box>
-            <SectionLabel>Poznámky a kontrola</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
-              Přidejte klinické poznámky a relaci odešlete.
-            </Typography>
             <TextField fullWidth multiline rows={4} label="Poznámky praktika"
               value={form.rawPractitionerNotes}
               onChange={e => update('rawPractitionerNotes', e.target.value)}
               placeholder="např. Pacient hlásí bolest na hrudi při cvičení, rodinná anamnéza srdečních chorob..."
-              sx={{ mb: 3 }} />
+              />
+          </Box>
+        )}
+      </Box>
+      </Shelf>
 
-            <Divider sx={{ my: 3 }} />
-            <SectionLabel>Shrnutí</SectionLabel>
-            <Grid container spacing={2}>
+      {activeStep === 3 && (
+        <Shelf id="summary" title="Shrnutí" hint="Co se odešle" layout="grid" minCardWidth={180} stagger={false}>
               {[
                 ['Pacient', form.patientId || '—'],
                 ['Praktik', form.practitionerName || '—'],
@@ -478,18 +502,9 @@ export default function DiagnosticForm() {
                 ['Krevní tlak', form.vitals.systolicBloodPressure === null || form.vitals.diastolicBloodPressure === null
                   ? '—'
                   : `${form.vitals.systolicBloodPressure}/${form.vitals.diastolicBloodPressure} mmHg`],
-              ].map(([label, value]) => (
-                <Grid key={label} size={{ xs: 6, sm: 4 }}>
-                  <SoftCard tone="muted" sx={{ p: 2 }}>
-                    <SectionLabel sx={{ mb: 0.5 }}>{label}</SectionLabel>
-                    <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
-                  </SoftCard>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
-      </SoftCard>
+              ].map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}
+        </Shelf>
+      )}
 
       {/* ── Navigation Buttons ── pinned at the bottom on a phone ── */}
       {(() => {
@@ -513,9 +528,9 @@ export default function DiagnosticForm() {
         return phone ? (
           <PinnedActionBar label="Další krok">{back}{forward}</PinnedActionBar>
         ) : (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>{back}{forward}</Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>{back}{forward}</Box>
         );
       })()}
-    </Box>
+    </PageFrame>
   );
 }

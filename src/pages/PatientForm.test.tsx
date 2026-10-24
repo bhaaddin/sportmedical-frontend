@@ -10,7 +10,7 @@
  * sending the reason or the sex, or showing a refusal as a generic failure.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,6 +23,8 @@ const update = vi.fn();
 vi.mock('../api/patients', () => ({ patientsApi: { getById, getProfile, update } }));
 vi.mock('../api/client', () => ({ default: { put: vi.fn() }, client: { put: vi.fn() } }));
 vi.mock('../api/patientIdentity', () => ({ patientIdentityApi: {} }));
+const listByEntity = vi.fn();
+vi.mock('../api/audit', () => ({ auditApi: { listByEntity }, AUDIT_ENTITY: { patient: 'Patient' } }));
 vi.mock('../components/registration/RuianAddressPicker', () => ({ default: () => null }));
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -42,6 +44,7 @@ beforeEach(() => {
   });
   getProfile.mockReset().mockResolvedValue({});
   update.mockReset().mockResolvedValue({});
+  listByEntity.mockReset().mockResolvedValue([]);
 });
 
 const renderForm = () =>
@@ -160,5 +163,33 @@ describe('the patient cannot be loaded', () => {
     expect(await screen.findByText('Pacienta se nepodařilo načíst.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zkusit znovu' }));
     expect(await screen.findByDisplayValue('Markova')).toBeInTheDocument();
+  });
+});
+
+/* The shelf page: the blocks are named shelves, and the card's last changes (author + reason) sit beside them. */
+describe('as a shelf page', () => {
+  it('names each block as a shelf and links back to the card', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.edit']));
+    renderForm();
+    await screen.findByDisplayValue('Markova');
+    for (const name of ['Základní údaje', 'Ostatní', 'Pojištění a adresa', 'Portál pacienta']) {
+      expect(screen.getByRole('region', { name })).toBeInTheDocument();
+    }
+    /* no audit for somebody who does not oversee the clinic, and nothing asked */
+    expect(screen.queryByRole('region', { name: 'Poslední změny' })).toBeNull();
+    expect(listByEntity).not.toHaveBeenCalled();
+  });
+
+  it('shows the last changes with their author and reason to whoever oversees the clinic', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.edit', 'settings.clinic.manage']));
+    listByEntity.mockResolvedValue([
+      { id: 'e1', userEmail: 'recepce@example.test', action: 'PatientUpdated', entity: 'Patient', entityId: 'p1', timestamp: '2026-10-01T08:00:00Z', notes: 'Překlep v příjmení' },
+    ]);
+    renderForm();
+    const recent = await screen.findByRole('region', { name: 'Poslední změny' });
+    const row = await within(recent).findByTestId('recent-change');
+    expect(row).toHaveTextContent('recepce@example.test');
+    expect(row).toHaveTextContent('Překlep v příjmení');
+    expect(within(recent).getByRole('link', { name: /Historie/ })).toHaveAttribute('href', '/patients/p1/historie');
   });
 });

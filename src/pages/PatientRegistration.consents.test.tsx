@@ -161,7 +161,9 @@ describe.each(['phone', 'tablet', 'desktop'] as const)('Souhlasy podepsané na m
     renderPage();
     await screen.findByRole('heading', { name: 'Nový pacient', level: 1 });
     await user.click(screen.getByRole('button', { name: 'Rychlá' }));
-    expect(await screen.findByText('Souhlasy podepsány na místě (papírově)')).toBeInTheDocument();
+    /* the shelf names the block; the field draws no second label */
+    expect(await screen.findByRole('region', { name: 'Souhlasy' })).toHaveTextContent('Podepsané na místě (papírově)');
+    expect(screen.queryByText('Souhlasy podepsány na místě (papírově)')).toBeNull();
     /* No činnost yet: just the treatment consent. */
     await waitFor(() => expect(consentBoxes()).toHaveLength(1));
     expect(getConsentOptions).toHaveBeenCalledWith(null);

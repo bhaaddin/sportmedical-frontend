@@ -113,6 +113,7 @@ const renderPage = (entry = '/patients/register') =>
         <Route path="/patients/register" element={<PatientRegistration />} />
         <Route path="/patients/:id" element={<div>karta-pacienta</div>} />
         <Route path="/patients" element={<div>seznam-pacientu</div>} />
+        <Route path="/planovani" element={<div>kalendar</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -378,5 +379,41 @@ describe.each([
     for (const grid of grids()) {
       expect(grid.getAttribute('data-layout')).toBe(expectedLayout);
     }
+  });
+});
+
+/* The shelf page: Podobní pacienti (the live duplicate check) and, after a quick registration, Co dál. */
+describe('as a shelf page', () => {
+  it('shows a possible duplicate as a patient chip that opens in a new tab, keeping what was typed', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
+    searchPatients.mockResolvedValue([{ patientId: 'dup-1', fullName: 'Filip Fehér', dateOfBirth: '1990-01-01', status: 'Active' }]);
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nový pacient', level: 1 });
+    await fillTheSeven(user);
+
+    const similar = await screen.findByRole('region', { name: 'Podobní pacienti' }, { timeout: 4000 });
+    const chip = within(similar).getByRole('link', { name: /Filip Fehér/ });
+    expect(chip).toHaveAttribute('href', '/patients/dup-1');
+    await user.click(chip);
+    expect(open).toHaveBeenCalledWith('/patients/dup-1', '_blank', 'noopener');
+    expect(screen.queryByText('karta-pacienta')).toBeNull();
+    expect(screen.getByLabelText('Jméno')).toHaveValue('Filip');
+    open.mockRestore();
+  });
+
+  it('offers karta, objednat and další pacient after a quick registration; objednat books this patient', async () => {
+    const user = userEvent.setup();
+    renderPage('/patients/register?mode=quick');
+    await screen.findByRole('heading', { name: 'Nový pacient', level: 1 });
+    await fillTheFour(user);
+    await user.click(screen.getByRole('button', { name: 'Uložit a pokračovat' }));
+
+    const next = await screen.findByRole('region', { name: 'Co dál' });
+    expect(within(next).getByRole('button', { name: 'Otevřít kartu pacienta' })).toBeInTheDocument();
+    expect(within(next).getByRole('button', { name: 'Další pacient' })).toBeInTheDocument();
+    await user.click(within(next).getByRole('button', { name: 'Objednat termín' }));
+    expect(await screen.findByText('kalendar')).toBeInTheDocument();
   });
 });

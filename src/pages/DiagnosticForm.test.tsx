@@ -11,10 +11,15 @@
  * the typed numbers.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 const create = vi.fn();
-vi.mock('../api/diagnostics', () => ({ diagnosticsApi: { create } }));
+vi.mock('../api/diagnostics', () => ({ diagnosticsApi: { create, downloadPdf: vi.fn() } }));
+const getById = vi.fn();
+vi.mock('../api/patients', () => ({ patientsApi: { getById, search: vi.fn().mockResolvedValue([]) } }));
+/* The page lives under the router (its shelves link to the card). */
+const render = (ui: React.ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const { default: DiagnosticForm } = await import('./DiagnosticForm');
@@ -91,5 +96,44 @@ describe('DiagnosticForm', () => {
       muscleMassKg: 41,
       rawPractitionerNotes: '',
     });
+  });
+});
+
+/* The shelf page: the patient opened from the card is a chip in the header, and the saved session says where it now lives. */
+describe('as a shelf page', () => {
+  beforeEach(() => {
+    getById.mockReset().mockResolvedValue({ id: 'p1', firstName: 'Jana', lastName: 'Marková' });
+    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+    window.history.replaceState({}, '', '/diagnostics/new?patientId=p1');
+  });
+
+  it('names the patient it was opened for, as a link to their card', async () => {
+    render(<DiagnosticForm />);
+    expect(await screen.findByRole('link', { name: /Jana Marková/ })).toHaveAttribute('href', '/patients/p1');
+    expect(screen.getByRole('region', { name: 'Pacient a lékař' })).toBeInTheDocument();
+  });
+
+  it('after saving: the metrics as cards and the way to the patient results', async () => {
+    render(<DiagnosticForm />);
+    type(/Jméno praktika/, 'MUDr. Test');
+    next();
+    await screen.findByLabelText(/Klidová srdeční frekvence/);
+    type(/Klidová srdeční frekvence/, '58');
+    type(/Maximální srdeční frekvence/, '190');
+    type(/Anaerobní práh/, '160');
+    type(/VO2 Max/, '52');
+    next();
+    await screen.findByLabelText(/Systolický krevní tlak/);
+    type(/Systolický krevní tlak/, '118');
+    type(/Diastolický krevní tlak/, '76');
+    type(/Podíl tělesného tuku/, '12');
+    type(/Svalová hmota/, '41');
+    next();
+    expect(within(await screen.findByRole('region', { name: 'Shrnutí' })).getAllByRole('listitem').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Odeslat relaci' }));
+
+    const after = await screen.findByRole('region', { name: 'Po uložení' });
+    expect(within(after).getByRole('link', { name: /Výsledky pacienta/ })).toHaveAttribute('href', '/patients/p1/vysledky');
+    expect(within(screen.getByRole('region', { name: 'Metriky relace' })).getAllByRole('listitem')).toHaveLength(7);
   });
 });

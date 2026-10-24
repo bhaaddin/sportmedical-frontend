@@ -31,9 +31,12 @@ export function OnSiteConsentsField({
   value,
   onChange,
   disabled = false,
+  hideLabel = false,
 }: {
   /** The chosen činnost, "" or null when none. */
   activityId: string | null;
+  /** The surrounding block already names it (a shelf titled "Souhlasy"): no label of its own. */
+  hideLabel?: boolean;
   value: OnSiteConsentSelection;
   onChange: (next: OnSiteConsentSelection) => void;
   disabled?: boolean;
@@ -76,7 +79,7 @@ export function OnSiteConsentsField({
 
   return (
     <Box component="section" data-testid="on-site-consents" data-device={device} sx={{ minWidth: 0 }}>
-      <SectionLabel>Souhlasy podepsány na místě (papírově)</SectionLabel>
+      {!hideLabel && <SectionLabel>Souhlasy podepsány na místě (papírově)</SectionLabel>}
       {state === "failed" ? (
         <Alert severity="warning">
           Nabídku souhlasů se nepodařilo načíst. Souhlasy lze zapsat i později.

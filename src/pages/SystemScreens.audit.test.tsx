@@ -358,6 +358,8 @@ describe('Zdraví systému', () => {
 /* ───────────────────────── Hodnocení pacientů ───────────────────────── */
 
 describe('Hodnocení pacientů', () => {
+  /* The link to a card is drawn only for whoever may open patients (the card route asks for patients.view). */
+  beforeEach(() => localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage', 'patients.view'])));
   const entry = (i: number, over: Record<string, unknown> = {}) => ({
     id: `f${i}`, appointmentId: `a${i}`, patientId: `p${i}`, rating: 5, comment: `Komentář ${i}`, invitedAtUtc: '2026-10-01T10:00:00Z', submittedAtUtc: '2026-10-02T10:00:00Z', ...over,
   });

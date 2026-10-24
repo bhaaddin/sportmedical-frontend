@@ -28,6 +28,13 @@
  * over the inputs, a two-column grid, and a sticky footer that keeps "Uložit
  * a pokračovat" in reach. Rychlá registrace now also issues the patient's
  * completion link the moment the record exists, and shows it with Kopírovat.
+ *
+ * Shelf page (docs/ui-shelf-system.md, 24. 10. 2026): a PageFrame with the mode
+ * switch; every block is a shelf - Základní údaje, Podobní pacienti (the live
+ * duplicate check: chips with a peek, opened in a new tab so nothing typed is
+ * lost), Kontakt, Činnost, Souhlasy, Pojištění, Adresa, and beside them Uloží
+ * se takto and Zbývá vyplnit. After a quick registration: Zaregistrováno (the
+ * link) and Co dál (karta, objednat, další pacient).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -36,7 +43,7 @@ import {
   Divider, FormControlLabel, LinearProgress, MenuItem, Stack, TextField,
   ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
-import { InfoOutlined, PersonAdd, Search } from '@mui/icons-material';
+import { EventAvailable, InfoOutlined, PersonAdd, PersonOutlined } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { activitiesApi } from '../api/activities';
 import type { Activity } from '../api/bookingContracts';
@@ -79,7 +86,8 @@ import {
 import {
   MODE_LABEL, progressSubtitle, requiredFieldCount,
 } from '../services/patientRegistration/progress';
-import { PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { ActionCard, EntityChip, PageFrame, Shelf, TARGET_SX, entityTarget } from '../ui/shelf';
 import { PhoneField } from '../components/ui/PhoneField';
 import {
   EMPTY_ON_SITE_CONSENTS,
@@ -91,7 +99,7 @@ import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 import FormField from '../components/registration/FormField';
 import IssuedLinkCard from '../components/registration/IssuedLinkCard';
-import { FIT_SCROLL_SX, FitBody, FitPage } from '../components/ui/fit';
+import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody } from '../components/ui/fit';
 import StickyFormFooter from '../components/registration/StickyFormFooter';
 import { FieldCell, FieldGrid } from '../components/registration/FieldGrid';
 import { PHONE_TOUCH_TARGETS } from '../components/registration/touchTargets';
@@ -789,105 +797,111 @@ export default function PatientRegistration() {
   /* ═══ Success: a quick registration and the link that finishes it ═══ */
   if (issued !== null) {
     const expiry = formatExpiry(issued.issued.expiresAtUtc);
+    const card = entityTarget({ kind: 'patient', id: issued.patientId }).to;
     return (
-      <Box sx={{ maxWidth: 'min(100%, 1200px)', mx: 'auto', width: '100%' }}>
-        <PageHeader
-          title="Nový pacient"
-          subtitle={`${MODE_LABEL.Quick} — hotovo`}
-          actions={
-            <Button variant="outlined" onClick={() => navigate('/patients')}>
-              Zpět na seznam
-            </Button>
-          }
-        />
-        <SoftCard sx={{ maxWidth: 760 }}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5 }}>
-            <Box
-              sx={{
-                width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                bgcolor: 'background.default', color: 'text.primary',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 16,
-              }}
-            >
-              {initials(issued.name)}
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6">{issued.name} je zaregistrován</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {issued.activityName !== '' ? `${issued.email} · ${issued.activityName}` : issued.email}
-              </Typography>
-            </Box>
-            <StatusChip tone="beige" sx={{ ml: 'auto' }}>Registrace není dokončena</StatusChip>
-          </Stack>
+      <PageFrame
+        title="Nový pacient"
+        purpose={`${MODE_LABEL.Quick} — hotovo`}
+        entities={[{ kind: 'patient', id: issued.patientId, label: issued.name }]}
+        actions={
+          <Button variant="outlined" onClick={() => navigate('/patients')} sx={TARGET_SX}>
+            Zpět na seznam
+          </Button>
+        }
+      >
+        <Shelf id="registered" title="Zaregistrováno" layout="board" stagger={false}>
+          <Box sx={{ p: { xs: 2, sm: 2.5 }, maxWidth: 760 }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5, flexWrap: 'wrap', rowGap: 1 }}>
+              <Box
+                sx={{
+                  width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                  bgcolor: 'background.default', color: 'text.primary',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: 16,
+                }}
+              >
+                {initials(issued.name)}
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6">{issued.name} je zaregistrován</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {issued.activityName !== '' ? `${issued.email} · ${issued.activityName}` : issued.email}
+                </Typography>
+              </Box>
+              <StatusChip tone="beige" sx={{ ml: 'auto' }}>Registrace není dokončena</StatusChip>
+            </Stack>
 
-          {issued.consentNote ? (
-            <Alert severity={issued.consentNote.severity} sx={{ mb: 2 }}>
-              {issued.consentNote.text}
-            </Alert>
-          ) : null}
+            {issued.consentNote ? (
+              <Alert severity={issued.consentNote.severity} sx={{ mb: 2 }}>
+                {issued.consentNote.text}
+              </Alert>
+            ) : null}
 
-          <IssuedLinkCard
-            label="Registrační odkaz pro pacienta"
-            link={issued.link}
-            note={
-              <>
-                {issued.issued.emailQueued
-                  ? `E-mail s odkazem odešel na ${issued.issued.sentTo ?? issued.email}. `
-                  : 'E-mail se neodesílá automaticky — odkaz pacientovi pošlete sami. '}
-                {expiry !== '' ? `Odkaz platí do ${expiry}. ` : ''}
-                Pacient přes něj doplní datum narození, adresu, rodné číslo a vstupní dotazník.
-              </>
-            }
+            <IssuedLinkCard
+              label="Registrační odkaz pro pacienta"
+              link={issued.link}
+              note={
+                <>
+                  {issued.issued.emailQueued
+                    ? `E-mail s odkazem odešel na ${issued.issued.sentTo ?? issued.email}. `
+                    : 'E-mail se neodesílá automaticky — odkaz pacientovi pošlete sami. '}
+                  {expiry !== '' ? `Odkaz platí do ${expiry}. ` : ''}
+                  Pacient přes něj doplní datum narození, adresu, rodné číslo a vstupní dotazník.
+                </>
+              }
+            />
+          </Box>
+        </Shelf>
+
+        {/* ── Co dál: the three things a desk does next, one press each ── */}
+        <Shelf id="next" title="Co dál" layout="row" fill minCardWidth={220} stagger={false}>
+          <ActionCard primary title="Otevřít kartu pacienta" icon={<PersonOutlined fontSize="small" />} onClick={() => navigate(card)} />
+          {/* The calendar opens its booking drawer on `newAppointment`, for this patient. */}
+          <ActionCard
+            title="Objednat termín"
+            icon={<EventAvailable fontSize="small" />}
+            onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: issued.patientId } })}
           />
-
-          <Divider sx={{ my: 2.5 }} />
-
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-            <Button variant="contained" onClick={() => navigate(`/patients/${issued.patientId}`)}>
-              Otevřít kartu pacienta
-            </Button>
-            <Button variant="outlined" startIcon={<PersonAdd />} onClick={startAnother}>
-              Další pacient
-            </Button>
-          </Stack>
-        </SoftCard>
-      </Box>
+          <ActionCard title="Další pacient" icon={<PersonAdd fontSize="small" />} onClick={startAnother} />
+        </Shelf>
+      </PageFrame>
     );
   }
 
   return (
-    <FitPage
+    <PageFrame
+      fit
+      title="Nový pacient"
+      purpose={progressSubtitle(form.mode, doneCount, requiredCount)}
+      actions={
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={form.mode}
+          aria-label="Režim registrace"
+          onChange={(_, value) => {
+            if (value === null) return;
+            update('mode', value);
+            /* Each mode has its own rules; what the other one flagged is not this one's. */
+            setErrors({});
+            setBanner(null);
+          }}
+        >
+          <ToggleButton value="Quick">Rychlá</ToggleButton>
+          <ToggleButton value="Standard">Úplná</ToggleButton>
+        </ToggleButtonGroup>
+      }
+    >
+    <Box
       data-device={device}
       data-mode={quick ? 'quick' : 'standard'}
-      sx={[phoneLayout && PHONE_TOUCH_TARGETS]}
+      sx={[
+        { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, ...(phoneLayout ? {} : FIT_FILL_SX) },
+        phoneLayout && PHONE_TOUCH_TARGETS,
+      ]}
     >
-      {/* ── Header ── */}
-      <PageHeader
-        title="Nový pacient"
-        subtitle={progressSubtitle(form.mode, doneCount, requiredCount)}
-        actions={
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={form.mode}
-            aria-label="Režim registrace"
-            onChange={(_, value) => {
-              if (value === null) return;
-              update('mode', value);
-              /* Each mode has its own rules; what the other one flagged is not this one's. */
-              setErrors({});
-              setBanner(null);
-            }}
-          >
-            <ToggleButton value="Quick">Rychlá</ToggleButton>
-            <ToggleButton value="Standard">Úplná</ToggleButton>
-          </ToggleButtonGroup>
-        }
-      />
-
       {banner !== null && (
-        <Alert severity={banner.severity} sx={{ mb: 2, flexShrink: 0 }} onClose={() => setBanner(null)}>
+        <Alert severity={banner.severity} sx={{ flexShrink: 0 }} onClose={() => setBanner(null)}>
           {banner.text}
         </Alert>
       )}
@@ -917,8 +931,7 @@ export default function PatientRegistration() {
           )}
 
           {/* ── Základní údaje ── */}
-          <SoftCard>
-            <SectionLabel>Základní údaje</SectionLabel>
+          <FormShelf id="basic" title="Základní údaje">
             <FieldGrid>
               <FieldCell>
                 <FormField label="Jméno" required name="firstName">
@@ -1037,31 +1050,44 @@ export default function PatientRegistration() {
             )}
             </FieldGrid>
 
-            {/* Live duplicate check — said where it applies, not after the save. */}
-            {similar.length > 0 && (
-              <Alert severity="warning" icon={<Search fontSize="small" />} sx={{ mt: 2 }}>
-                <AlertTitle sx={{ fontSize: 14 }}>
-                  {similar.length === 1
-                    ? 'V registru je někdo podobný'
-                    : `V registru je ${similar.length} podobných záznamů`}
-                </AlertTitle>
-                <Stack spacing={0.5}>
-                  {similar.slice(0, 4).map((candidate) => (
-                    <Typography key={candidate.patientId} variant="body2">
-                      {candidate.fullName} · {candidate.dateOfBirth} · {candidate.status}
-                    </Typography>
-                  ))}
-                </Stack>
-                <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
-                  Ověřte, než založíte druhý záznam — rozdělil by historii vyšetření.
-                </Typography>
-              </Alert>
-            )}
-          </SoftCard>
+          </FormShelf>
+
+          {/* ── Podobní pacienti: the live duplicate check, said where it applies, not after the save. Each one opens in a
+              new tab (a peek on hover), so checking never costs what has been typed. ── */}
+          {similar.length > 0 && (
+            <Shelf
+              id="similar"
+              title="Podobní pacienti"
+              hint="Ověřte, než založíte druhý záznam — rozdělil by historii vyšetření."
+              count={similar.length}
+              countTone="beige"
+              layout="list"
+              stagger={false}
+            >
+              {similar.slice(0, 4).map((candidate) => (
+                <Box
+                  key={candidate.patientId}
+                  role="listitem"
+                  data-similar=""
+                  sx={{ px: 1.75, py: 1, display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}
+                >
+                  <EntityChip
+                    entity={{ kind: 'patient', id: candidate.patientId, label: candidate.fullName }}
+                    onNavigate={(event) => {
+                      event.preventDefault();
+                      window.open(entityTarget({ kind: 'patient', id: candidate.patientId }).to, '_blank', 'noopener');
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {candidate.dateOfBirth} · {candidate.status}
+                  </Typography>
+                </Box>
+              ))}
+            </Shelf>
+          )}
 
           {/* ── Kontakt ── */}
-          <SoftCard>
-            <SectionLabel>Kontakt</SectionLabel>
+          <FormShelf id="contact" title="Kontakt">
             <FieldGrid>
               <FieldCell>
                 <FormField label="E-mail" required name="email">
@@ -1127,12 +1153,11 @@ export default function PatientRegistration() {
                 </FormField>
               </FieldCell>
             </FieldGrid>
-          </SoftCard>
+          </FormShelf>
 
           {/* ── Činnost (rychlá registrace) ── */}
           {quick && (
-            <SoftCard data-field="activityId">
-              <SectionLabel>Činnost</SectionLabel>
+            <FormShelf id="activity" title="Činnost" field="activityId">
               {activitiesState === 'failed' ? (
                 <Alert
                   severity="error"
@@ -1177,25 +1202,25 @@ export default function PatientRegistration() {
                   </FieldCell>
                 </FieldGrid>
               )}
-            </SoftCard>
+            </FormShelf>
           )}
 
           {/* ── Souhlasy podepsané na místě: both modes, the server's list for the činnost ── */}
-          <SoftCard data-field="onSiteConsents">
+          <FormShelf id="consents" title="Souhlasy" hint="Podepsané na místě (papírově)" field="onSiteConsents">
             <OnSiteConsentsField
+              hideLabel
               activityId={quick ? form.activityId || null : null}
               value={consents}
               onChange={setConsents}
               disabled={submitting}
             />
-          </SoftCard>
+          </FormShelf>
 
           {/* The patient gives insurance and address through the link in a quick registration. */}
           {!quick && (
             <>
           {/* ── Pojištění ── */}
-          <SoftCard>
-            <SectionLabel>Pojištění</SectionLabel>
+          <FormShelf id="insurance" title="Pojištění">
 
             <ToggleButtonGroup
               exclusive
@@ -1398,11 +1423,10 @@ export default function PatientRegistration() {
                 </FieldCell>
               </FieldGrid>
             )}
-          </SoftCard>
+          </FormShelf>
 
           {/* ── Adresa ── */}
-          <SoftCard data-field="ruianAddressPointCode">
-            <SectionLabel>Adresa</SectionLabel>
+          <FormShelf id="address" title="Adresa" field="ruianAddressPointCode">
             <FieldGrid>
               <FieldCell>
                 <FormField label="Typ pobytu" required>
@@ -1430,7 +1454,7 @@ export default function PatientRegistration() {
                 />
               </FieldCell>
             </FieldGrid>
-          </SoftCard>
+          </FormShelf>
             </>
           )}
         </Stack>
@@ -1440,8 +1464,7 @@ export default function PatientRegistration() {
           spacing={2}
           sx={{ minWidth: 0, '@media (min-width: 1280px)': { ...FIT_SCROLL_SX, pr: 0.5 } }}
         >
-          <SoftCard>
-            <SectionLabel>Uloží se takto</SectionLabel>
+          <FormShelf id="summary" title="Uloží se takto">
             <Typography variant="h6" sx={{ mb: 0.5 }}>
               {`${form.firstName} ${form.lastName}`.trim() || 'Nový pacient'}
             </Typography>
@@ -1488,15 +1511,9 @@ export default function PatientRegistration() {
                   stored and shown everywhere after the save. */}
               <LabelValue label="Telefon" value={phoneGrouped || form.phone || '—'} />
             </Stack>
-          </SoftCard>
+          </FormShelf>
 
-          <SoftCard>
-            <Stack direction="row" sx={{ alignItems: 'baseline' }}>
-              <SectionLabel>Zbývá vyplnit</SectionLabel>
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                {doneCount} z {requiredCount}
-              </Typography>
-            </Stack>
+          <FormShelf id="outstanding" title="Zbývá vyplnit" hint={`${doneCount} z ${requiredCount}`}>
             <LinearProgress
               variant="determinate"
               value={requiredCount === 0 ? 100 : (doneCount / requiredCount) * 100}
@@ -1515,7 +1532,7 @@ export default function PatientRegistration() {
                 ))}
               </Stack>
             )}
-          </SoftCard>
+          </FormShelf>
 
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
             Rodné číslo i číslo pojištěnce se do protokolu zapisují zamaskované.
@@ -1548,9 +1565,21 @@ export default function PatientRegistration() {
         submitting={submitting}
         onCancel={() => setReview(null)}
         onConfirmDistinct={() => { if (review !== null) void send(review.confirmation); }}
-        onUseExisting={(candidate) => { setReview(null); navigate(`/patients/${candidate.patientId}`); }}
+        onUseExisting={(candidate) => { setReview(null); navigate(entityTarget({ kind: 'patient', id: candidate.patientId }).to); }}
       />
-    </FitPage>
+    </Box>
+    </PageFrame>
+  );
+}
+
+/** One block of the form: a shelf (its title is the section's heading) holding a padded board. */
+function FormShelf({
+  id, title, hint, field, children,
+}: { id: string; title: string; hint?: string; field?: string; children: React.ReactNode }) {
+  return (
+    <Shelf id={id} title={title} hint={hint} layout="board" stagger={false}>
+      <Box data-field={field} sx={{ p: { xs: 2, sm: 2.5 } }}>{children}</Box>
+    </Shelf>
   );
 }
 

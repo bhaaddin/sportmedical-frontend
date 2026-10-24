@@ -7,6 +7,10 @@
 
    Owner/Administrator only — merging two records is irreversible in
    practice, so Staff can see the queue but not resolve it.
+
+   Shelves (docs/ui-shelf-system.md): Čeká na rozhodnutí (oldest first, a
+   card per submission with its possible matches) and Právě vyřízeno (what
+   was decided here, a merge linked to the patient it joined).
    ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -21,13 +25,13 @@ import {
   Typography,
 } from '@mui/material';
 import { PersonAdd, Block, Refresh } from '@mui/icons-material';
+import { alpha } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDateOnly } from '../utils/time';
 import { usePermission } from '../auth/usePermission';
-import { FitBody, FitPage } from '../components/ui/fit';
-import { PageHeader, SoftCard, StatusChip } from '../components/ui';
+import { StatusChip } from '../components/ui';
+import { EntityLink, PageFrame, Shelf, TARGET_SX, cardSurface, entityTarget } from '../ui/shelf';
 import { FormDialog } from './sports/FormDialog';
-import { LoadError, PageSkeleton } from './sports/LoadStates';
 import { useTouchSx } from './sports/touch';
 import {
   IntakeOutcome,
@@ -49,6 +53,9 @@ import type {
 
 export default function IntakeReviewQueue() {
   const maySeePatients = usePermission('patients.view');
+  const mayManageLink = usePermission('settings.clinic.manage');
+  /* What this person resolved on this screen since it opened: a name and how, a merge with the patient it joined. */
+  const [resolved, setResolved] = useState<Array<{ intakeId: string; name: string; how: string; patientId?: string }>>([]);
   const [entries, setEntries] = useState<IntakeQueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +139,12 @@ export default function IntakeReviewQueue() {
         await dismissIntake(entry.intakeId, (reason ?? '').trim());
       }
       setEntries((current) => current.filter((e) => e.intakeId !== entry.intakeId));
+      setResolved((current) => [{
+        intakeId: entry.intakeId,
+        name: `${entry.givenName} ${entry.familyName}`,
+        how: resolution === IntakeResolution.Merge ? 'Sloučeno' : resolution === IntakeResolution.CreateNew ? 'Založen nový pacient' : 'Zamítnuto',
+        ...(resolution === IntakeResolution.Merge && candidate !== undefined ? { patientId: candidate.patientId } : {}),
+      }, ...current]);
     } catch (caught) {
       setError(
         isStaleResolution(caught)
@@ -144,54 +157,63 @@ export default function IntakeReviewQueue() {
     }
   };
 
-  return (
-    <FitPage>
-      <PageHeader
-        title="Fronta ke kontrole"
-        subtitle={
-          loading
-            ? 'Načítání…'
-            : loadFailed
-              ? 'Frontu se nepodařilo načíst.'
-              : entries.length === 0
-            ? 'Nic nečeká na kontrolu.'
-            : `${entries.length} ${entries.length === 1 ? 'záznam čeká' : 'záznamů čeká'} na rozhodnutí.`
-        }
-        actions={
-          <Button variant="outlined" startIcon={<Refresh />} onClick={() => void load()} disabled={loading} sx={touch}>
-            Načíst znovu
-          </Button>
-        }
-      />
+  /* Oldest first: the one that has waited longest is the one to decide now. */
+  const waiting = [...entries].sort((a, b) => Date.parse(a.submittedAtUtc) - Date.parse(b.submittedAtUtc));
 
+  return (
+    <PageFrame
+      title="Kontrola registrací"
+      purpose={
+        loading
+          ? 'Načítání…'
+          : loadFailed
+            ? 'Frontu se nepodařilo načíst.'
+            : entries.length === 0
+              ? 'Nic nečeká na kontrolu.'
+              : `${entries.length} ${entries.length === 1 ? 'záznam čeká' : 'záznamů čeká'} na rozhodnutí.`
+      }
+      actions={
+        <Button variant="outlined" startIcon={<Refresh />} onClick={() => void load()} disabled={loading} sx={{ ...TARGET_SX, ...touch }}>
+          Načíst znovu
+        </Button>
+      }
+    >
       {error !== null && (
-        <Alert severity="error" sx={{ mb: 2, flexShrink: 0 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ flexShrink: 0 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      {/* The queue is a feed: it scrolls inside its own region, and a wide screen lays the records out in columns. */}
-      <FitBody scroll>
-      {loading ? (
-        <PageSkeleton rows={3} />
-      ) : loadFailed ? (
-        <LoadError what="Frontu ke kontrole" onRetry={() => void load()} />
-      ) : entries.length === 0 ? (
-        <SoftCard sx={{ p: 6, textAlign: 'center' }}>
-          <StatusChip tone="green" dot sx={{ mb: 1.5 }}>Vše vyřízeno</StatusChip>
-          <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
-            Fronta je prázdná
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Všechny dotazníky jsou vyřízené.
-          </Typography>
-        </SoftCard>
-      ) : (
-        <Box sx={{ display: 'grid', gap: 2, alignItems: 'start', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 560px), 1fr))' }}>
-        {entries.map((entry) => (
-          <SoftCard key={entry.intakeId} sx={{ p: { xs: 2, sm: 2.5 } }}>
+      {/* ── Čeká: one card per submission, oldest first; a wide screen lays them out in columns ── */}
+      <Shelf
+        id="waiting"
+        title="Čeká na rozhodnutí"
+        hint="Od nejstaršího"
+        count={loading || loadFailed ? undefined : entries.length}
+        countTone="beige"
+        layout="grid"
+        minCardWidth={520}
+        cardHeight={180}
+        skeletons={2}
+        stagger={false}
+        loading={loading}
+        error={loadFailed ? 'Frontu ke kontrole se nepodařilo načíst.' : false}
+        onRetry={() => void load()}
+        empty={entries.length === 0}
+        emptyState={{
+          text: 'Fronta je prázdná — všechny dotazníky jsou vyřízené.',
+          ...(mayManageLink ? { action: { label: 'Odkaz pro registraci', to: '/nastaveni/odkaz-registrace' } } : {}),
+        }}
+      >
+        {waiting.map((entry) => (
+          <Box
+            key={entry.intakeId}
+            role="listitem"
+            data-card="intake"
+            sx={(t) => ({ ...cardSurface(t, false), p: { xs: 2, sm: 2.5 } })}
+          >
             <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }} data-intake-head>
-              <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
+              <Typography component="h3" sx={{ fontSize: 18, fontWeight: 700 }}>
                 {entry.givenName} {entry.familyName}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -210,31 +232,7 @@ export default function IntakeReviewQueue() {
                 "založit nového" because a value fell through would create the
                 duplicate the queue exists to prevent.
               */}
-              {(() => {
-                const outcome = outcomeOf(entry.outcome);
-                if (outcome === null) {
-                  return (
-                    <StatusChip tone="beige">{`neznámý výsledek (${entry.outcome})`}</StatusChip>
-                  );
-                }
-                return (
-                  <StatusChip
-                    tone={
-                      outcome === IntakeOutcome.ReviewRequired
-                        ? 'beige'
-                        : outcome === IntakeOutcome.AutoAssignToExisting
-                          ? 'green'
-                          : 'primary'
-                    }
-                  >
-                    {outcome === IntakeOutcome.ReviewRequired
-                      ? 'Ke kontrole'
-                      : outcome === IntakeOutcome.AutoAssignToExisting
-                        ? 'Shoda s pacientem'
-                        : 'Nový pacient'}
-                  </StatusChip>
-                );
-              })()}
+              <OutcomeChip value={entry.outcome} />
               <Box sx={{ flexGrow: 1 }} />
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {new Date(entry.submittedAtUtc).toLocaleString('cs-CZ')}
@@ -248,7 +246,7 @@ export default function IntakeReviewQueue() {
               looked, or somebody creates a duplicate believing it was checked.
             */}
             <Box sx={{ mb: 2 }}>
-              <Button size="small" onClick={() => void openEntry(entry)} sx={{ ...touch, width: { xs: '100%', md: 'auto' } }}>
+              <Button size="small" onClick={() => void openEntry(entry)} sx={{ ...TARGET_SX, ...touch, width: { xs: '100%', md: 'auto' } }}>
                 {openId === entry.intakeId
                   ? 'Skrýt možné shody'
                   : entry.topScore > 0
@@ -283,7 +281,11 @@ export default function IntakeReviewQueue() {
                 ? (details[entry.intakeId]?.candidates ?? [])
                 : []
               ).map((candidate: IntakeCandidate) => (
-                <SoftCard key={candidate.patientId} tone="muted" sx={{ mb: 2, p: 2 }}>
+                <Box
+                  key={candidate.patientId}
+                  data-candidate=""
+                  sx={(t) => ({ mb: 2, p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: alpha(t.palette.text.primary, 0.03) })}
+                >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                       Možná shoda
@@ -297,9 +299,9 @@ export default function IntakeReviewQueue() {
                     {maySeePatients && (
                       <Button
                         size="small"
-                        sx={touch}
+                        sx={{ ...TARGET_SX, ...touch }}
                         component={RouterLink}
-                        to={`/patients/${candidate.patientId}`}
+                        to={entityTarget({ kind: 'patient', id: candidate.patientId }).to}
                         target="_blank"
                       >
                         Otevřít kartu pacienta
@@ -312,7 +314,7 @@ export default function IntakeReviewQueue() {
                   <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexDirection: { xs: 'column', md: 'row' } }}>
                     <Button
                       size="small"
-                      sx={touch}
+                      sx={{ ...TARGET_SX, ...touch }}
                       variant="contained"
                       disabled={busyId === entry.intakeId}
                       onClick={() => {
@@ -323,7 +325,7 @@ export default function IntakeReviewQueue() {
                       Sloučit s tímto pacientem
                     </Button>
                   </Box>
-                </SoftCard>
+                </Box>
               ))
             )}
 
@@ -331,7 +333,7 @@ export default function IntakeReviewQueue() {
             <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' } }}>
               <Button
                 size="small"
-                sx={touch}
+                sx={{ ...TARGET_SX, ...touch }}
                 variant="outlined"
                 startIcon={<PersonAdd />}
                 disabled={busyId === entry.intakeId}
@@ -341,7 +343,7 @@ export default function IntakeReviewQueue() {
               </Button>
               <Button
                 size="small"
-                sx={touch}
+                sx={{ ...TARGET_SX, ...touch }}
                 variant="outlined"
                 color="error"
                 startIcon={<Block />}
@@ -354,11 +356,24 @@ export default function IntakeReviewQueue() {
                 Zamítnout
               </Button>
             </Box>
-          </SoftCard>
+          </Box>
         ))}
-        </Box>
+      </Shelf>
+
+      {/* ── Právě vyřízeno: what this person decided here, each merge linked to the patient it joined ── */}
+      {resolved.length > 0 && (
+        <Shelf id="resolved" title="Právě vyřízeno" count={resolved.length} countTone="green" layout="list" stagger={false}>
+          {resolved.map((r) => (
+            <Box key={r.intakeId} role="listitem" sx={{ px: 1.75, py: 1.25, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              {r.patientId !== undefined && maySeePatients
+                ? <EntityLink entity={{ kind: 'patient', id: r.patientId, label: r.name }} />
+                : <Typography sx={{ fontWeight: 600 }}>{r.name}</Typography>}
+              <Box sx={{ flex: 1 }} />
+              <StatusChip tone={r.how === 'Zamítnuto' ? 'grey' : 'green'} size="sm">{r.how}</StatusChip>
+            </Box>
+          ))}
+        </Shelf>
       )}
-      </FitBody>
 
       {/* Rejection is the one action that destroys a patient's submission, so
           it asks for a reason. Every resolution is audited; this one needs the
@@ -440,8 +455,20 @@ export default function IntakeReviewQueue() {
             placeholder="Například: testovací odeslání, duplicitní žádost…"
           />
       </FormDialog>
-    </FitPage>
+    </PageFrame>
   );
+}
+
+/** What the matcher concluded, in words; an unknown value is said, never folded into a safe default. */
+function OutcomeChip({ value }: { value: number }) {
+  const outcome = outcomeOf(value);
+  if (outcome === null) return <StatusChip tone="beige">{`neznámý výsledek (${value})`}</StatusChip>;
+  const [tone, text] = outcome === IntakeOutcome.ReviewRequired
+    ? ['beige', 'Ke kontrole'] as const
+    : outcome === IntakeOutcome.AutoAssignToExisting
+      ? ['green', 'Shoda s pacientem'] as const
+      : ['primary', 'Nový pacient'] as const;
+  return <StatusChip tone={tone}>{text}</StatusChip>;
 }
 
 /*

@@ -5,18 +5,20 @@
    patients answered, newest first. Nothing here is published — publication, if
    ever wanted, is a separate decision, never automatic.
 
-   Three layouts: a phone gets one card per answer, a tablet a table with
-   rating, comment and date, the desktop adds the link to the patient's card.
+   Shelves (docs/ui-shelf-system.md): Souhrn (how many, the average), K
+   vyřízení (two stars or fewer - somebody should call back; only when there
+   are any) and Hodnocení (all of them: a card per answer on a phone, rating,
+   comment and date on a tablet, the desktop adds the patient's card).
    ══════════════════════════════════════════════════════════════ */
 
-import { Box, Grid, Rating, Stack, Typography } from '@mui/material';
+import { Box, Rating, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { FEEDBACK_QUERY_KEY, listFeedback, type FeedbackEntry } from '../api/feedback';
-import { KpiCard } from '../components/ui';
-import { SettingsScreen } from './settings/SettingsFrame';
+import { usePermission } from '../auth/usePermission';
+import { MetricCard, PageFrame, Shelf, entityTarget } from '../ui/shelf';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
-import { LoadError, PageSkeleton } from './sports/LoadStates';
+import { ShelfRow } from './patients/ShelfRow';
 
 const when = (utc: string): string =>
   new Date(utc).toLocaleString('cs-CZ', {
@@ -41,11 +43,17 @@ export function averageRating(entries: readonly Pick<FeedbackEntry, 'rating'>[])
   return rated.length === 0 ? null : rated.reduce((sum, rating) => sum + rating, 0) / rated.length;
 }
 
+/** Two stars or fewer: the answers somebody should read first, and probably call back. */
+export const LOW_RATING = 2;
+export const isLow = (entry: Pick<FeedbackEntry, 'rating'>): boolean => typeof entry.rating === 'number' && entry.rating <= LOW_RATING;
+
+const cardOf = (entry: Entry) => entityTarget({ kind: 'patient', id: entry.patientId }).to;
+
 const patientLink = (entry: Entry) => (
   <Typography
     variant="body2"
     component={RouterLink}
-    to={`/patients/${entry.patientId}`}
+    to={cardOf(entry)}
     onClick={(event: React.MouseEvent) => event.stopPropagation()}
     sx={{
       color: 'primary.main', fontWeight: 600, textDecoration: 'none', display: 'inline-flex',
@@ -65,29 +73,14 @@ const comment = (entry: Entry) =>
 
 export default function FeedbackReviewPage() {
   const navigate = useNavigate();
+  /* The answers carry a patient id, never a name: the link to the card is the one connection, and only for whoever may open it. */
+  const mayOpenPatient = usePermission('patients.view');
   const query = useQuery({ queryKey: FEEDBACK_QUERY_KEY, queryFn: listFeedback });
 
-  const title = 'Hodnocení pacientů';
-  const sentence = 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nikde nezveřejňuje';
-
-  if (query.isPending) {
-    return (
-      <SettingsScreen title={title} subtitle={sentence} aside={false} related={false}>
-        <PageSkeleton kpis={2} rows={4} />
-      </SettingsScreen>
-    );
-  }
-
-  if (query.isError || !query.data) {
-    return (
-      <SettingsScreen title={title} subtitle={sentence} aside={false} related={false}>
-        <LoadError what="Hodnocení" onRetry={() => void query.refetch()} />
-      </SettingsScreen>
-    );
-  }
-
-  const entries = query.data;
+  const entries = query.data ?? [];
+  const known = query.data !== undefined && !query.isError;
   const average = averageRating(entries);
+  const low = entries.filter(isLow);
 
   const columns: DataColumn<Entry>[] = [
     {
@@ -99,47 +92,78 @@ export default function FeedbackReviewPage() {
       key: 'when', header: 'Odesláno', tablet: true,
       cell: (e) => <Box sx={{ whiteSpace: 'nowrap' }}>{e.submittedAtUtc ? when(e.submittedAtUtc) : '—'}</Box>,
     },
-    { key: 'patient', header: 'Pacient', align: 'right', cell: patientLink },
+    ...(mayOpenPatient ? [{ key: 'patient', header: 'Pacient', align: 'right' as const, cell: patientLink }] : []),
   ];
 
   return (
-    <SettingsScreen title={title} subtitle={sentence} aside={false} related={false}>
-      {entries.length > 0 && (
-      <Grid container spacing={2} sx={{ mb: 2.5 }}>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard label="Hodnocení" value={entries.length} hint="odpovědí celkem" />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <KpiCard
+    <PageFrame
+      title="Hodnocení pacientů"
+      purpose="Co pacienti napsali po dokončené návštěvě — soukromé, nic se nikde nezveřejňuje"
+    >
+      {known && entries.length > 0 && (
+        <Shelf id="summary" title="Souhrn" layout="row" fill minCardWidth={200} phoneWidth="min(44vw, 200px)" stagger={false}>
+          <MetricCard label="Hodnocení" value={entries.length} hint="odpovědí celkem" />
+          <MetricCard
             label="Průměr"
-            value={average !== null ? `${average.toFixed(1).replace('.', ',')} / 5` : '—'}
+            value={average !== null ? `${average.toFixed(1).replace('.', ',')} / 5` : '—'}
             hint="hvězdiček"
             tone="primary"
           />
-        </Grid>
-      </Grid>
+        </Shelf>
       )}
 
-      <ResponsiveDataList
-        ariaLabel="Hodnocení pacientů"
-        rows={entries}
-        rowKey={(e) => e.id}
-        columns={columns}
-        onRowClick={(e) => navigate(`/patients/${e.patientId}`)}
-        empty="Zatím žádné hodnocení. Pozvánka se připraví po dokončení návštěvy."
-        renderCard={(e) => (
-          <Stack spacing={1}>
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
-              <Rating value={e.rating ?? 0} readOnly />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {e.submittedAtUtc ? when(e.submittedAtUtc) : '—'}
-              </Typography>
+      {known && low.length > 0 && (
+        <Shelf id="low" title="K vyřízení" hint={`${LOW_RATING} hvězdičky a méně: stojí za to se ozvat`} count={low.length} countTone="red" layout="list" stagger={false}>
+          {low.map((e) => (
+            <ShelfRow
+              key={e.id}
+              tone="red"
+              title={<Rating value={e.rating ?? 0} readOnly size="small" />}
+              detail={(
+                <>
+                  {e.comment ? e.comment : 'Bez komentáře.'}
+                  {e.submittedAtUtc ? ` · ${when(e.submittedAtUtc)}` : ''}
+                </>
+              )}
+              trailing={mayOpenPatient ? patientLink(e) : undefined}
+            />
+          ))}
+        </Shelf>
+      )}
+
+      <Shelf
+        id="answers"
+        title="Hodnocení"
+        hint="Od nejnovějšího"
+        count={known ? entries.length : undefined}
+        layout="free"
+        stagger={false}
+        loading={query.isPending}
+        error={query.isError ? 'Hodnocení se nepodařilo načíst.' : false}
+        onRetry={() => void query.refetch()}
+        empty={known && entries.length === 0}
+        emptyState={{ text: 'Zatím žádné hodnocení. Pozvánka se připraví po dokončení návštěvy.' }}
+      >
+        <ResponsiveDataList
+          ariaLabel="Hodnocení pacientů"
+          rows={entries}
+          rowKey={(e) => e.id}
+          columns={columns}
+          {...(mayOpenPatient ? { onRowClick: (e: Entry) => navigate(cardOf(e)) } : {})}
+          renderCard={(e) => (
+            <Stack spacing={1}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
+                <Rating value={e.rating ?? 0} readOnly />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {e.submittedAtUtc ? when(e.submittedAtUtc) : '—'}
+                </Typography>
+              </Stack>
+              {comment(e)}
+              {mayOpenPatient && <Box>{patientLink(e)}</Box>}
             </Stack>
-            {comment(e)}
-            <Box>{patientLink(e)}</Box>
-          </Stack>
-        )}
-      />
-    </SettingsScreen>
+          )}
+        />
+      </Shelf>
+    </PageFrame>
   );
 }
