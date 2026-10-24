@@ -1,8 +1,8 @@
 /*
  * Dnešní přehled and the money (Etapa 12, "ceny všude"): every late row says
- * what it costs - a Cena column on a desktop and a tablet, a line under the
- * name on a phone - and the list opens with "Celkem dnes", the sum of the
- * day's visits that still stand, at their agreed prices.
+ * what it costs on its own line (the shelf rows of the day; on a phone the
+ * price drops under the name), and the day opens with "Celkem dnes", the sum
+ * of the day's visits that still stand, at their agreed prices.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -87,33 +87,36 @@ describe.each([
   ['desktop', VIEWPORTS.desktop],
   ['tablet', VIEWPORTS.tablet],
 ])('Dnešní přehled on a %s', (_name, width) => {
-  it('has a Cena column with every row\'s price and the day\'s total on top', async () => {
+  it("says every late row's price on its line and the day's total on top", async () => {
     setViewport(width);
     renderPage();
 
     expect(await screen.findByTestId('day-total')).toHaveTextContent('Celkem dnes: 4 400 Kč');
-    expect(await screen.findByRole('columnheader', { name: 'Cena' })).toBeInTheDocument();
-    const prices = await screen.findAllByTestId('row-price');
+    const late = await screen.findByRole('region', { name: 'Mají zpoždění' });
+    const prices = await within(late).findAllByTestId('row-price');
     /* formatCzk groups thousands with a no-break space; the assertion reads it as a space. */
     expect(prices.map((p) => (p.textContent ?? '').replace(/ /g, ' '))).toEqual([
       '1 600 Kč',
       '1 200 Kčupraveno (ceník 1 600 Kč)',
       '1 600 Kč',
     ]);
-    expect(prices[0].tagName).toBe('TD');
+    /* The price stands on the row of the person it belongs to. */
+    const rowB = within(late).getByText('Pacient b').closest('[data-row="appointment"]') as HTMLElement;
+    expect(within(rowB).getByTestId('row-price')).toHaveTextContent('upraveno');
   });
 });
 
 describe('Dnešní přehled on a phone', () => {
-  it('puts the price under the name instead of in a column, and still totals the day', async () => {
+  it('keeps the price on the row (under the name) and still totals the day', async () => {
     setViewport(VIEWPORTS.phone);
     renderPage();
 
     expect(await screen.findByTestId('day-total')).toHaveTextContent('Celkem dnes: 4 400 Kč');
     await screen.findAllByTestId('row-price');
-    expect(screen.queryByRole('columnheader', { name: 'Cena' })).not.toBeInTheDocument();
-    const nameCell = screen.getByText('Pacient b').closest('td') as HTMLElement;
-    expect(within(nameCell).getByTestId('row-price')).toHaveTextContent('1 200 Kč');
-    expect(within(nameCell).getByTestId('row-price')).toHaveTextContent('upraveno (ceník 1 600 Kč)');
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
+    const late = screen.getByRole('region', { name: 'Mají zpoždění' });
+    const row = within(late).getByText('Pacient b').closest('[data-row="appointment"]') as HTMLElement;
+    expect(within(row).getByTestId('row-price')).toHaveTextContent('1 200 Kč');
+    expect(within(row).getByTestId('row-price')).toHaveTextContent('upraveno (ceník 1 600 Kč)');
   });
 });

@@ -13,6 +13,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 
 const range = vi.fn();
 const getAvailability = vi.fn();
@@ -113,20 +114,27 @@ beforeEach(() => {
 
 const withQueries = (ui: ReactNode) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
 };
 
+/* A činnost is one row of its služba's shelf. */
 const rowOf = async (activity: string) => {
-  const cell = await screen.findByText(activity, { selector: 'p' });
-  return cell.closest('tr') as HTMLTableRowElement;
+  const name = await screen.findByText(activity);
+  return name.closest('[data-row="activity"]') as HTMLElement;
 };
 
 describe('the overview by service', () => {
   it('lists each činnost under its service with the count, the weekdays and the rota’s names', async () => {
     render(withQueries(<ServiceOverviewPage />));
 
-    expect(await screen.findByText('Sportovní prohlídky')).toBeInTheDocument();
+    /* The služba is a shelf of its own, named by its heading. */
+    const service = await screen.findByRole('region', { name: 'Sportovní prohlídky' });
     const row = await rowOf('Základní prohlídka');
+    expect(service).toContainElement(row);
 
     /* Three will happen; the cancelled one is counted apart. */
     await waitFor(() => expect(within(row).getByText('3')).toBeInTheDocument());
@@ -185,5 +193,42 @@ describe('the overview by service', () => {
 
     expect(await screen.findByText('Nejvýše 62 dní najednou.')).toBeInTheDocument();
     expect(range).not.toHaveBeenCalled();
+  });
+});
+
+describe('the overview by service as shelves', () => {
+  it('frames the page with one h1, a filter shelf, the free capacity and one shelf per služba', async () => {
+    const { container } = render(withQueries(<ServiceOverviewPage />));
+    expect(screen.getByRole('heading', { level: 1, name: 'Přehled podle služeb' })).toBeInTheDocument();
+    await rowOf('Základní prohlídka');
+    await waitFor(() => expect(container.querySelector('[data-shelf="totals"]')).toHaveAttribute('data-state', 'ready'));
+    const ids = [...container.querySelectorAll('section[data-shelf]')].map((s) => s.getAttribute('data-shelf'));
+    expect(ids).toEqual(['filter', 'totals', 'service-s-exam']);
+    const service = screen.getByRole('region', { name: 'Sportovní prohlídky' });
+    expect(within(service).getByLabelText('Počet: 3')).toBeInTheDocument();
+  });
+
+  it('links the služba and the činnost for a person who may open them, and draws plain text otherwise', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
+    const first = render(withQueries(<ServiceOverviewPage />));
+    await rowOf('Základní prohlídka');
+    expect(screen.getByRole('link', { name: 'Služba: Sportovní prohlídky' })).toHaveAttribute('href', '/nastaveni/sluzby/s-exam');
+    expect(screen.getByRole('link', { name: 'Základní prohlídka' })).toHaveAttribute('href', '/activities');
+    first.unmount();
+
+    localStorage.setItem('permissions', JSON.stringify([]));
+    render(withQueries(<ServiceOverviewPage />));
+    await rowOf('Základní prohlídka');
+    expect(screen.queryByRole('link', { name: /Sportovní prohlídky/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Základní prohlídka' })).toBeNull();
+  });
+
+  it('a range with nothing booked and nothing offered says so and offers the calendar', async () => {
+    range.mockResolvedValue([]);
+    preview.mockResolvedValue([]);
+    render(withQueries(<ServiceOverviewPage />));
+    const totals = await screen.findByRole('region', { name: 'Volná kapacita' });
+    expect(await within(totals).findByText('V tomto rozsahu není nic objednáno a nic se nenabízí.')).toBeInTheDocument();
+    expect(within(totals).getByRole('link', { name: 'Otevřít kalendář' })).toHaveAttribute('href', '/planovani');
   });
 });

@@ -1604,7 +1604,7 @@ function historyValue(value: string | null): string {
  * one — `3` here is "cancelled" while `3` as a status is "completed". An
  * unknown action is drawn as unknown and never drops the row.
  */
-function HistoryRow({ line }: { line: HistoryLine }) {
+export function HistoryRow({ line }: { line: HistoryLine }) {
   const { t } = useTranslation();
   const action = historyActionName(line.action);
 
