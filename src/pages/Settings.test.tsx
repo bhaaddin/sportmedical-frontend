@@ -8,7 +8,7 @@
  * buffer, working hours - all hardcoded, saving nowhere) stay gone.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { setViewport, VIEWPORTS } from '../test/viewport';
@@ -85,29 +85,38 @@ const linksTo = (name: string | RegExp) =>
   screen.getAllByRole('link', { name }).map((a) => a.getAttribute('href'));
 
 describe('the settings hub', () => {
-  it("shows one tile per group, in the brief's order, each a link to its page", async () => {
+  it("shows one shelf per group, in the brief's order, each with a link to its page", async () => {
     renderSettings();
 
     const headings = (await screen.findAllByRole('heading', { level: 2 })).map((h) => h.textContent);
     expect(headings.slice(0, 7)).toEqual(['Provoz', 'Služby a ceny', 'Kluby', 'Komunikace', 'Dokumenty', 'Vzhled webu', 'Systém']);
     expect(headings[headings.length - 1]).toBe('Osobní');
 
-    expect(screen.getByRole('link', { name: /^Provoz — \d+ položek/ })).toHaveAttribute('href', '/settings/provoz');
-    expect(screen.getByRole('link', { name: /^Služby a ceny/ })).toHaveAttribute('href', '/settings/sluzby-a-ceny');
-    expect(screen.getByRole('link', { name: /^Systém/ })).toHaveAttribute('href', '/settings/system');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Provoz' })).toHaveAttribute('href', '/settings/provoz');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Služby a ceny' })).toHaveAttribute('href', '/settings/sluzby-a-ceny');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Systém' })).toHaveAttribute('href', '/settings/system');
   });
 
-  it('says what each group holds and how many items, on the tile', async () => {
+  it('says what each group holds, in one line under its name', async () => {
     renderSettings();
     expect(await screen.findByText(/Kdy se pracuje, kdy ne/)).toBeInTheDocument();
-    expect(screen.getAllByText(/\d+ položek|\d+ položky|1 položka/).length).toBeGreaterThanOrEqual(7);
   });
 
-  /* Items are one click further in: the hub lists groups, not thirty rows. */
-  it('does not list the items themselves until somebody searches or opens a group', async () => {
+  /* The shelf's cards ARE the group's screens: one click from the hub to the screen. */
+  it("puts the group's screens on its shelf as cards, each a link straight to the screen", async () => {
+    renderSettings();
+    const provoz = await screen.findByRole('region', { name: 'Provoz' });
+    const link = within(provoz).getByRole('link', { name: /^Otevírací doba/ });
+    expect(link).toHaveAttribute('href', '/working-hours');
+    /* One quiet line: what is inside, from the catalogue. */
+    expect(link).toHaveTextContent('Hodiny podle dnů v týdnu');
+    expect(within(screen.getByRole('region', { name: 'Služby a ceny' })).getByRole('link', { name: /^Ceník/ })).toHaveAttribute('href', '/nastaveni/cenik');
+  });
+
+  it('never draws "Vyžaduje nastavení" when nothing answered (no all-clear, no guess)', async () => {
     renderSettings();
     await screen.findByText('Můj účet');
-    expect(screen.queryByRole('link', { name: 'Otevírací doba' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Vyžaduje nastavení' })).not.toBeInTheDocument();
   });
 
   it('searches names, descriptions and keywords, and a result links straight to the item', async () => {
@@ -116,11 +125,14 @@ describe('the settings hub', () => {
 
     await user.type(screen.getAllByLabelText('Hledat v nastavení')[0], 'sleva');
 
-    expect(screen.getByRole('link', { name: /Slevy a cenové hladiny/ })).toHaveAttribute('href', '/nastaveni/slevy');
+    const results = screen.getByRole('region', { name: 'Výsledky hledání' });
+    expect(within(results).getByRole('link', { name: /Slevy a cenové hladiny/ })).toHaveAttribute('href', '/nastaveni/slevy');
+    /* A result names its group. */
+    expect(within(results).getAllByText('Služby a ceny').length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: /Otevírací doba/ })).not.toBeInTheDocument();
-    /* The group tiles and the personal cards give way to the results. */
+    /* The group shelves and the personal cards give way to the results. */
     expect(screen.queryByText('Můj účet')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /^Provoz — / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Celá skupina: Provoz' })).not.toBeInTheDocument();
   });
 
   it('finds an item by what a receptionist would type, diacritics or not', async () => {
@@ -140,6 +152,11 @@ describe('the settings hub', () => {
 
     expect(screen.getByText(/Nic odpovídajícího „xyzzy“\. Zkuste jiné slovo/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Otevírací doba/ })).not.toBeInTheDocument();
+
+    /* The empty shelf's next action: back to the shelves. */
+    await user.click(screen.getByRole('button', { name: 'Zrušit hledání' }));
+    expect(screen.getAllByLabelText('Hledat v nastavení')[0]).toHaveValue('');
+    expect(screen.getByRole('link', { name: 'Celá skupina: Provoz' })).toBeInTheDocument();
   });
 });
 
@@ -154,7 +171,8 @@ describe('a group page', () => {
     expect(screen.getByText(/Čím víc lidí přijde společně/)).toBeInTheDocument();
   });
 
-  it('has the breadcrumb Nastavení / Skupina and a way back', async () => {
+  it('has the breadcrumb Nastavení / Skupina and, on a phone, a way back', async () => {
+    setViewport(VIEWPORTS.phone);
     renderSettings('/settings/kluby');
 
     const crumbs = await screen.findByRole('navigation', { name: 'Kde jste' });
@@ -181,28 +199,23 @@ describe('a group page', () => {
 });
 
 describe('the three layouts', () => {
-  it('draws the hub as a LIST of groups on a phone', async () => {
+  const groupList = (name: string) => within(screen.getByRole('region', { name })).getByRole('list', { name });
+
+  it("draws each group's screens as a ROW that swipes on a phone", async () => {
     setViewport(VIEWPORTS.phone);
     renderSettings();
 
-    expect(await screen.findByRole('link', { name: /^Provoz — / })).toHaveAttribute('href', '/settings/provoz');
-    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(7);
+    expect(await screen.findByRole('link', { name: 'Celá skupina: Provoz' })).toHaveAttribute('href', '/settings/provoz');
+    expect(groupList('Provoz')).toHaveStyle({ display: 'flex', overflowX: 'auto' });
+    expect(within(groupList('Provoz')).getAllByRole('listitem').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('draws the hub as tiles on an iPad', async () => {
-    setViewport(VIEWPORTS.tablet);
+  it.each([VIEWPORTS.tablet, VIEWPORTS.desktop])('draws them as a GRID at %i px', async (width) => {
+    setViewport(width);
     renderSettings();
 
-    expect(await screen.findByRole('link', { name: /^Provoz — / })).toHaveAttribute('href', '/settings/provoz');
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
-  });
-
-  it('draws the hub as tiles on a desktop', async () => {
-    setViewport(VIEWPORTS.desktop);
-    renderSettings();
-
-    expect(await screen.findByRole('link', { name: /^Systém — / })).toHaveAttribute('href', '/settings/system');
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(await screen.findByRole('link', { name: 'Celá skupina: Systém' })).toHaveAttribute('href', '/settings/system');
+    expect(groupList('Systém')).toHaveStyle({ display: 'grid' });
   });
 
   it.each([VIEWPORTS.phone, VIEWPORTS.tablet, VIEWPORTS.desktop])('draws a group page at %i px', async (width) => {
@@ -226,8 +239,10 @@ describe('what a receptionist sees', () => {
     /* Provoz is shown to her because Pauzy a přestávky needs no permission,
        while Otevírací doba and the rest of the group need
        settings.clinic.manage and are dropped. */
-    expect(await screen.findByRole('link', { name: /^Provoz — 1 položka/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /^Vzhled webu/ })).not.toBeInTheDocument();
+    const provoz = await screen.findByRole('region', { name: 'Provoz' });
+    expect(within(provoz).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(provoz).getByRole('link', { name: /^Pauzy a přestávky/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Vzhled webu/ })).not.toBeInTheDocument();
   });
 
   it('opens a group page with only her rows', async () => {
