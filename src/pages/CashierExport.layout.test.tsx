@@ -212,6 +212,26 @@ describe('Účetní export', () => {
     expect(await screen.findByText('faktury-2026-09.csv')).toBeInTheDocument();
   });
 
+  it('says what the chosen period holds before anything is exported', async () => {
+    const today = new Date().toISOString();
+    clientGet.mockImplementation((url: string) => {
+      if (url.endsWith('/history')) return Promise.resolve({ data: [] });
+      if (url === '/api/billing/invoices') {
+        return Promise.resolve({ data: [
+          { id: 'i1', invoiceNumber: '1', status: 'Issued', totalCzk: 1600, issueDateUtc: today },
+          { id: 'i2', invoiceNumber: '2', status: 'Paid', totalCzk: 2200, issueDateUtc: today },
+          { id: 'i3', invoiceNumber: '3', status: 'Cancelled', totalCzk: 900, issueDateUtc: today },
+        ] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    renderAt('desktop', <AccountingExportPage />);
+    expect(await screen.findByText(/^V období vystaveno 2 doklady za 3\s800\sKč\.$/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Faktury' })).toHaveAttribute('href', '/billing');
+    expect(screen.getByRole('region', { name: 'Nový export' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Poslední exporty' })).toBeInTheDocument();
+  });
+
   it('stacks the form fields one per row on a phone', async () => {
     serve([]);
     renderAt('phone', <AccountingExportPage />);
