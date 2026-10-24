@@ -1,0 +1,13 @@
+import { launch, newPage, login, api } from './lib.mjs';
+const b = await launch(); const p = await newPage(b, 'desktop'); await login(p);
+const r = await api(p, 'GET', '/api/v1/club-orders');
+const list = r.json?.data ?? r.json ?? [];
+const today = new Date().toISOString().slice(0,10);
+for (const o of list.filter(o => o.status !== 'Cancelled' && !/ZZ/.test(o.clubName))) console.log(o.id.slice(0,6), o.status, o.clubName, 'reg', o.registered + '/' + o.totalSeats, 'blocks', (o.blocks||[]).map(x=>x.fromDate+'..'+x.toDate+' '+x.dailyFrom+'-'+x.dailyTo+' st='+x.status).join(' | '), 'off', (o.offeredDates||[]).join(','), 'req', (o.requestedDates||[]).join(','));
+const cals = (await api(p, 'GET', '/api/calendars')).json; const cl = cals.data ?? cals;
+console.log(cl.map(c=>c.id.slice(0,6)+':'+c.name).join(' '));
+const c0 = cl[0].id;
+const bl = await api(p, 'GET', `/api/calendars/${c0}/blocks?from=${today}&to=2026-12-31`);
+const arr = bl.json?.data ?? bl.json ?? [];
+console.log('blocks', bl.status, arr.length, arr.filter(x=>x.kind==='club').slice(0,3).map(x=>JSON.stringify(x)).join('\n'));
+await b.close();

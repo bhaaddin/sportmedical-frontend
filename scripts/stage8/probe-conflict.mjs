@@ -1,0 +1,26 @@
+/* What does the server answer when a club is placed over a booking? (club ZZ test, booking + order cancelled at the end) */
+import { launch, newPage, login, api, findOrMakeClub } from './lib.mjs';
+const b = await launch(); const p = await newPage(b, 'desktop'); await login(p);
+const cals = (await api(p, 'GET', '/api/calendars')).json; const calendar = (cals.data ?? cals).find((c) => c.isActive !== false);
+const acts = (await api(p, 'GET', '/api/activities')).json.data.activities.filter((a) => a.isActive);
+const act = acts.find((a) => a.durationMinutes === 40);
+const pts = (await api(p, 'GET', '/api/patients?pageSize=100')).json; const patient = (pts.data?.items ?? pts.items ?? pts.data ?? [])[0];
+const day = '2026-12-02';
+const av = await api(p, 'GET', `/api/calendars/${calendar.id}/availability?activityId=${act.id}&from=${day}&to=${day}&forPublic=false&staffStarts=true`);
+const slot = (av.json?.data ?? av.json ?? [])[2]?.startUtc;
+const made = await api(p, 'POST', `/api/calendars/${calendar.id}/appointments`, { calendarId: calendar.id, patientId: patient.id, activityId: act.id, startUtc: slot, source: 0, note: 'ZZ test stage8 r24' });
+const appt = made.json?.data?.appointment ?? made.json?.data ?? made.json?.appointment;
+console.log('booking', made.status, slot);
+const club = await findOrMakeClub(p);
+const hh = new Date(slot).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false });
+const mk = (d) => ({ fromDate: d, toDate: d, dailyFrom: '08:00', dailyTo: '16:00', activityIds: null });
+const r = await api(p, 'POST', '/api/v1/club-orders/staff', { clubId: club.id, serviceId: act.clinicServiceId, activitySeats: [{ activityId: act.id, seats: 3 }], paymentMethod: 'ClubInvoice', ranges: [mk('2026-12-04')], calendarIds: [calendar.id], status: 'Confirmed', note: 'ZZ test stage8 r24' });
+console.log('staff order', r.status);
+const oid0 = r.json?.id;
+const up = await api(p, 'PUT', `/api/v1/club-orders/${oid0}`, { ranges: [mk('2026-12-04'), mk(day)], calendarIds: [calendar.id] });
+console.log('update', up.status, JSON.stringify(up.json ?? up.text).slice(0, 700), hh);
+const oid = oid0;
+if (oid) await api(p, 'POST', `/api/v1/club-orders/${oid}/cancel?cancelAthletes=true`);
+if (appt?.id) console.log('del', (await api(p, 'DELETE', `/api/calendars/${calendar.id}/appointments/${appt.id}?reason=ZZ%20test%20cleanup`)).status);
+await b.close().catch(() => {});
+process.exit(0);

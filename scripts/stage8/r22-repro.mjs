@@ -1,0 +1,13 @@
+import { launch, newPage, login, shot } from './lib.mjs';
+const b = await launch(); const p = await newPage(b, 'desktop'); await login(p);
+await p.goto(`${process.env.BASE}/planovani`); await p.waitForSelector('.sm-planner', { timeout: 120000 }); await p.waitForTimeout(3000);
+await p.click('[data-command=nextWeek]'); await p.waitForTimeout(2500);
+const info = await p.evaluate(() => [...document.querySelectorAll('.board-window.is-club')].map(e => e.innerText.replace(/\s+/g,' ').slice(0,80)));
+console.log('club windows', info.length, info.slice(0,4));
+console.log('inquiry flags', await p.$$eval('.day-inquiry', e => e.map(x => x.innerText)));
+await shot(p, 'r22-before-week-desktop');
+await p.click('[data-command=nextWeek]'); await p.waitForTimeout(2500); await p.click('[data-command=nextWeek]').catch(()=>{}); await p.waitForTimeout(2500);
+console.log('week+2 club windows', await p.$$eval('.board-window.is-club', e => e.length), 'inq', await p.$$eval('.day-inquiry', e => e.map(x => x.innerText)));
+await shot(p, 'r22-before-week3-desktop');
+console.log(p.errors.slice(0,3));
+await b.close();

@@ -13,19 +13,27 @@
 import type { TimeBlock } from '../../../api/bookingContracts';
 import { spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
 
-export type HoldState = 'waiting' | 'full' | 'expired';
+export type HoldState = 'waiting' | 'full' | 'expired' | 'requested' | 'offered';
 
 export const HOLD_TEXT = {
   waiting: 'Čeká na hráče',
   full: 'Obsazeno',
   expired: 'Hold vypršel',
+  /* R22: time given to a club that asked for it / that the desk offered, no block yet */
+  requested: 'Čeká na potvrzení',
+  offered: 'Čeká na odpověď',
   reserved: (club: string) => `Rezervováno pro klub ${club}`,
   holdUntil: (day: string) => `Držení do ${day}`,
+  /** R22: what the window of a pending hold says in place of the club's name */
+  pendingTitle: (kind: 'requested' | 'offered', club: string) => (kind === 'requested' ? `Rezervováno pro klub ${club}` : `Nabídnuto klubu ${club}`),
+  /** R22: the offered day only warns */
+  offeredWarn: (club: string) => `Nabídnuto klubu ${club}`,
 } as const;
 
 /** The block's hold state, or null when the server says nothing about it (an older build, or a manual block). */
-export function holdStateOf(block: Pick<TimeBlock, 'kind' | 'playersMissing' | 'windowEmpty' | 'holdExpired' | 'seats' | 'registered'>): HoldState | null {
+export function holdStateOf(block: Pick<TimeBlock, 'kind' | 'playersMissing' | 'windowEmpty' | 'holdExpired' | 'seats' | 'registered'> & { pendingHold?: 'requested' | 'offered' | undefined }): HoldState | null {
   if (block.kind !== 'club') return null;
+  if (block.pendingHold) return block.pendingHold;
   if (block.holdExpired === true) return 'expired';
   if (block.playersMissing === true) return 'waiting';
   if (block.playersMissing === false) return 'full';
@@ -51,8 +59,14 @@ export function clubHolding(blocks: readonly TimeBlock[], day: string, range: Mi
   return hit?.block ?? null;
 }
 
+/** The offered-day stand-in that touches `range` on `day`: it never refuses a booking, it only warns (the club may decline). */
+export function offeredHolding(blocks: readonly TimeBlock[], day: string, range: MinuteRange): TimeBlock | null {
+  return clubHolding(blocks.filter((b) => b.pendingHold === 'offered'), day, range);
+}
+
 /** "Rezervováno pro klub FK Slaný" (the club's name is the block's; a club-less block says "klub"). */
-export const clubReservedText = (block: Pick<TimeBlock, 'clubName'>): string => HOLD_TEXT.reserved(block.clubName?.trim() || 'klub');
+export const clubReservedText = (block: Pick<TimeBlock, 'clubName'> & { pendingHold?: 'requested' | 'offered' | undefined }): string =>
+  block.pendingHold === 'requested' ? `${HOLD_TEXT.reserved(block.clubName?.trim() || 'klub')} · ${HOLD_TEXT.requested.toLowerCase()}` : HOLD_TEXT.reserved(block.clubName?.trim() || 'klub');
 
 /** One club window of a day as the month tile, the phone list and the mini calendar show it. */
 export interface ClubDayItem {

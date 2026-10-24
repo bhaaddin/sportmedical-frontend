@@ -963,6 +963,13 @@ export const timeBlockSchema = z.object({
   windowEmpty: z.boolean().nullable().optional(),
   holdUntilUtc: z.string().nullable().optional(),
   holdExpired: z.boolean().nullable().optional(),
+  /*
+   * Stage 8, R22 - never sent by a server. The board makes these two itself: `pendingHold` marks a stand-in for time an order gives a club
+   * but that is no block yet (requested = the club asked for the day, offered = the desk offered it); `holdDerived` marks hold fields
+   * that were completed from the club-order list because an older server sent none (so the release button is not offered on them).
+   */
+  pendingHold: z.enum(['requested', 'offered']).optional(),
+  holdDerived: z.boolean().optional(),
 });
 export type TimeBlock = z.infer<typeof timeBlockSchema>;
 export const timeBlockListSchema = z.array(timeBlockSchema);

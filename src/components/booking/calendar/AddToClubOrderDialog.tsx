@@ -32,11 +32,15 @@ import { orderCode, rangeLine } from '../../clubs/order/orderFormat';
 import { rowFromRange, rowIndexForError } from '../../clubs/order/orderLogic';
 import { firstWord, normalizeAllowed, toggleAllowed, type RoutedActivity } from '../../clubs/order/routing';
 import { isLiveOrder, orderWindows, routedActivities, shortSplit, termsWord } from '../../clubs/orders/orderWindows';
+import { appointmentsApi } from '../../../api/appointments';
+import type { DayAppointment } from '../../../api/bookingContracts';
+import { clubWindowsOf, collidingBookings, isTimeTakenRefusal, type ClubWindow } from './clubConflict';
 import { ordersRangesOf, pickedCalendarIds, picksFromRanges } from './pickLogic';
 import { pickedLabel, type PickedRange, type PickedTime } from './multiSelect';
 
 const STALE = 60 * 1000;
 /* R4 / R17: the owner's override with a reason - the same panel as the booking dialog, loaded only when a refusal needs it */
+const ClubConflictStep = lazy(() => import('./ClubConflictStep'));
 const WorkerBusyNotice = lazy(() => import('../WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyNotice })));
 
 /** The order's current windows, as picks a fresh `update` call can be built from (same recipe as `usePickOrder.start`). */
@@ -164,6 +168,9 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
   /* R4: the worker is busy in another calendar: the clash is named, and an owner / administrator may go over it with a reason */
   const [busy, setBusy] = useState<{ busy: WorkerBusy; forbidden: boolean } | null>(null);
 
+  /* R24: the refusal was "the time is taken" and patients' bookings are in the way: list them, propose new slots, move, then place the club */
+  const [conflict, setConflict] = useState<{ bookings: DayAppointment[]; staying: DayAppointment[]; windows: ClubWindow[] } | null>(null);
+  const [moving, setMoving] = useState(false);
   const picks = useMemo(
     () => (order === null ? [] : [...existingPicks(order), ...markedPicks(marked, calendars, allowed)]),
     [order, marked, calendars, allowed],
@@ -208,10 +215,28 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
       const index = rowIndexForError(e, ranges.map(rowFromRange));
       const range = index === null ? null : ranges[index];
       setFailure({ message: e.message, conflict: range === null ? null : rangeLine(range) });
+      if (isTimeTakenRefusal(e)) void findConflict();
     },
   });
 
-  const pending = save.isPending;
+  /* the bookings that really stand in the club's windows (the server's answer names none, the calendar's own list does) */
+  async function findConflict() {
+    const windows = clubWindowsOf(ranges);
+    if (windows.length === 0) return;
+    const days = windows.map((w) => w.day).sort();
+    try {
+      const all = await appointmentsApi.range(days[0]!, days[days.length - 1]!, calendarIds);
+      const inWay = collidingBookings(windows, calendarIds, all);
+      if (inWay.length === 0) return;
+      const ids = new Set(inWay.map((a) => a.id));
+      setFailure(null);
+      setConflict({ bookings: inWay, staying: all.filter((a) => !ids.has(a.id)), windows });
+    } catch {
+      /* the list could not be read: the plain refusal stays */
+    }
+  }
+
+  const pending = save.isPending || moving;
 
   const chooseClub = (next: Club | null) => {
     setClub(next);
@@ -220,6 +245,7 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
     setFailure(null);
     setAffected(null);
     setBusy(null);
+    setConflict(null);
   };
   const chooseOrder = (next: ClubOrderView) => {
     setOrder(next);
@@ -305,6 +331,23 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
                 forbidden={busy.forbidden}
                 working={pending}
                 onOverride={(reason) => save.mutate({ cancelAffected: affected !== null, overrideReason: reason })}
+              />
+            </Suspense>
+          ) : null}
+          {conflict !== null ? (
+            <Suspense fallback={null}>
+              <ClubConflictStep
+                bookings={conflict.bookings}
+                staying={conflict.staying}
+                windows={conflict.windows}
+                calendarName={(id) => calendars.find((c) => c.id === id)?.name ?? 'Kalendář'}
+                today={today}
+                onBusy={setMoving}
+                describeError={(error) => (error instanceof Error && error.message ? error.message : 'Přesun se nepodařil.')}
+                onMoved={() => {
+                  setConflict(null);
+                  save.mutate({ cancelAffected: false });
+                }}
               />
             </Suspense>
           ) : null}

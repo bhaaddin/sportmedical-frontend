@@ -68,11 +68,12 @@ export function ClubBlockPopover({
   const blockQuery = useQuery({
     queryKey: ["club-blocks", "popover", pick?.clubBlockId ?? ""],
     queryFn: () => clubBlocksApi.get(pick?.clubBlockId ?? ""),
-    enabled: pick !== null,
+    /* R22: a block that already names its order (a stand-in for a requested / offered day, or one completed from the order list) needs no read */
+    enabled: pick !== null && !pick.block?.clubOrderId,
     staleTime: 15_000,
     retry: false,
   });
-  const orderId = blockQuery.data?.clubOrderId ?? null;
+  const orderId = pick?.block?.clubOrderId || blockQuery.data?.clubOrderId || null;
   const orderQuery = useQuery({
     queryKey: ["club-order", orderId],
     queryFn: () => clubOrdersApi.get(orderId ?? ""),
@@ -81,11 +82,11 @@ export function ClubBlockPopover({
     retry: false,
   });
   const order = orderQuery.data;
-  const loading = pick !== null && (blockQuery.isLoading || (orderId !== null && orderId !== "" && orderQuery.isLoading));
+  const loading = pick !== null && ((blockQuery.isLoading && !pick.block?.clubOrderId) || (orderId !== null && orderId !== "" && orderQuery.isLoading));
   const ownedByOrder = orderId !== null && orderId !== "";
   /* the block of the main board carries its order itself (stage 2); older servers need the block read above */
   const effectiveOrderId = holdBlock?.clubOrderId || orderId || '';
-  const canRelease = mayRelease && hold !== null && effectiveOrderId !== '';
+  const canRelease = mayRelease && hold !== null && effectiveOrderId !== '' && !holdBlock?.pendingHold && !holdBlock?.holdDerived;
 
   const windows = order === undefined ? [] : orderWindows(order);
   const title = !pick
