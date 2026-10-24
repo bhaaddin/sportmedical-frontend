@@ -155,7 +155,8 @@ export function ClubSummaryCard({ clubId, fallback }: { clubId: string; fallback
       <LinearProgress variant="determinate" value={seatPercent(s.usedMinutes, s.bookedMinutes)} aria-label="Využití rezervovaného času" sx={{ mb: 2 }} />
 
       <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', mb: 2 }} data-testid="summary-statuses">
-        {ORDER_STATUSES.map((st) => (
+        {/* R21: cancelled orders are history, not a live status */}
+        {ORDER_STATUSES.filter((st) => st !== 'Cancelled').map((st) => (
           <StatusChip key={st} tone={STATUS_TONE[st]}>{ORDER_STATUS_LABEL[st]}: {s.ordersByStatus[st]}</StatusChip>
         ))}
       </Stack>

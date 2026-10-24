@@ -26,7 +26,6 @@ import {
   Box, Button, Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography,
 } from '@mui/material';
 import { Close, EditOutlined } from '@mui/icons-material';
-import toast from 'react-hot-toast';
 import { diagnosticsApi } from '../../api/diagnostics';
 import type { DiagnosticSession } from '../../api/diagnostics';
 import { AsyncSection } from '../../components/booking/AsyncSection';
@@ -39,6 +38,7 @@ import { formatPragueDate } from '../../utils/time';
 import ManualResultsForm from './ManualResultsForm';
 import SessionValues from './results/SessionValues';
 import { measurementDate } from './results/measuredValues';
+import { ExportGate } from '../../components/ui/ExportGate';
 
 /** A yyyy-MM-dd day, or an instant read in the clinic's zone. */
 const formatDay = (value: string): string => {
@@ -67,11 +67,7 @@ export default function PatientResultsPage() {
   );
 
   const openReport = async (session: DiagnosticSession) => {
-    try {
-      await diagnosticsApi.downloadPdf(session.id);
-    } catch {
-      toast.error('Zprávu se nepodařilo otevřít');
-    }
+    await diagnosticsApi.downloadPdf(session.id); // shows its own failure, the refusal in Czech
   };
 
   const columns: DataColumn<DiagnosticSession>[] = [
@@ -125,9 +121,13 @@ export default function PatientResultsPage() {
               Upravit
             </Button>
           )}
-          <Button size="small" variant="outlined" onClick={() => void openReport(s)} sx={{ minHeight: 36 }}>
-            Otevřít zprávu
-          </Button>
+          <ExportGate>
+            {(blocked) => (
+              <Button size="small" variant="outlined" disabled={blocked} onClick={() => void openReport(s)} sx={{ minHeight: 36 }}>
+                Otevřít zprávu
+              </Button>
+            )}
+          </ExportGate>
         </Stack>
       ),
     },
@@ -154,13 +154,18 @@ export default function PatientResultsPage() {
           Upravit
         </Button>
       )}
-      <Button
-        variant="outlined"
-        onClick={(e) => { e.stopPropagation(); void openReport(s); }}
-        sx={{ minHeight: 44, alignSelf: 'stretch' }}
-      >
-        Otevřít zprávu
-      </Button>
+      <ExportGate>
+        {(blocked) => (
+          <Button
+            variant="outlined"
+            disabled={blocked}
+            onClick={(e) => { e.stopPropagation(); void openReport(s); }}
+            sx={{ minHeight: 44, alignSelf: 'stretch' }}
+          >
+            Otevřít zprávu
+          </Button>
+        )}
+      </ExportGate>
     </Stack>
   );
 

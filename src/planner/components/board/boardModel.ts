@@ -22,6 +22,7 @@ import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, span
 import { inFilter } from '../../model/services';
 import { lockedDayLook, type LockedDayLook } from '../../../colors/dayLock';
 import type { ClubDayItem } from './clubHold';
+import { frameSubs, type FrameSub } from './clubFrame';
 import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
@@ -162,6 +163,14 @@ export interface BoardWindowModel {
   calendarId: string;
   calendarName: string;
   clubDates: DayRange | null;
+  /** R16b: the činnost sub-blocks inside a club's frame (offsets in px from the window's top); empty when the server named none. */
+  frame: BoardFrameSub[];
+}
+
+export interface BoardFrameSub extends FrameSub {
+  /** Offset from the top of the window, px. */
+  top: number;
+  height: number;
 }
 
 export interface DayShadeModel {
@@ -489,7 +498,7 @@ function windowModels(
       const all = calendar.blocksByCalendar.get(cal.id) ?? [];
       const blocks = all.filter((b) => touchesDay(b.startUtc, b.endUtc, day));
       if (blocks.length === 0) continue;
-      for (const { block, span } of drawnBlocksOfDay(blocks, day, lunch)) {
+      for (const { block, span, parts } of drawnBlocksOfDay(blocks, day, lunch)) {
         const club = block.kind === 'club';
         if (club && calendar.excludeClubId && block.clubId === calendar.excludeClubId) continue;
         if (club && calendar.excludeClubBlockIds && block.clubBlockId && calendar.excludeClubBlockIds.has(block.clubBlockId)) continue;
@@ -521,6 +530,12 @@ function windowModels(
           calendarId: cal.id,
           calendarName: cal.name,
           clubDates: club ? clubBlockDates(all, block.clubBlockId, block) : null,
+          frame: club
+            ? frameSubs(parts, day, calendar.catalogue).map((sub) => {
+                const inner = boxOfSpan(g, sub.start, sub.end);
+                return { ...sub, top: Math.max(0, inner.top - box.top), height: Math.min(inner.height, box.height) };
+              })
+            : [],
         });
       }
     }

@@ -15,12 +15,19 @@
 import { useEffect } from 'react';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
+import { S41Icon } from './plan/S41Icon';
 import { usePlanActions } from './plan/usePlanActions';
 import { usePlanFigures } from './plan/usePlanFigures';
+import { completionAdvice } from '../guide/advice';
+import { PLANNER_TEXT } from '../text';
+import '../guide/guide.base.css';
 import './plan/plan.css';
 import type { CSSProperties } from 'react';
 
 const HIDE_AFTER_MS = 10000;
+/* The whole order is complete: the next step ("Připravit formulář") stays on screen long enough to be read and used. */
+const HIDE_COMPLETE_AFTER_MS = 30000;
+const G = PLANNER_TEXT.guide.callout;
 
 export function CompletionCallout() {
   const completion = usePlannerSelector((s) => s.planning.completion);
@@ -30,16 +37,17 @@ export function CompletionCallout() {
 
   useEffect(() => {
     if (!completion) return undefined;
-    const timer = window.setTimeout(() => act.hideCompletion(), HIDE_AFTER_MS);
+    const timer = window.setTimeout(() => act.hideCompletion(), base.remaining === 0 ? HIDE_COMPLETE_AFTER_MS : HIDE_AFTER_MS);
     return () => window.clearTimeout(timer);
-  }, [completion, act]);
+  }, [completion, act, base.remaining === 0]);
 
   const f = completion ? base.byId.get(completion.categoryId) : undefined;
   if (!completion || !f) {
     return <div id="planner-feedback" className="planner-feedback" hidden aria-live="polite" data-testid="completion-callout" />;
   }
   const wholeOrder = base.remaining === 0;
-  const next = base.list.find((x) => x.categoryId !== f.categoryId && !x.done) ?? null;
+  const advice = completionAdvice({ list: base.list, categoryId: f.categoryId });
+  const next = advice.next;
 
   return (
     <div
@@ -64,13 +72,36 @@ export function CompletionCallout() {
         <p className="completion-message">
           {wholeOrder ? 'Všechny činnosti v objednávce jsou naplánované.' : 'Další sloty pro tuto činnost již nelze přidávat.'}
         </p>
+        <p className="completion-next" data-completion-next={advice.kind}>{advice.sentence}</p>
         <div className="completion-actions">
+          {advice.kind === 'prepare' ? (
+            <button
+              type="button"
+              className="completion-primary"
+              data-completion-prepare=""
+              onClick={() => { act.hideCompletion(); plan.publish(); }}
+            >
+              <S41Icon name="document" /> {G.prepare}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="completion-primary"
+              data-completion-another=""
+              onClick={() => {
+                act.hideCompletion();
+                if (next) plan.arm(base, next.categoryId);
+              }}
+            >
+              {G.next(next?.name ?? '')} <Icon name="arrow-right" />
+            </button>
+          )}
           <button
             type="button"
             data-completion-review=""
             onClick={() => { act.hideCompletion(); act.openDialog({ kind: 'finish' }); }}
           >
-            Prohlédnout plán <Icon name="arrow-right" />
+            {G.review}
           </button>
           <button
             type="button"
@@ -84,17 +115,9 @@ export function CompletionCallout() {
           >
             Přidat termín navíc
           </button>
-          <button
-            type="button"
-            data-completion-another=""
-            onClick={() => {
-              act.hideCompletion();
-              if (wholeOrder || !next) return;
-              plan.arm(base, next.categoryId);
-            }}
-          >
-            {wholeOrder ? 'Zavřít' : 'Jiná činnost'}
-          </button>
+          {advice.kind === 'prepare' ? (
+            <button type="button" data-completion-another="" onClick={() => act.hideCompletion()}>{G.close}</button>
+          ) : null}
         </div>
       </section>
     </div>

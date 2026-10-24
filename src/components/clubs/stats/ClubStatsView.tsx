@@ -90,10 +90,10 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
       key: 'orders', header: 'Objednávky',
       cell: (c) => (
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {(['Requested', 'Confirmed', 'Completed', 'Cancelled', 'Invited'] as const)
+          {(['Requested', 'Confirmed', 'Completed', 'Invited'] as const)
             .filter((k) => c.ordersByStatus[k] > 0)
             .map((k) => (
-              <StatusChip key={k} size="sm" tone={k === 'Confirmed' ? 'green' : k === 'Cancelled' ? 'grey' : k === 'Requested' ? 'beige' : 'blue'}>
+              <StatusChip key={k} size="sm" tone={k === 'Confirmed' ? 'green' : k === 'Requested' ? 'beige' : 'blue'}>
                 {STATUS_SHORT[k]} {c.ordersByStatus[k]}
               </StatusChip>
             ))}

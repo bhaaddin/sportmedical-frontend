@@ -9,6 +9,7 @@
  * personal identifier is ever a column; as a last line of defence a cell that
  * looks like a birth number (rodné číslo) is blanked rather than written.
  */
+import { downloadCsv as saveCsv } from '../../utils/download';
 import { csvFileName, toCsv } from './aggregate';
 import type { CsvCell, Period } from './aggregate';
 
@@ -43,15 +44,12 @@ export function buildStatisticsCsv(sections: readonly CsvSection[], period: Peri
 export const statisticsCsvFileName = (areaLabel: string, period: Period): string =>
   csvFileName(areaLabel, period);
 
-/** Downloads a CSV through a one-off link; nothing is sent anywhere. */
-export function downloadCsv(fileName: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+/**
+ * Saves a CSV through the one download helper (`utils/download`): UTF-8 with one byte-order mark, allowed by an
+ * administrator (`exports.download`) and audited by kind and row count. `kind` is the audit slug.
+ */
+export function downloadCsv(fileName: string, csv: string, kind = 'statistics-csv'): Promise<boolean> {
+  /* header line + one per row; the blank lines between sections are rows too, close enough for an audit count */
+  const rows = Math.max(0, csv.split(/\r?\n/).filter((line) => line.trim() !== '').length - 1);
+  return saveCsv(kind, fileName, csv, rows);
 }

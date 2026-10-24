@@ -86,6 +86,10 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Vystavit úplný výpis údajů pacienta',
     detail: 'Úplný výpis všech údajů o pacientovi (např. na jeho žádost o přístup k údajům).',
   },
+  'exports.download': {
+    label: 'Stahovat soubory ze systému',
+    detail: 'Exporty, CSV, PDF faktury a zprávy, dokumenty pacienta, seznamy hráčů. Bez tohoto práva tlačítka stažení nejdou použít; každé stažení se zapíše do auditu.',
+  },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',
     detail: 'Číst odpovědi pacientů a nastavovat dotazníky.',

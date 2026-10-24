@@ -10,7 +10,7 @@ const row = (over: Partial<DayRowModel>): DayRowModel => ({
 });
 const win = (over: Partial<BoardWindowModel>): BoardWindowModel => ({
   key: 'window:c1:k1:2026-11-18', kind: 'club', col: 2, sub: 0, subs: 1, day: '2026-11-18', top: 0, height: 10, lane: 0, lanes: 1, left: '0', width: '1', label: 'FK Slaný',
-  timeLabel: '08:00–16:00', start: 480, end: 960, colour: '#2E7D32', block: {} as TimeBlock, allBlocks: [], calendarId: 'c1', calendarName: 'Ordinace 1', clubDates: null, ...over,
+  timeLabel: '08:00–16:00', start: 480, end: 960, colour: '#2E7D32', block: {} as TimeBlock, allBlocks: [], calendarId: 'c1', calendarName: 'Ordinace 1', clubDates: null, frame: [], ...over,
 });
 
 describe('the phone day: bookings, terms, club windows and blocks in one list by start', () => {

@@ -153,3 +153,7 @@ html[data-motion='full'] .sm-planner .liquid-layer:nth-child(even)::before { ani
   .sm-planner .day-cell.spectrum-day .liquid-water.has-layers,
   .sm-planner .liquid-layer::before { animation: none !important; }
 }
+
+/* R16b: a club's day in the mini calendar is a closed frame in the club's colour with the činnosti inside it as colour segments */
+.sm-planner .day-cell .mini-clubs i[data-framed] { display: flex; width: 14px; height: 6px; padding: 1px; gap: 1px; box-sizing: border-box; background-image: none; outline-offset: 0; border-radius: 3px; }
+.sm-planner .day-cell .mini-clubs i[data-framed] b { flex: 1 1 0; min-width: 0; border-radius: 1px; }

@@ -11,6 +11,7 @@
  *
  * Pure: no React, no network.
  */
+import { refusalAdvice, withAdvice } from '../../guide/advice';
 import { minutesAsTime, type DayMark, type IntervalInput, type IsoDate, type PlannerSession } from '../../model';
 import { takeForActivity } from '../../../components/booking/calendar/pickPlan';
 import { freeBlocksOfPlannerDay } from './addDay';
@@ -146,9 +147,12 @@ const daysWord = (n: number): string => (n === 1 ? '1 den' : n >= 2 && n <= 4 ? 
 /** The sentence the desk reads after a pick: what was taken and, for every day that was not, why. */
 export function describeDayPick(plan: DayPickPlan, names: ReadonlyMap<string, string> = new Map()): { text: string; tone: 'ok' | 'info' | 'refused' } {
   if (plan.parts.length === 0) {
-    if (plan.fulfilled) return { text: 'Všechny požadované osoby už mají termín - víc klub nepotřebuje.', tone: 'refused' };
+    if (plan.fulfilled) return { text: withAdvice('Všechny požadované osoby už mají termín - víc klub nepotřebuje.'), tone: 'refused' };
     const why = plan.skipped.slice(0, 2).map((s) => `${formatShortDate(s.date)} ${s.reason.charAt(0).toLowerCase()}${s.reason.slice(1)}`).join(' ');
-    return { text: why === '' ? 'Nic nebylo naplánováno.' : `Nic nebylo naplánováno. ${why}`, tone: 'refused' };
+    /* The first reason decides what to do instead (another day, a shorter stretch ...). */
+    const first = plan.skipped[0]?.reason ?? '';
+    const hint = refusalAdvice(first);
+    return { text: why === '' ? 'Nic nebylo naplánováno.' : `Nic nebylo naplánováno. ${why}${hint ? ` ${hint}` : ''}`, tone: 'refused' };
   }
   const total = [...plan.slotsBy.values()].reduce((n, v) => n + v, 0);
   const per = [...plan.slotsBy.entries()].map(([id, n]) => `${names.get(id) ?? id} ${n}`).join(', ');

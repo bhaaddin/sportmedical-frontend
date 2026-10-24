@@ -1,0 +1,32 @@
+/* ══════════════════════════════════════════════════════════════
+   The "what now" pop-out of the club planner (lazy chunk). A small calm card that never blocks: only the card takes
+   pointer events, it sits over the board's corner and never over the strip of činnosti. Accent colours follow the setting.
+   ══════════════════════════════════════════════════════════════ */
+.sm-planner .guide-hint {
+  position: absolute; z-index: 21; right: 8px; bottom: calc(100% + 10px); width: min(340px, calc(100% - 16px)); box-sizing: border-box;
+  padding: 12px 44px 4px 15px; border-radius: 12px; pointer-events: auto; text-align: left;
+  color: hsl(from #e6fbff var(--sm-hsl, h s l)); background: color-mix(in srgb, hsl(from #052f40 var(--sm-hsl, h s l)) 97%, transparent);
+  border: 1px solid hsl(from #1fa5b6 var(--sm-hsl, h s l)); box-shadow: 0 12px 28px #0009;
+}
+.sm-planner .guide-hint-title { font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; font-weight: 850; color: hsl(from #7fe9dc var(--sm-hsl, h s l)); }
+.sm-planner .guide-hint-text { margin: 5px 0 2px; font-size: 13px; line-height: 1.45; }
+.sm-planner .guide-hint-close {
+  position: absolute; top: 4px; right: 4px; height: 44px; width: 44px; border: 0; background: transparent; cursor: pointer;
+  color: hsl(from #a6d6dd var(--sm-hsl, h s l)); font-size: 22px; line-height: 1;
+}
+.sm-planner .guide-hint-close:hover { color: #fff; }
+.sm-planner .guide-hint-mute {
+  min-height: 44px; padding: 0 2px; border: 0; background: transparent; cursor: pointer; font-size: 12px; text-decoration: underline;
+  color: hsl(from #a6d6dd var(--sm-hsl, h s l));
+}
+@keyframes guide-hint-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+html[data-motion='full'] .sm-planner .guide-hint { animation: guide-hint-in 240ms ease-out both; }
+html[data-motion='reduced'] .sm-planner .guide-hint { animation: plan-fade-in 140ms ease-out both; }
+
+/* the compact layouts draw the board in a layer of their own: the hint is above it, below the dock, the completion card and the dialogs */
+.sm-planner.is-compact .guide-hint { z-index: calc(var(--compact-layer-z, 20) - 4); }
+/* the strip's box (a stacking context of its own, z 9) rises above the board's layers (z 20) while it carries a hint, so the hint can be pressed */
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards:has(> .guide-hint) { z-index: 30; }
+
+/* the phone: the strip lies below the fold, so the hint appears with it - right above its cards, never over them */
+.sm-planner[data-layout='phone'] .guide-hint { right: 12px; left: 12px; width: auto; max-width: 460px; margin: 0 auto; }

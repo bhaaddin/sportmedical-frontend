@@ -32,6 +32,11 @@ function PhoneEntryRow({ entry, onOpenEntry, member = false }: { entry: PhoneEnt
         <span className="phone-entry-main">
           <strong>{entry.kind === 'club' ? <Icon name="lock" /> : null}{entry.title}</strong>
           {entry.sub ? <small data-testid={entry.kind === 'club' ? 'phone-club-sub' : undefined}>{entry.sub}</small> : null}
+          {entry.acts.length > 0 ? (
+            <span className="phone-club-acts" data-testid="phone-club-acts">
+              {entry.acts.map((a) => <small key={a.id} style={{ '--act': a.colour } as CSSProperties}><i aria-hidden="true" />{a.name}</small>)}
+            </span>
+          ) : null}
         </span>
         <span className="phone-entry-tail">
           {entry.tail ? <span>{entry.tail}{folded ? <span aria-hidden="true"> {open ? '▴' : '▾'}</span> : null}</span> : null}
@@ -172,6 +177,11 @@ export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: strin
                   : r.countLabel ? <span>{r.countLabel}</span> : null}
                 {r.calendarLine ? <span className="phone-month-calendars" data-testid={`phone-month-calendars-${r.date}`}>{r.calendarLine}</span> : null}
                 {r.clubs.map((line) => <span key={line} className="phone-month-club" data-testid={`phone-month-club-${r.date}`}>{line}</span>)}
+                {r.clubActs.length > 0 ? (
+                  <span className="phone-club-acts" data-testid={`phone-month-club-acts-${r.date}`}>
+                    {r.clubActs.map((a) => <small key={a.id} style={{ '--act': a.colour } as CSSProperties}><i aria-hidden="true" />{a.name}</small>)}
+                  </span>
+                ) : null}
                 {r.inquiry ? <span className="phone-month-inquiry" data-testid={`phone-month-inquiry-${r.date}`}>{r.inquiry}</span> : null}
                 {!r.countLabel && !r.flag && !r.blocked && r.clubs.length === 0 && !r.inquiry ? <span className="phone-month-none">{PLANNER_TEXT.phone.noBookings}</span> : null}
               </span>

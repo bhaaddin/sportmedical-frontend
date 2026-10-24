@@ -39,6 +39,7 @@ import { formatDateOnly } from '../utils/time';
 import { MetricCard, Shelf, TARGET_SX, cardSurface } from '../ui/shelf';
 import { PatientRelatedShelf } from '../ui/shelf/PatientRelated';
 import type { PatientContext } from './patients/PatientLayout';
+import { ExportGate } from '../components/ui/ExportGate';
 
 /* ── Helpers ── */
 
@@ -163,7 +164,7 @@ export default function PatientDetails() {
 
   const handleDownloadPdf = async (sessionId: string) => {
     setLoadingPdf(sessionId);
-    try { await diagnosticsApi.downloadPdf(sessionId); } catch { /* the button stays; the download did not */ }
+    await diagnosticsApi.downloadPdf(sessionId); // shows its own failure; the button stays either way
     setLoadingPdf(null);
   };
 
@@ -300,15 +301,20 @@ export default function PatientDetails() {
                               </Typography>
                             </Box>
                             {s.requiresDoctorReview && <StatusChip tone="beige">K posouzení</StatusChip>}
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); void handleDownloadPdf(s.id); }}
-                              title="Stáhnout PDF"
-                              aria-label="Stáhnout PDF"
-                              sx={{ width: 44, height: 44 }}
-                            >
-                              {loadingPdf === s.id ? <LinearProgress sx={{ width: 20 }} /> : <Download sx={{ fontSize: 18 }} />}
-                            </IconButton>
+                            <ExportGate>
+                              {(blocked) => (
+                                <IconButton
+                                  size="small"
+                                  disabled={blocked}
+                                  onClick={(e) => { e.stopPropagation(); void handleDownloadPdf(s.id); }}
+                                  title="Stáhnout PDF"
+                                  aria-label="Stáhnout PDF"
+                                  sx={{ width: 44, height: 44 }}
+                                >
+                                  {loadingPdf === s.id ? <LinearProgress sx={{ width: 20 }} /> : <Download sx={{ fontSize: 18 }} />}
+                                </IconButton>
+                              )}
+                            </ExportGate>
                             {isExpanded ? <ExpandLess /> : <ExpandMore />}
                           </Stack>
 

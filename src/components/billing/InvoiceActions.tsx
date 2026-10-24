@@ -7,6 +7,7 @@
 import { Box, Button } from '@mui/material';
 import type { Invoice } from '../../api/billing';
 import { isOpen, isPendingApproval } from '../../pages/billing/invoiceView';
+import { ExportGate } from '../ui/ExportGate';
 
 export const PENDING_PAY_REASON = 'Doklad čeká na schválení — platbu zatím nelze přijmout.';
 
@@ -79,16 +80,20 @@ export default function InvoiceActions({
           </Button>
         </>
       )}
-      <Button
-        size={size}
-        variant="outlined"
-        disabled={busy}
-        onClick={() => handlers.onPdf(invoice)}
-        aria-label={`PDF ${invoice.invoiceNumber}`}
-        sx={sx}
-      >
-        PDF
-      </Button>
+      <ExportGate>
+        {(blocked) => (
+          <Button
+            size={size}
+            variant="outlined"
+            disabled={busy || blocked}
+            onClick={() => handlers.onPdf(invoice)}
+            aria-label={`PDF ${invoice.invoiceNumber}`}
+            sx={sx}
+          >
+            PDF
+          </Button>
+        )}
+      </ExportGate>
     </Box>
   );
 }

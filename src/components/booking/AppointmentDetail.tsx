@@ -135,6 +135,8 @@ interface AppointmentDetailProps {
   onClose: () => void;
   /** The grid reloads itself when anything here changed the appointment. */
   onChanged: () => void;
+  /** R15c (d): the booking was cancelled from here - the screen may offer to take it back (it is handed what was cancelled). */
+  onCancelled?: (appointment: Appointment) => void;
 }
 
 export function AppointmentDetail({
@@ -144,6 +146,7 @@ export function AppointmentDetail({
   open,
   onClose,
   onChanged,
+  onCancelled,
 }: AppointmentDetailProps) {
   const detailQuery = useQuery({
     queryKey: ["appointment", calendarId, appointmentId],
@@ -172,6 +175,7 @@ export function AppointmentDetail({
           calendarId={calendarId}
           calendarName={calendar?.name}
           onChanged={onChanged}
+          onCancelled={onCancelled}
           onClose={onClose}
         />
       ) : (
@@ -231,6 +235,7 @@ function DetailBody({
   calendarId,
   calendarName,
   onChanged,
+  onCancelled,
   onClose,
 }: {
   layout: DetailLayout;
@@ -239,6 +244,7 @@ function DetailBody({
   calendarId: string;
   calendarName?: string;
   onChanged: () => void;
+  onCancelled?: (appointment: Appointment) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -369,6 +375,7 @@ function DetailBody({
     mutationFn: (reason: string) => appointmentsApi.cancel(calendarId, appointment.id, reason),
     onSuccess: () => {
       afterWrite();
+      onCancelled?.(appointment);
       onClose();
     },
     onError: onWriteError,

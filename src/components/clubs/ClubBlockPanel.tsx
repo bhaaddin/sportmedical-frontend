@@ -28,6 +28,7 @@ import { ClubBlockDialog } from './ClubBlockDialog';
 import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
+import { ExportGate } from '../ui/ExportGate';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText, downloadAthletesCsv, sortAthletes } from './athleteList';
 import type { SortDirection } from './athleteList';
 
@@ -202,15 +203,20 @@ export function ClubBlockPanel({
           <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1 }}>
             <SectionLabel sx={{ mb: 0 }}>{`Sportovci v bloku (${detail.registered})`}</SectionLabel>
             {athletes.length > 0 ? (
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<FileDownloadOutlined sx={{ fontSize: 18 }} />}
-                onClick={() => downloadAthletesCsv(athletes, blockTitle(block))}
-                sx={{ minHeight: 44 }}
-              >
-                Stáhnout seznam
-              </Button>
+              <ExportGate>
+                {(blocked) => (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<FileDownloadOutlined sx={{ fontSize: 18 }} />}
+                    disabled={blocked}
+                    onClick={() => void downloadAthletesCsv(athletes, blockTitle(block))}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Stáhnout seznam
+                  </Button>
+                )}
+              </ExportGate>
             ) : null}
           </Stack>
           {seatRows.length > 1 ? (

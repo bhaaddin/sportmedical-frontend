@@ -105,6 +105,7 @@ const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const ClubOrdersPage = lazy(() => import('./pages/clubs/orders/ClubOrdersPage'));
 const ClubOrderHistoryPage = lazy(() => import('./pages/clubs/orders/ClubOrderHistoryPage'));
+const ClubOrdersHistoryPage = lazy(() => import('./pages/clubs/orders/ClubOrdersHistoryPage'));
 const ClubPlayersPage = lazy(() => import('./pages/clubs/ClubPlayersPage'));
 const ClubStatsPage = lazy(() => import('./pages/clubs/ClubStatsPage'));
 const ClubBillingPage = lazy(() => import('./pages/clubs/ClubBillingPage'));
@@ -471,6 +472,8 @@ export default function StaffApp() {
           <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
           <Route path="/clubs" element={<ClubsPage />} />
           <Route path="/clubs/objednavky" element={<ClubOrdersPage />} />
+          {/* R21: the cancelled orders (3 segments); one order's history below has 4, so `historie` is never read as an order id */}
+          <Route path="/clubs/objednavky/historie" element={<ClubOrdersHistoryPage />} />
           <Route path="/clubs/objednavky/:orderId/historie" element={<ClubOrderHistoryPage />} />
           {/* R14b: the Rezervace page is gone; an old bookmark lands on the orders (it must not fall through to /clubs/:clubId) */}
           <Route path="/clubs/rezervace" element={<Navigate to="/clubs/objednavky" replace />} />

@@ -13,6 +13,7 @@ import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
 import { FitBody, FitPage } from '../../components/ui/fit';
 import { downloadCsv } from '../statistics/csv';
+import { ExportGate } from '../../components/ui/ExportGate';
 import { formatSlotTime } from './clubOrders';
 import { ClubDot, LoadError, SelectFilter } from './subpages/common';
 import { collectPlayers, filterPlayers, playersToCsv, telHref, type PlayerRow } from './subpages/players';
@@ -89,9 +90,13 @@ export default function ClubPlayersPage() {
         title="Hráči klubů"
         subtitle={`Zaregistrovaní přes odkazy klubů · ${rows.length}`}
         actions={
-          <Button variant="outlined" disabled={rows.length === 0} onClick={() => downloadCsv('hraci-klubu.csv', `﻿${playersToCsv(rows)}`)}>
-            Stáhnout seznam
-          </Button>
+          <ExportGate>
+            {(blocked) => (
+              <Button variant="outlined" disabled={blocked || rows.length === 0} onClick={() => void downloadCsv('hraci-klubu.csv', playersToCsv(rows), 'players-csv')}>
+                Stáhnout seznam
+              </Button>
+            )}
+          </ExportGate>
         }
         mb={2}
       />

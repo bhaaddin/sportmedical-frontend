@@ -17,6 +17,7 @@ import { useIsPhone } from '../../layout/useDevice';
 import { csvFileName, formatCzk, toCsv } from './aggregate';
 import type { CsvCell, Period } from './aggregate';
 import { downloadCsv } from './csv';
+import { ExportGate } from '../../components/ui/ExportGate';
 
 export const CHART_HEIGHT = 260;
 
@@ -94,15 +95,19 @@ export function ChartCard({ def, period }: { def: ChartDef; period: Period }) {
             <ToggleButton value="chart" sx={{ px: 1.5, py: 0.25, fontSize: 12, ...target }}>Graf</ToggleButton>
             <ToggleButton value="table" sx={{ px: 1.5, py: 0.25, fontSize: 12, ...target }}>Tabulka</ToggleButton>
           </ToggleButtonGroup>
-          <Button
-            size="small"
-            variant="outlined"
-            sx={target}
-            disabled={!isExportable(def)}
-            onClick={() => downloadCsv(csvFileName(title, period), toCsv(columns, rows))}
-          >
-            Export CSV
-          </Button>
+          <ExportGate>
+            {(blocked) => (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={target}
+                disabled={blocked || !isExportable(def)}
+                onClick={() => void downloadCsv(csvFileName(title, period), toCsv(columns, rows))}
+              >
+                Export CSV
+              </Button>
+            )}
+          </ExportGate>
         </Stack>
       </Stack>
 

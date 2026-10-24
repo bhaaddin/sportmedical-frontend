@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import client from './client';
+import { download, fileNameFromDisposition } from '../utils/download';
 
 /*
  * Diagnostic sessions (contract C-M, Etapa 3).
@@ -186,17 +187,20 @@ export const diagnosticsApi = {
     return Array.isArray(list) ? list.map(readSession) : [];
   },
 
-  downloadPdf: async (sessionId: string): Promise<void> => {
-    const res = await client.get(`/api/pdf/diagnostic-session/${sessionId}`, {
-      responseType: 'blob',
-    });
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `diagnosticka-zprava_${sessionId.slice(0, 8)}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  },
+  /**
+   * The session's PDF report, saved through the one download helper (allowed by `exports.download`, audited by the
+   * server, the PDF kept byte for byte). A failure is already shown; resolves with whether it was saved.
+   */
+  downloadPdf: (sessionId: string): Promise<boolean> =>
+    download(
+      { kind: 'diagnostic-pdf', fileName: `diagnosticka-zprava_${sessionId.slice(0, 8)}.pdf`, failureMessage: 'Zprávu se nepodařilo otevřít' },
+      {
+        kind: 'fetch',
+        fetch: async () => {
+          const res = await client.get(`/api/pdf/diagnostic-session/${sessionId}`, { responseType: 'blob' });
+          const fileName = fileNameFromDisposition(res.headers?.['content-disposition'] as string | undefined);
+          return fileName === null ? (res.data as Blob) : { blob: res.data as Blob, fileName };
+        },
+      },
+    ),
 };

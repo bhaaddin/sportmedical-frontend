@@ -11,8 +11,9 @@
  * NOTHING is e-mailed from here: there is no sending - the desk copies the link / the text and sends it. The
  * numbers are the order's own counter (plan/orderFigures.ts).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePlannerData } from '../../../data/PlannerDataProvider';
+import { PLANNER_TEXT } from '../../../text';
 import { usePlannerCommands } from '../../../data/usePlannerCommands';
 import { dateOf, printable, timeLeft } from '../../../model';
 import { usePlannerActions, usePlannerSelector } from '../../../state/PlannerStoreProvider';
@@ -24,11 +25,13 @@ import { usePlanFigures } from '../../plan/usePlanFigures';
 import { writeMessage } from '../../plan/usePlanCommit';
 import { absoluteLink, usePublicSiteBase } from '../../../../components/clubs/orders/absoluteLink';
 import { CopyButton } from '../../../../components/clubs/orders/CopyButton';
+import { publishSteps } from '../../../guide/advice';
+import '../../../guide/guide.base.css';
 import { createFlowStore, useFlow } from './flowStore';
 import { useCopy } from './shared';
 
 /** The link generated in this session (survives going to a preview and back). */
-const published = createFlowStore<{ url: string | null; generated: boolean; busy: boolean; owner: object | null }>({ url: null, generated: false, busy: false, owner: null });
+const published = createFlowStore<{ url: string | null; generated: boolean; busy: boolean; owner: object | null; previewed: boolean; copied: boolean }>({ url: null, generated: false, busy: false, owner: null, previewed: false, copied: false });
 
 export const LINK_PLACEHOLDER = '[ODKAZ ZATÍM NEBYL VYGENEROVÁN - nejdřív ho vygenerujte v „Připravit formulář“]';
 
@@ -41,10 +44,10 @@ export function emailText(figures: Pick<OrderFigures, 'requested' | 'planned'>, 
 }
 
 /** What was generated in THIS planner (a store left over from another source instance counts for nothing). */
-function usePublished(): { url: string | null; generated: boolean; busy: boolean } {
+function usePublished(): { url: string | null; generated: boolean; busy: boolean; previewed: boolean; copied: boolean } {
   const { source } = usePlannerData();
   const state = useFlow(published);
-  return state.owner === source ? state : { url: null, generated: false, busy: false };
+  return state.owner === source ? state : { url: null, generated: false, busy: false, previewed: false, copied: false };
 }
 
 /**
@@ -107,11 +110,12 @@ function PublishSide({ profileEmail, generated, link, figures }: { profileEmail:
   const [error, setError] = useState<string | null>(null);
 
   const generate = async () => {
-    published.set({ busy: true, owner: source });
+    /* A new link: the preview and the copy of the old one count for nothing. */
+    published.set({ busy: true, owner: source, previewed: false, copied: false });
     setError(null);
     try {
       const result = await commands.publishForm();
-      published.set({ url: result.url ?? (published.get().owner === source ? published.get().url : null), generated: result.generated, busy: false, owner: source });
+      published.set({ url: result.url ?? (published.get().owner === source ? published.get().url : null), generated: result.generated, busy: false, owner: source, previewed: false, copied: false });
       act.setFormGenerated(result.generated);
       act.toast(result.url ? 'Odkaz pro klub je připravený.' : 'Odkaz zatím nevzniká: tento zdroj dat jen ukazuje náhled. Nic nebylo odesláno.');
     } catch (e) {
@@ -120,29 +124,56 @@ function PublishSide({ profileEmail, generated, link, figures }: { profileEmail:
     }
   };
   const mail = emailText(figures, profile.clubName, catalogue?.clinicName ?? '', link);
+  const progress = publishSteps({ generated: link !== null, previewed: state.previewed, copied: state.copied });
+  const [one, two, three] = progress.steps;
+  const markCopied = (ok: boolean) => { if (ok) published.set({ copied: true, owner: source }); };
+  const copyThen = async (text: string, done: string, blocked?: string) => { markCopied(await copy(text, done, blocked)); };
 
   return (
     <section className="pub-card">
       <div className="pub-kicker">02 / VYGENEROVÁNÍ A PUBLIKACE</div>
       <div className="pub-side-heading">Klubový přihlašovací formulář</div>
-      <div className="pub-side-desc">Po publikaci získá klub stabilní soukromý odkaz. Sportovci se přihlašují na konkrétní sloty. Pozdější změny termínů se projeví ve stejném odkazu.</div>
+      <ol className="pub-steps" aria-label={PLANNER_TEXT.guide.steps.title} data-testid="publish-steps">
+        {progress.steps.map((st) => (
+          <li key={st.n} className={`pub-step is-${st.state}`} data-step={st.n} data-state={st.state} aria-current={st.state === 'current' ? 'step' : undefined}>
+            <span className="pub-step-n" aria-hidden="true">{st.state === 'done' ? '✓' : st.n}</span>
+            <span className="pub-step-title">{st.title}</span>
+            <span className="pub-step-state">{PLANNER_TEXT.guide.steps.state[st.state]}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="pub-say" data-testid="publish-say" role="status">{progress.say}</p>
       <div className="pub-link-row">
         <div className="pub-link" id="adaptive-link-label" data-testid="publish-link" data-url={link ?? ''}>
           {link ?? (generated ? 'ODKAZ ZATÍM NEVZNIKÁ · ukázkový zdroj dat' : 'Odkaz zatím nevygenerován')}
         </div>
-        <CopyButton text={link ?? ''} ariaLabel="Zkopírovat odkaz pro klub" testId="publish-link-copy" />
+        <CopyButton text={link ?? ''} ariaLabel="Zkopírovat odkaz pro klub" testId="publish-link-copy" onCopied={markCopied} />
       </div>
-      <div className="pub-actions">
-        <button type="button" id="pub-see-form" onClick={() => act.openDialog({ kind: 'formPreview' })}>Náhled formuláře</button>
-        <button type="button" id="pub-see-email" onClick={() => act.openDialog({ kind: 'emailPreview' })}>Náhled e-mailu</button>
-        <button type="button" className="primary" id="pub-generate" disabled={state.busy} onClick={() => void generate()}>
-          {generated ? 'Obnovit odkaz' : 'Vygenerovat odkaz'}
-        </button>
+      <div className="pub-actions pub-steps-actions">
+        <div className="pub-step-action">
+          <button type="button" className={`${one.state === 'current' ? 'primary ' : ''}pub-go`} id="pub-generate" disabled={state.busy} onClick={() => void generate()}>
+            <b aria-hidden="true">1</b> {generated ? 'Obnovit odkaz' : 'Vygenerovat odkaz'}
+          </button>
+        </div>
+        <div className="pub-step-action">
+          <button type="button" className={`${two.state === 'current' ? 'primary ' : ''}pub-go`} id="pub-see-email" disabled={two.state === 'locked'} aria-describedby={two.reason ? 'pub-why-2' : undefined} onClick={() => act.openDialog({ kind: 'emailPreview' })}>
+            <b aria-hidden="true">2</b> Náhled e-mailu
+          </button>
+          {two.reason ? <small id="pub-why-2" className="pub-why" data-testid="publish-why-2">{two.reason}</small> : null}
+        </div>
       </div>
       <div className="pub-side-desc" style={{ marginTop: 11 }}>Příjemce: <b>{profileEmail || 'e-mail kontaktu nebyl vyplněn'}</b></div>
-      <div className="pub-actions">
-        <button type="button" id="pub-copy" disabled={link === null} onClick={() => link && void copy(link, 'Odkaz zkopírován.')}>Kopírovat odkaz</button>
-        <button type="button" id="pub-copy-email" onClick={() => void copy(`${mail.subject}\n\n${mail.body}`, link ? 'Text e-mailu zkopírován.' : 'Text e-mailu zkopírován - odkaz v něm zatím chybí.', 'Nepodařilo se zkopírovat; označte text ručně.')}>Kopírovat text e-mailu</button>
+      <div className="pub-actions pub-steps-actions">
+        <div className="pub-step-action">
+          <button type="button" className={`${three.state === 'current' ? 'primary ' : ''}pub-go`} id="pub-copy" disabled={three.state === 'locked' || link === null} aria-describedby={three.reason ? 'pub-why-3' : undefined} onClick={() => link && void copyThen(link, 'Odkaz zkopírován.')}>
+            <b aria-hidden="true">3</b> Kopírovat odkaz
+          </button>
+          <button type="button" id="pub-copy-email" disabled={three.state === 'locked'} aria-describedby={three.reason ? 'pub-why-3' : undefined} onClick={() => void copyThen(`${mail.subject}\n\n${mail.body}`, link ? 'Text e-mailu zkopírován.' : 'Text e-mailu zkopírován - odkaz v něm zatím chybí.', 'Nepodařilo se zkopírovat; označte text ručně.')}>Kopírovat text e-mailu</button>
+          {three.reason ? <small id="pub-why-3" className="pub-why" data-testid="publish-why-3">{three.reason}</small> : null}
+        </div>
+      </div>
+      <div className="pub-actions pub-extras">
+        <button type="button" id="pub-see-form" onClick={() => act.openDialog({ kind: 'formPreview' })}>Náhled formuláře</button>
         <button type="button" id="pub-edit-contact" onClick={() => act.openDialog({ kind: 'clubEdit' })}>Upravit kontakt</button>
       </div>
       {error ? <p className="plan-dialog-error" role="alert">{error}</p> : null}
@@ -204,6 +235,10 @@ function EmailPreviewBody() {
   const link = useLink();
   const copy = useCopy();
   const mail = emailText(base, profile.clubName, catalogue?.clinicName ?? '', link);
+  const { source } = usePlannerData();
+  const hasLink = link !== null;
+  /* Looking at the e-mail WITH its link is step 2 of the publication. */
+  useEffect(() => { if (hasLink) published.set({ previewed: true, owner: source }); }, [hasLink, source]);
   return (
     <>
       <div className="pub-kicker">PŘED PŘÍPADNÝM ODESLÁNÍM</div>

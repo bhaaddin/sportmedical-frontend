@@ -192,20 +192,17 @@ describe('publish · the real invitation, the e-mail draft on the clipboard, not
     expect(screen.getByTestId('publish-link')).toHaveTextContent('Odkaz zatím nevygenerován');
     expect(within(dialog).getByRole('button', { name: 'Kopírovat odkaz' })).toBeDisabled();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Kopírovat text e-mailu' }));
-    await waitFor(() => expect(clipboard.writeText).toHaveBeenCalledTimes(1));
-    const draft = clipboard.writeText.mock.calls[0]![0];
-    expect(draft).toContain('Klinika Test · Termíny vyšetření pro SK Dukla');
-    expect(draft).toContain('Počet požadovaných osob: 70');
-    expect(draft).toContain('Aktuálně naplánováno: 5');
-    expect(draft).toContain('[ODKAZ ZATÍM NEBYL VYGENEROVÁN');
+    // the later steps wait for the earlier ones, and each says why
+    expect(within(dialog).getByRole('button', { name: 'Náhled e-mailu' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Kopírovat text e-mailu' })).toBeDisabled();
+    expect(screen.getByTestId('publish-why-2')).toHaveTextContent('Nejdřív vygenerujte odkaz');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vygenerovat odkaz' }));
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByTestId('publish-link')).toHaveTextContent('https://klub.test/objednavka/abc'));
     expect(within(dialog).getByRole('button', { name: 'Obnovit odkaz' })).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Kopírovat odkaz' }));
-    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith('https://klub.test/objednavka/abc'));
+    expect(within(dialog).getByRole('button', { name: 'Kopírovat odkaz' })).toBeDisabled();
+    expect(screen.getByTestId('publish-why-3')).toHaveTextContent('Nejdřív si prohlédněte e-mail');
 
     // the e-mail preview now carries the link
     fireEvent.click(within(dialog).getByRole('button', { name: 'Náhled e-mailu' }));
@@ -213,8 +210,18 @@ describe('publish · the real invitation, the e-mail draft on the clipboard, not
     expect(mail).toHaveTextContent('https://klub.test/objednavka/abc');
     fireEvent.click(screen.getByRole('button', { name: 'Kopírovat text e-mailu' }));
     await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining('https://klub.test/objednavka/abc')));
-    // the form preview lists the club's terms of the order
+    const draft = clipboard.writeText.mock.calls[0]![0];
+    expect(draft).toContain('připravili jsme pro SK Dukla termíny sportovních vyšetření');
+    expect(draft).toContain('Počet požadovaných osob: 70');
+    expect(draft).toContain('Aktuálně naplánováno: 5');
+
+    // back in the dialog the third step is open
     fireEvent.click(screen.getByRole('button', { name: /Zpět k publikaci/ }));
+    const again = await screen.findByTestId('planner-dialog');
+    await waitFor(() => expect(within(again).getByRole('button', { name: 'Kopírovat odkaz' })).toBeEnabled());
+    fireEvent.click(within(again).getByRole('button', { name: 'Kopírovat odkaz' }));
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith('https://klub.test/objednavka/abc'));
+    // the form preview lists the club's terms of the order
     fireEvent.click(await screen.findByRole('button', { name: 'Náhled formuláře' }));
     expect(await screen.findAllByRole('button', { name: 'Vybrat termín' })).toHaveLength(2);
     expect(screen.getByText(/Na klubovou objednávku|Vyberte si požadované vyšetření/)).toBeInTheDocument();
@@ -235,15 +242,18 @@ describe('publish · the real invitation, the e-mail draft on the clipboard, not
     fireEvent.click(beside);
     await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(full));
     await waitFor(() => expect(beside).toHaveTextContent('Zkopírováno'));
-    // "Kopírovat odkaz" copies the same full address
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Kopírovat odkaz' }));
-    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(full));
     // the e-mail preview holds the full link, and so does the copied text
     fireEvent.click(within(dialog).getByRole('button', { name: 'Náhled e-mailu' }));
     expect(await screen.findByTestId('email-draft')).toHaveTextContent(full);
     expect(screen.getByTestId('email-link')).toHaveTextContent(full);
     fireEvent.click(screen.getByRole('button', { name: 'Kopírovat text e-mailu' }));
     await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining(full)));
+    // "Kopírovat odkaz" (step 3, open after the preview) copies the same full address
+    fireEvent.click(screen.getByRole('button', { name: /Zpět k publikaci/ }));
+    const again = await screen.findByTestId('planner-dialog');
+    await waitFor(() => expect(within(again).getByRole('button', { name: 'Kopírovat odkaz' })).toBeEnabled());
+    fireEvent.click(within(again).getByRole('button', { name: 'Kopírovat odkaz' }));
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(full));
   });
 
   it('a failed link says why and keeps the dialog', async () => {

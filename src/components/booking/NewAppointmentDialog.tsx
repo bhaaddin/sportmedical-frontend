@@ -51,6 +51,12 @@ import { BubbleFrame } from "./NewAppointmentDialog.bubble";
 import type { BubbleAnchor } from "./NewAppointmentDialog.bubble.logic";
 import { AgreedPriceField, noteWithPriceReason } from "./price/AgreedPriceField";
 import { priceView } from "./price/agreedPrice";
+import { freeNeedsReason } from "./extras/priceRules";
+import { OFF, readConfirmChannel, saveConfirmChannel, storedUserId } from "./extras/confirmChannel";
+import { NEAREST_TEXT, nearestFreeFor } from "./extras/nearestFreeSearch";
+/* R15c: the extras of the booking flow load only when the dialog shows them */
+const DiscountPresets = lazy(() => import("./extras/DiscountPresetChips").then((m) => ({ default: m.DiscountPresets })));
+const SameDayNotice = lazy(() => import("./extras/SameDayNotice").then((m) => ({ default: m.SameDayNotice })));
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import { QuickPatientForm } from "./patient/QuickPatientForm";
@@ -399,7 +405,14 @@ export function NewAppointmentDialog({
   const [activityId, setActivityId] = useState("");
   const [note, setNote] = useState("");
   const [sendSms, setSendSms] = useState(false);
-  const [sendLink, setSendLink] = useState(false);
+  /* R15c (g): the desk's confirmation choice is remembered per user in this browser; off until it was ever chosen */
+  const userId = useMemo(() => storedUserId(), []);
+  const rememberedChannel = () => (userId === null ? OFF : readConfirmChannel(userId));
+  const [sendLink, setSendLink] = useState(() => rememberedChannel().email);
+  const chooseSendLink = (on: boolean) => {
+    setSendLink(on);
+    saveConfirmChannel(userId, { sms: false, email: on });
+  };
 
   /* 6.4: a time outside the offer, and never without a reason. */
   const [overriding, setOverriding] = useState(false);
@@ -704,7 +717,7 @@ export function NewAppointmentDialog({
       /* The link is asked for after the booking, so the e-mail can name the
          appointment. A link that fails must not unbook anybody: it is retried
          from the booked screen instead. */
-      if (sendLink && view.patientId) {
+      if (sendLink && mayRegister && view.patientId) {
         try {
           view.link = await issueLink(view.patientId);
         } catch {
@@ -823,6 +836,11 @@ export function NewAppointmentDialog({
         disabled={booking}
         reason={priceReason}
         onReasonChange={mode === "quick" ? undefined : setPriceReason}
+        extras={
+          <Suspense fallback={null}>
+            <DiscountPresets listPriceCzk={listPriceCzk} typed={priceTyped} onPick={setPriceTyped} reason={priceReason} allowFree={mode !== "quick"} disabled={booking} />
+          </Suspense>
+        }
       />
     ) : null;
   const serviceField = serviceGate ? (
@@ -944,7 +962,7 @@ export function NewAppointmentDialog({
     setServiceSwitchNote(null);
     setNote("");
     setSendSms(false);
-    setSendLink(false);
+    setSendLink(rememberedChannel().email);
     setOverriding(false);
     setOverrideReason("");
     setConflict(null);
@@ -962,7 +980,7 @@ export function NewAppointmentDialog({
     setMode(next);
     setPatient(null);
     setEventName("");
-    setSendLink(false);
+    setSendLink(rememberedChannel().email);
     setConflict(null);
     setQuickRefusal(null);
   };
@@ -997,6 +1015,33 @@ export function NewAppointmentDialog({
     setChangeAnchor(null);
     if (!isDateOnly(date)) return;
     moveTo({ date: addDaysToDateOnly(date, days) });
+  };
+
+  /*
+   * R15c (b): "Nejbližší volný termín" of ONE činnost: the server's own availability for that činnost on the chosen calendar,
+   * from now; the činnost is chosen and the slot moves to its first free start. Nothing is booked.
+   */
+  const [nearestBusy, setNearestBusy] = useState<string | null>(null);
+  const [nearestNote, setNearestNote] = useState<string | null>(null);
+  const findNearestForActivity = async (id: string) => {
+    if (effectiveCalendarId === "" || id === "") return;
+    setNearestBusy(id);
+    setNearestNote(null);
+    try {
+      const found = await nearestFreeFor(effectiveCalendarId, id);
+      if (!found) {
+        setNearestNote(NEAREST_TEXT.none);
+        return;
+      }
+      if (mode === "quick") setQuick((q) => ({ ...q, activityId: id }));
+      else setActivityId(id);
+      moveTo({ date: found.date, time: found.time, end: null });
+      setNearestNote(NEAREST_TEXT.found(formatDateOnly(found.date), found.time));
+    } catch {
+      setNearestNote(NEAREST_TEXT.failed);
+    } finally {
+      setNearestBusy(null);
+    }
   };
 
   const findNextFree = async () => {
@@ -1047,7 +1092,7 @@ export function NewAppointmentDialog({
   };
 
   /* A typed price that is not an amount books nothing until it is fixed. */
-  const ready = whoReady && activity !== null && startUtc !== null && !booking && !price.invalid;
+  const ready = whoReady && activity !== null && startUtc !== null && !booking && !price.invalid && !freeNeedsReason(price.agreedPriceCzk, priceReason);
   const canBook = ready && availabilityQuery.isSuccess && offered;
   const canBookOverride =
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
@@ -1059,7 +1104,8 @@ export function NewAppointmentDialog({
     activity !== null &&
     startUtc !== null &&
     !booking &&
-    !price.invalid;
+    !price.invalid &&
+    !freeNeedsReason(price.agreedPriceCzk, mode === "quick" ? "-" : priceReason);
   const canBookQuick = quickReady && availabilityQuery.isSuccess && offered;
   const canOverrideQuick =
     quickReady && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
@@ -1529,6 +1575,14 @@ export function NewAppointmentDialog({
         </AsyncSection>
       ) : null;
 
+  /* R15c (c): the patient already has a booking that day - a notice, never a block */
+  const sameDayNotice =
+    patient !== null && isDateOnly(date) && calendars.length > 0 ? (
+      <Suspense fallback={null}>
+        <SameDayNotice patientId={patient.id} date={date} calendarIds={calendars.map((c) => c.id)} />
+      </Suspense>
+    ) : null;
+
   const step1 = (
     <Stack spacing={3}>
       <AsyncSection
@@ -1593,7 +1647,10 @@ export function NewAppointmentDialog({
         <Box component="section" aria-label={TEXT.findPatient}>
           <SectionLabel>{TEXT.findPatient}</SectionLabel>
           {patient ? (
-            <PatientFilled hit={patient} onChange={() => setPatient(null)} />
+            <>
+              <PatientFilled hit={patient} onChange={() => setPatient(null)} />
+              {sameDayNotice ? <Box sx={{ mt: 1 }}>{sameDayNotice}</Box> : null}
+            </>
           ) : (
             <PatientSearch
               enabled={open}
@@ -1706,6 +1763,8 @@ export function NewAppointmentDialog({
     <Stack spacing={3}>
       {whoCard}
 
+      {sameDayNotice}
+
       {serviceField}
 
       <Box component="section">
@@ -1745,11 +1804,28 @@ export function NewAppointmentDialog({
               setConflict(null);
             }}
             disabled={booking}
+            onNearest={effectiveCalendarId === "" ? undefined : (id) => void findNearestForActivity(id)}
+            nearestBusyId={nearestBusy}
           />
         </AsyncSection>
         )}
+        {nearestNote ? (
+          <Typography variant="body2" role="status" data-testid="nearest-note" sx={{ mt: 1, color: "text.secondary" }}>{nearestNote}</Typography>
+        ) : null}
         {/* Etapa 12: right under the chosen činnost - the list price, correctable by hand. */}
         {priceField ? <Box sx={{ mt: 2 }}>{priceField}</Box> : null}
+        {activity !== null && effectiveCalendarId !== "" ? (
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="nearest-free-chosen"
+            disabled={booking || nearestBusy !== null}
+            onClick={() => void findNearestForActivity(activity.id)}
+            sx={{ mt: 1.5, minHeight: 44 }}
+          >
+            {nearestBusy === activity.id ? NEAREST_TEXT.seeking : NEAREST_TEXT.button}
+          </Button>
+        ) : null}
       </Box>
 
       {/* A time the desk chose itself (a click, a drag, a free slot): shown as the slot, not as fields to fill in again. */}
@@ -1879,7 +1955,7 @@ export function NewAppointmentDialog({
             <Checkbox
               disabled={patient === null || !mayRegister}
               checked={sendLink && patient !== null}
-              onChange={(e) => setSendLink(e.target.checked)}
+              onChange={(e) => chooseSendLink(e.target.checked)}
             />
           }
           label={

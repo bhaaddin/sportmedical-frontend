@@ -27,7 +27,8 @@ import { ClubAvatar } from '../../../components/clubs/ClubAvatar';
 import { formatCzk } from '../../../components/clubs/order/orderFormat';
 import { useClubSummary } from '../../../components/clubs/orders/ClubSummaryCard';
 import { LinkCopyRow } from '../../../components/clubs/orders/LinkCopyRow';
-import { clubCalendarPath } from '../../../components/shell/plannerRoutes';
+import { onlyCancelled, withoutCancelled } from '../../../components/clubs/orders/orderLogic';
+import { clubCalendarPath, clubOrdersHistoryPath } from '../../../components/shell/plannerRoutes';
 import { StatusChip } from '../../../components/ui';
 import { useDevice } from '../../../layout/useDevice';
 import { pragueDateKey } from '../../../utils/time';
@@ -81,7 +82,7 @@ export default function ClubOverviewPage() {
   });
 
   /* The list answers carry no history; an order's own answer does. Read the few orders touched last (the key the order panel and the history page share). */
-  const recentIds = useMemo(() => newestOrderIds(ordersQuery.data ?? []), [ordersQuery.data]);
+  const recentIds = useMemo(() => newestOrderIds(withoutCancelled(ordersQuery.data ?? [])), [ordersQuery.data]);
   const detailQueries = useQueries({
     queries: recentIds.map((id) => ({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000, retry: false })),
   });
@@ -141,8 +142,10 @@ export default function ClubOverviewPage() {
     if (mayBill) void invoicesQuery.refetch();
   };
 
-  const orderList = orders === 'failed' ? [] : orders;
-  const metrics = clubMetrics({ clubId, today, orders, blocks, summary, invoices });
+  /* R21: the page lists and counts LIVE orders; the cancelled ones are behind "Historie" (their count is on the link). */
+  const orderList = orders === 'failed' ? [] : withoutCancelled(orders);
+  const cancelledCount = orders === 'failed' ? 0 : onlyCancelled(orders).length;
+  const metrics = clubMetrics({ clubId, today, orders: orders === 'failed' ? orders : orderList, blocks, summary, invoices });
   const cards = orderCards(orderList);
   const terms = nextTerms(blocks === 'failed' ? [] : blocks, orderList, today);
   const detailsLoading = detailQueries.some((q) => q.isLoading);
@@ -153,6 +156,7 @@ export default function ClubOverviewPage() {
   const linkOrder = focus !== null && focus.status !== 'Cancelled' ? focus : null;
   const invoiceable = canBeInvoiced(club);
   const ordersTo = `/clubs/objednavky?clubId=${encodeURIComponent(clubId)}`;
+  const historyTo = clubOrdersHistoryPath(clubId);
   const playersTo = `/clubs/hraci?clubId=${encodeURIComponent(clubId)}`;
   const wide = device === 'desktop';
 
@@ -222,8 +226,9 @@ export default function ClubOverviewPage() {
         error={orders === 'failed' ? 'Objednávky klubu se nepodařilo načíst.' : false}
         onRetry={() => void ordersQuery.refetch()}
         empty={cards.length === 0}
-        emptyState={{ text: 'Klub zatím nemá žádnou objednávku.', action: { label: OVERVIEW_PAGE_TEXT.newOrder, onClick: () => setEntry(true) } }}
+        emptyState={{ text: cancelledCount > 0 ? 'Klub nemá žádnou živou objednávku. Zrušené jsou v Historii.' : 'Klub zatím nemá žádnou objednávku.', action: { label: OVERVIEW_PAGE_TEXT.newOrder, onClick: () => setEntry(true) } }}
         viewAll={{ to: ordersTo, label: 'Všechny objednávky' }}
+        controls={<Button component={RouterLink} to={historyTo} size="small" variant="outlined" data-testid="club-orders-history-link" aria-label={`Historie zrušených objednávek (${cancelledCount})`} sx={TARGET_SX}>{`Historie (${cancelledCount})`}</Button>}
         minCardWidth={288}
         cardHeight={132}
       >

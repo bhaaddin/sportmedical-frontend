@@ -4,6 +4,10 @@
  * than a phone number, and never let a name turn into a formula.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+vi.mock('../../api/exports', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/exports')>();
+  return { ...actual, exportsApi: { policy: vi.fn(), authorize: vi.fn().mockResolvedValue(undefined) } };
+});
 import type { ClubBlockAthlete } from '../../api/clubBlocks';
 import { pragueWallClockToInstant } from '../../utils/time';
 import { athletePrice, athletePriceText, athletesCsvFilename, athletesToCsv, CSV_HEADERS, csvCell, csvTime, downloadAthletesCsv, sortAthletes } from './athleteList';
@@ -114,7 +118,7 @@ describe('the file', () => {
     const createUrl = vi.fn().mockReturnValue('blob:x');
     Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    downloadAthletesCsv([athlete()], 'FK Slaný');
+    expect(await downloadAthletesCsv([athlete()], 'FK Slaný')).toBe(true);
     const blob = createUrl.mock.calls[0][0] as Blob;
     const bytes = new Uint8Array(await blob.arrayBuffer());
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);

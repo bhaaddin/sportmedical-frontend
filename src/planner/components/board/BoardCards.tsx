@@ -23,6 +23,7 @@ import { Icon } from '../Icons';
 import { holdLabel, holdStateOf, seatsLabel } from './clubHold';
 import type { Theme } from '@mui/material/styles';
 import { DESIGN, darkOf } from '../../../theme';
+import { distinctActivities, stripesCss, subTitle } from './clubFrame';
 import { toneVars, withAlpha, type BookingCardModel, type BoardWindowModel, type SessionCardModel } from './boardModel';
 
 const tooltipSlotProps = {
@@ -276,19 +277,40 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
       data-testid={`board-window-${w.block.id}-${w.day}`}
       aria-haspopup="dialog"
       data-hold={hold ?? undefined}
-      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `Blok klubu ${w.label}, ${w.timeLabel}${w.block.orderCode ? `, objednávka ${w.block.orderCode}` : ''}${hold ? `, ${holdLabel(hold)}` : ''}`}
-      title={manual ? undefined : [`Blok klubu · ${w.label}`, w.block.orderCode, w.timeLabel, hold ? holdLabel(hold) : null, seatsLabel(w.block)].filter(Boolean).join(' · ')}
+      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `Blok klubu ${w.label}, ${w.timeLabel}${w.block.orderCode ? `, objednávka ${w.block.orderCode}` : ''}${hold ? `, ${holdLabel(hold)}` : ''}${w.frame.length > 0 ? `, ${w.frame.map(subTitle).join('; ')}` : ''}`}
+      title={manual ? undefined : [`Blok klubu · ${w.label}`, w.block.orderCode, w.timeLabel, hold ? holdLabel(hold) : null, seatsLabel(w.block), ...w.frame.map(subTitle)].filter(Boolean).join(' · ')}
       onClick={(e) => {
         e.stopPropagation();
         onOpen(w, { x: e.clientX, y: e.clientY });
       }}
     >
+      {!manual && w.frame.length > 0 ? (
+        <span className="win-frame" data-testid="club-frame" aria-hidden="true">
+          {w.frame.map((sub) => (
+            <i
+              key={sub.key}
+              className="win-sub"
+              data-testid="club-frame-sub"
+              data-activities={sub.activities.map((a) => a.id).join(',')}
+              title={subTitle(sub)}
+              style={{ top: `${sub.top}px`, height: `${sub.height}px`, backgroundImage: stripesCss(sub.activities.map((a) => a.colour), (c) => withAlpha(c, 0.62)), '--sub-line': sub.activities[0]!.colour } as CSSProperties}
+            />
+          ))}
+        </span>
+      ) : null}
       <span className="board-sticky">
         {!manual ? <Icon name="lock" /> : null}
         <span className="win-label">{w.label}</span>
         {!manual && w.block.orderCode ? <span className="win-code" data-testid="club-window-code">{w.block.orderCode}</span> : null}
         {!manual ? <span className="win-time" data-testid="club-window-time">{w.timeLabel}</span> : null}
         {hold ? <span className="win-hold" data-testid="club-window-hold" data-hold={hold}>{holdLabel(hold)}</span> : null}
+        {!manual && w.frame.length > 0 && w.height >= 64 ? (
+          <span className="win-acts" data-testid="club-window-acts">
+            {distinctActivities(w.frame).slice(0, 3).map((a) => (
+              <small key={a.id} style={{ '--act': a.colour } as CSSProperties}><i aria-hidden="true" />{a.name}</small>
+            ))}
+          </span>
+        ) : null}
       </span>
     </button>
   );

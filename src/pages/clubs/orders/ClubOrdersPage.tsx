@@ -9,6 +9,10 @@
  * itself; a narrower window keeps the detail as a drawer, a phone as a full-screen drawer. When the detail is open and
  * the list pane gets narrow, the table gives way to cards so no column is squeezed.
  *
+ * R21 (stage 7): only LIVE orders are listed here (Invited, Requested, Confirmed, Completed). The cancelled ones live in
+ * the special view behind the "Historie" button at the top right (`/clubs/objednavky/historie`, ClubOrdersHistoryPage);
+ * a deep link `{ openOrderId }` to a cancelled order still opens it here (read-only, its status says why).
+ *
  * Router state (spent once read): { openOrderId } opens that order; { newOrder: {clubId?} | true } opens the chooser.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -19,10 +23,11 @@ import {
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { clubsApi } from '../../../api/clubs';
+import { History } from '@mui/icons-material';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
-import { clubCalendarPath } from '../../../components/shell/plannerRoutes';
+import { clubCalendarPath, clubOrdersHistoryPath } from '../../../components/shell/plannerRoutes';
 import { formatPricedSeats, orderTotalCzk, priceText } from '../../../components/clubs/orders/orderMoney';
 import { FilterChips, PageHeader, SoftCard, StatusChip } from '../../../components/ui';
 import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody, FitPage } from '../../../components/ui/fit';
@@ -30,7 +35,7 @@ import { useElementWidth } from './useElementWidth';
 import { ClubOrderDetailPanel } from '../../../components/clubs/orders/ClubOrderDetailPanel';
 import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { PinnedActions } from '../PinnedActions';
-import { filterOrders, groupChip, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
+import { filterOrders, groupChip, onlyCancelled, withoutCancelled, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
 import type { OrderStatusFilter } from '../../../components/clubs/orders/orderLogic';
 import { hasOrderState, readOrderState } from '../../../components/clubs/orders/orderRouteState';
 
@@ -89,10 +94,12 @@ export default function ClubOrdersPage() {
     placeholderData: keepPreviousData,
   });
 
-  const all = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+  const everything = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+  const all = useMemo(() => withoutCancelled(everything), [everything]);
+  const cancelledCount = useMemo(() => onlyCancelled(everything).length, [everything]);
   const counts = useMemo(() => statusCounts(all), [all]);
   const visible = useMemo(() => filterOrders(all, status, from, to), [all, status, from, to]);
-  const openOrder = openId === null ? undefined : all.find((o) => o.id === openId);
+  const openOrder = openId === null ? undefined : everything.find((o) => o.id === openId);
 
   /* From 1024 px the opened order sits beside the list instead of over it. */
   const wide = useMediaQuery('(min-width: 1024px)');
@@ -105,7 +112,7 @@ export default function ClubOrdersPage() {
 
   const options = [
     { key: 'all' as OrderStatusFilter, label: 'Vše', count: counts.all },
-    ...ORDER_STATUSES.map((s) => ({ key: s as OrderStatusFilter, label: ORDER_STATUS_LABEL[s], count: counts[s] })),
+    ...ORDER_STATUSES.filter((s) => s !== 'Cancelled').map((s) => ({ key: s as OrderStatusFilter, label: ORDER_STATUS_LABEL[s], count: counts[s] })),
   ];
 
   const actions = (
@@ -113,6 +120,20 @@ export default function ClubOrdersPage() {
       <Button variant="contained" onClick={() => setEntryOpen(true)}>Nová objednávka</Button>
     </>
   );
+  /* R21: the one extra button of the header; it carries how many cancelled orders wait behind it. */
+  const historyButton = (
+    <Button
+      variant="outlined"
+      startIcon={<History />}
+      onClick={() => navigate(clubOrdersHistoryPath(clubId))}
+      data-testid="orders-history-button"
+      aria-label={`Historie zrušených objednávek (${cancelledCount})`}
+      sx={{ minHeight: 44, whiteSpace: 'nowrap' }}
+    >
+      {`Historie (${cancelledCount})`}
+    </Button>
+  );
+  const headerActions = phone ? historyButton : <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>{historyButton}{actions}</Stack>;
 
   /* The list's own scroll: tablet and desktop only (a phone's page flows and the region scrolls it). */
   const scrollSx = phone ? {} : { ...FIT_FILL_SX, ...FIT_SCROLL_SX };
@@ -214,13 +235,13 @@ export default function ClubOrdersPage() {
   ) : visible.length === 0 ? (
     <SoftCard sx={{ textAlign: 'center', py: 5 }}>
       <Typography sx={{ fontWeight: 600, mb: 0.5 }}>{all.length === 0 ? 'Zatím tu žádná objednávka není.' : 'Tomuto filtru neodpovídá žádná objednávka.'}</Typography>
-      {all.length === 0 ? <Typography variant="body2" color="text.secondary">Pošlete klubu formulář nebo založte objednávku sami.</Typography> : null}
+      {all.length === 0 ? <Typography variant="body2" color="text.secondary">Pošlete klubu formulář nebo založte objednávku sami.{cancelledCount > 0 ? ' Zrušené objednávky najdete v Historii.' : ''}</Typography> : null}
     </SoftCard>
   ) : asCards ? cards : table;
 
   return (
     <FitPage data-testid="club-orders" data-layout={device} data-columns={columns} data-docked={docked && openId !== null ? 'true' : 'false'}>
-      <PageHeader title="Objednávky klubů" subtitle="Co kluby objednaly, co čeká na zpracování a co je v kalendáři" actions={phone ? undefined : actions} mb={2} />
+      <PageHeader title="Objednávky klubů" subtitle="Co kluby objednaly, co čeká na zpracování a co je v kalendáři" actions={headerActions} mb={2} />
 
       {/* The filters share a row with the status chips when the window is wide enough, and wrap under them when it is not. */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 3, rowGap: 1.5, mb: 2 }}>

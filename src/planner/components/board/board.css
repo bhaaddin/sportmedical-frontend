@@ -748,3 +748,75 @@
   .sm-planner.is-compact .calendar-chip { flex-direction: column; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px; border-radius: 12px; min-width: 44px; }
   .sm-planner.is-compact .calendar-chip > span { max-width: 100%; font-size: 11px; line-height: 1.15; }
 }
+
+/* ---- R16b: a club's day is ONE framed block - a continuous frame in the club's colour, the činnosti inside it ---- */
+.sm-planner .board-window.is-club { border-style: solid; border-width: 2px; border-left-width: 4px; border-color: var(--win-line); border-left-color: inherit; }
+.sm-planner .board-window.is-club[data-hold='expired'] { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
+.sm-planner .board-window .win-frame { position: absolute; inset: 0; pointer-events: none; }
+.sm-planner .board-window .win-sub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-repeat: no-repeat;
+  border-top: 1px solid var(--sub-line);
+  border-bottom: 1px solid var(--sub-line);
+}
+.sm-planner .board-window .board-sticky { position: sticky; z-index: 1; text-shadow: 0 1px 2px rgba(0, 12, 20, 0.85); }
+.sm-planner .board-window .win-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; max-width: 100%; }
+.sm-planner .board-window .win-acts small { display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 650; padding: 1px 5px; border-radius: 99px; background: rgba(0, 20, 33, 0.72); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-planner .board-window .win-acts i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--act); }
+/* R16b: the month tile's club bar is a closed frame; the činnosti inside it are a row of colour segments (words in the title) */
+.sm-planner .month-tile .tile-club.is-held { flex-wrap: wrap; border: 2px solid var(--club, #6e91a5); border-left-width: 3px; }
+.sm-planner .month-tile .tile-club.is-held[data-hold='expired'] { border-style: dashed; border-left-style: solid; }
+.sm-planner .month-tile .tile-club-acts { flex: 1 0 100%; display: flex; gap: 2px; height: 6px; margin: 0; padding: 0; font-style: normal; }
+.sm-planner .month-tile .tile-club-acts i { flex: 1 1 0; min-width: 0; border-radius: 2px; }
+
+/* ---- R15c (e): the keyboard shortcut pop-out ---- */
+.sm-planner .board-shortcuts {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 16;
+  width: min(320px, calc(100% - 28px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid hsl(from #1c6b82 var(--sm-hsl, h s l));
+  background: #052a3c;
+  color: #e7f4ff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+.sm-planner .board-shortcuts-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.sm-planner .board-shortcuts-head .control { min-width: 44px; min-height: 44px; font-size: 20px; }
+.sm-planner .board-shortcuts dl { margin: 0; display: grid; gap: 4px; }
+.sm-planner .board-shortcuts dl > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.sm-planner .board-shortcuts dt { font-weight: 800; font-variant-numeric: tabular-nums; white-space: pre; }
+.sm-planner .board-shortcuts dd { margin: 0; color: #cfe7f1; text-align: right; }
+.sm-planner .board-shortcuts small { display: block; margin-top: 8px; color: #9fc3d6; font-size: 11px; }
+
+/* ---- R15c (d): the undo bar (a move or a cancel can be taken back for 30 s) ---- */
+.sm-planner .board-undo {
+  position: absolute;
+  left: 50%;
+  bottom: 66px;
+  transform: translateX(-50%);
+  z-index: 15;
+  max-width: min(560px, calc(100% - 28px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 12px;
+  border: 1px solid hsl(from #1c6b82 var(--sm-hsl, h s l));
+  background: #052a3c;
+  color: #e7f4ff;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.sm-planner .board-undo[data-tone='error'] { background: #4b1525; border-color: #ec667a; color: #ffd2d7; }
+.sm-planner .board-undo .undo-text { min-width: 0; overflow-wrap: anywhere; }
+.sm-planner .board-undo .undo-left { font-variant-numeric: tabular-nums; opacity: 0.8; font-weight: 500; white-space: nowrap; }
+.sm-planner .board-undo button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 9px; border: 1px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); background: transparent; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); font: inherit; font-weight: 800; cursor: pointer; }
+.sm-planner .board-undo button.undo-dismiss { border-color: transparent; color: inherit; font-size: 18px; }
+.sm-planner .board-undo button:disabled { opacity: 0.55; cursor: progress; }
