@@ -365,16 +365,16 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 18 | `/nastaveni/slevy` | Slevy (196) | SettingsFrame | Slevy (cards), Kdo je používá | clubs, group discounts | A3 | P3 |
 | 19 | `/nastaveni/skupinove-slevy` | Skupinové slevy (330) | SettingsFrame | Stupně (cards), Příklad výpočtu | clubs, orders | A3 | P3 |
 | 20 | `/nastaveni/firma-a-faktury` | Firma a faktury (336) | SettingsFrame | Firma, Číslování faktur (preview), Bankovní účet | invoices | A3 | P3 |
-| 21 | `/clubs` | Přehled klubů (382) | FitPage + SoftCard cards | Čeká na vás (inquiries), Kluby (club cards: seats, next term, owed), Připnuté kluby | club chips + peek, orders, invoices, planner (link, out of scope) | A4 | P1 |
-| 22 | `/clubs/objednavky` | Objednávky klubů (264) | FitPage + list + detail | Poptávky (Requested), Potvrzené, Dokončené (status shelves), detail with RelatedShelf (club, invoice, players) | club, invoice, planner window | A4 | P1 |
-| 23 | `/clubs/rezervace` | Rezervace (172) | ResponsiveDataList | Dnes, Tento týden (windows), Bez obsazení (attention) | club, order, calendar day | A4 | P2 |
-| 24 | `/clubs/hraci` | Hráči (128) | ResponsiveDataList + filters | Hráči (grow table), Chybí termín (attention) | club, order, athlete status | A4 | P2 |
-| 25 | `/clubs/statistiky` | Statistiky klubů (99) | SoftCard | metrics per club, Obsazenost (grid) | club chips | A4 | P3 |
-| 26 | `/clubs/fakturace` | Fakturace klubů (162) | KpiCard + list | K vyfakturování (attention), Faktury klubů | club, invoice, order | A4 | P2 |
+| 21 | `/clubs` | Přehled klubů (382) | FitPage + SoftCard cards | Čeká na vás (inquiries), Kluby (club cards: seats, next term, owed), Připnuté kluby | club chips + peek, orders, invoices, planner (link, out of scope) | A4 | done |
+| 22 | `/clubs/objednavky` | Objednávky klubů (264) | FitPage + list + detail | Poptávky (Requested), Potvrzené, Dokončené (status shelves), detail with RelatedShelf (club, invoice, players) | club, invoice, planner window | A4 | done |
+| 23 | `/clubs/rezervace` | Rezervace (172) | ResponsiveDataList | Dnes, Tento týden (windows), Bez obsazení (attention) | club, order, calendar day | A4 | done |
+| 24 | `/clubs/hraci` | Hráči (128) | ResponsiveDataList + filters | Hráči (grow table), Chybí termín (attention) | club, order, athlete status | A4 | done |
+| 25 | `/clubs/statistiky` | Statistiky klubů (99) | **Done (shelf3 w1)** PageFrame + one shelf | metrics per club, Obsazenost (grid) | club chips | A4 | done |
+| 26 | `/clubs/fakturace` | Fakturace klubů (162) | KpiCard + list | K vyfakturování (attention), Faktury klubů | club, invoice, order | A4 | done |
 | 27 | `/clubs/:clubId/kalendar` | Plánovač klubu | planner stage | **Out** - fixed layout | - | - | out |
 | 27a | `/clubs/:clubId` | Stránka klubu (Stage 5a) | shelf page: Statistiky, Objednávky, Nejbližší termíny, Poslední změny, Hráči, Odkazy | **In** - `pages/clubs/overview`, `docs/stage5a-2026-10.md` | - | - | done |
 | 28 | `/nastaveni/kluby` | Nastavení klubů (302) | SettingsFrame | Výchozí hodnoty, Odkazy a platnost | clubs, orders | A4 | P3 |
-| 29 | `/vyhrazeni` | Vyhrazení partnerů (735) | FitPage + SoftCard | Aktivní vyhrazení (cards), Končí brzy (attention) | partner/club, calendar, orders | A4 | P2 |
+| 29 | `/vyhrazeni` | Vyhrazení partnerů (735) | **Done (shelf3 w1)** PageFrame + shelves | Aktivní vyhrazení (cards), Končí brzy (attention) | partner/club, calendar, orders | A4 | done |
 | 30 | `/intake-review` | Kontrola registrací (509) | **Done (S-2)** | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | done |
 | 31 | `/hodnoceni-pacientu` | Hodnocení pacientů (145) | **Done (S-2)** | metrics (průměr, počet), Nová hodnocení (cards), K vyřízení | patient, appointment | A2 | done |
 | 32 | `/planovani` | Kalendář | planner stage | **Out** - fixed layout | - | - | out |

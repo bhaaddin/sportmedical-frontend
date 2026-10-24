@@ -11,6 +11,8 @@ const issued = (i: Invoice): boolean => i.status === 'Issued' || i.status === 'P
 
 export interface ClubTotals {
   key: string;
+  /** The club's id when the invoices carry it (a link to its page); empty otherwise. */
+  clubId: string;
   clubName: string;
   count: number;
   issuedCzk: number;
@@ -23,7 +25,7 @@ export function clubTotals(invoices: readonly Invoice[]): ClubTotals[] {
   for (const i of invoices) {
     const key = i.clubId ?? i.clubName ?? i.recipientName ?? '';
     const name = i.clubName ?? i.recipientName ?? 'Neznámý klub';
-    const row = map.get(key) ?? { key, clubName: name, count: 0, issuedCzk: 0, paidCzk: 0, unpaidCzk: 0 };
+    const row = map.get(key) ?? { key, clubId: i.clubId ?? '', clubName: name, count: 0, issuedCzk: 0, paidCzk: 0, unpaidCzk: 0 };
     row.count += 1;
     if (issued(i)) {
       row.issuedCzk += i.totalCzk;

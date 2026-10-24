@@ -191,6 +191,7 @@ const PAGE_PATH = {
   'set-2fa': '/nastaveni/zabezpeceni',
   /* Phase 2, S-2 */
   /* Phase 2, S-3 */
+  clubs: '/clubs', 'clubs-orders': '/clubs/objednavky', 'clubs-hraci': '/clubs/hraci', 'clubs-fakturace': '/clubs/fakturace', 'clubs-stats': '/clubs/statistiky', vyhrazeni: '/vyhrazeni',
   billing: '/billing', cashier: '/cashier', export: '/accounting-export', cenik: '/nastaveni/cenik',
   /* Phase 2, S-1 Den na recepci (route table 33-36 and `*`); `termin` opens a real appointment (read only). */
   dnes: '/dnes', sluzby: '/prehled-sluzeb', availability: '/availability', notfound: '/tahle-stranka-neexistuje',

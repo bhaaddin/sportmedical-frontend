@@ -337,11 +337,11 @@ describe('one screen (fitted pages)', () => {
     expect(table.querySelector('thead th')).not.toBeNull();
   });
 
-  it('Fakturace: the clubs and the invoices are two tables that scroll inside their own panels', async () => {
+  it('Fakturace: the invoices table scrolls inside its shelf, the clubs table stays as tall as its rows', async () => {
     mount(<BillingPage />);
     const invoices = await screen.findByRole('table', { name: 'Faktury klubů' });
     expect(scrolls(invoices.parentElement!)).toBe(true);
-    expect(scrolls(screen.getByRole('table', { name: 'Součty podle klubu' }).parentElement!)).toBe(true);
+    expect(screen.getByRole('table', { name: 'Součty podle klubu' })).toBeInTheDocument();
   });
 
   it('Statistiky on a desktop: a grid of panels - clubs, services, činnosti, two charts - and each table scrolls', async () => {

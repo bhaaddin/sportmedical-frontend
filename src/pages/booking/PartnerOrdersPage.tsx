@@ -1,4 +1,4 @@
-import { FitBody, FitPage } from "../../components/ui/fit";
+import { EntityLink, PageFrame, Shelf, TARGET_SX, cardSurface } from "../../ui/shelf";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -27,7 +27,6 @@ import { partnerTypeName } from "../../api/bookingContracts";
 import type { PartnerWindow } from "../../api/bookingContracts";
 import { useDevice } from "../../layout/useDevice";
 import { formatDateOnly, formatPragueDate, pragueDateKey } from "../../utils/time";
-import { AsyncSection } from "../../components/booking/AsyncSection";
 import {
   NewPartnerOrderDialog,
   type PartnerOrderPrefill,
@@ -35,7 +34,7 @@ import {
 import { ReleaseWindowDialog } from "../../components/booking/ReleaseWindowDialog";
 import { ClubScheduleReport } from "../../components/booking/ClubScheduleReport";
 import { errorText } from "../../components/booking/errorText";
-import { PageHeader, SectionLabel, SoftCard, StatusChip } from "../../components/ui";
+import { SectionLabel, SoftCard, StatusChip } from "../../components/ui";
 import { blockRange } from "../../components/clubs/blockLogic";
 import { pragueHHMM } from "../clubs/clubOrders";
 import { PinnedActions } from "../clubs/PinnedActions";
@@ -232,6 +231,21 @@ export default function PartnerOrdersPage() {
   });
 
   const orders = ordersQuery.data ?? [];
+  const activeOrders = orders.filter((o) => !o.isRevoked);
+  const revokedOrders = orders.filter((o) => o.isRevoked);
+  const today = pragueDateKey(new Date());
+
+  /* Windows whose release date is at most two days away and that are still held: what the desk must act on first. */
+  const dueSoon: { order: PartnerOrder; window: PartnerWindow; daysLeft: number }[] = [];
+  for (const order of orders) {
+    if (order.isRevoked) continue;
+    for (const w of order.windows) {
+      if (w.releasedAt || w.releaseDate === null) continue;
+      const daysLeft = Math.round((new Date(`${w.releaseDate}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
+      if (daysLeft <= 2) dueSoon.push({ order, window: w, daysLeft });
+    }
+  }
+  dueSoon.sort((a, b) => a.daysLeft - b.daysLeft || a.window.date.localeCompare(b.window.date));
 
   const calendarPicker = (
     <TextField
@@ -251,27 +265,56 @@ export default function PartnerOrdersPage() {
     </TextField>
   );
 
+  const loadingAny = calendarsQuery.isLoading || (calendars.length > 0 && ordersQuery.isLoading);
+  const failedAny = calendarsQuery.isError ? calendarsQuery.error : ordersQuery.isError ? ordersQuery.error : null;
+  const emptyAll = !loadingAny && failedAny === null && (calendars.length === 0 || orders.length === 0);
+  const retryAll = () => { void calendarsQuery.refetch(); void ordersQuery.refetch(); };
+  const openBlock = (order: PartnerOrder) =>
+    navigate("/clubs", {
+      state: {
+        clubId: order.clubId ?? blockById.get(order.clubBlockId ?? "")?.clubId ?? undefined,
+        clubBlockId: order.clubBlockId ?? undefined,
+      },
+    });
+  const startExtend = (order: PartnerOrder) => {
+    setExtending(order);
+    setNewDeadline("");
+  };
+  const orderCard = (order: PartnerOrder) => (
+    <OrderCard
+      key={order.id}
+      order={order}
+      block={order.clubBlockId !== null ? (blockById.get(order.clubBlockId) ?? null) : null}
+      phone={phone}
+      onOpenBlock={() => openBlock(order)}
+      busy={revoke.isPending}
+      onRelease={(w) => setReleasing({ order, window: w })}
+      onExtend={() => startExtend(order)}
+      onRevoke={() => {
+        revoke.reset();
+        setConfirmRevoke(order);
+      }}
+    />
+  );
+
   return (
-    <FitPage
-      data-testid="partner-orders"
-      data-layout={device}
-      data-columns={columns}
+    <PageFrame
+      fit
+      title="Hromadné objednávky"
+      purpose="Kluby a firmy, kterým je vyhrazen čas. Počty se počítají z termínů, nesčítají se tady."
+      actions={
+        phone ? undefined : (
+          <>
+            {calendarPicker}
+            <Button variant="contained" disabled={chosen === ""} onClick={() => setCreating(true)} sx={TARGET_SX}>
+              Nová hromadná objednávka
+            </Button>
+          </>
+        )
+      }
     >
-      <PageHeader
-        title="Hromadné objednávky"
-        subtitle="Kluby a firmy, kterým je vyhrazen čas. Počty se počítají z termínů, nesčítají se tady."
-        actions={
-          phone ? undefined : (
-            <>
-              {calendarPicker}
-              <Button variant="contained" disabled={chosen === ""} onClick={() => setCreating(true)}>
-                Nová hromadná objednávka
-              </Button>
-            </>
-          )
-        }
-      />
-      {phone ? <Box sx={{ mb: 2 }}>{calendarPicker}</Box> : null}
+      <Box data-testid="partner-orders" data-layout={device} data-columns={columns} sx={{ display: "contents" }}>
+      {phone ? <Box>{calendarPicker}</Box> : null}
 
       {/*
         When this call fails the banner simply does not appear, and an absent
@@ -281,12 +324,12 @@ export default function PartnerOrdersPage() {
       {noticesQuery.isError ? (
         <Alert
           severity="warning"
-          sx={{ mb: 2 }}
           action={
             <Button
               color="inherit"
               size="small"
               onClick={() => void noticesQuery.refetch()}
+              sx={TARGET_SX}
             >
               {t("booking.common.retry")}
             </Button>
@@ -298,7 +341,7 @@ export default function PartnerOrdersPage() {
 
       {/* What falls due today. 4.7: this says what to send, it does not send. */}
       {(noticesQuery.data ?? []).length > 0 ? (
-        <Alert severity="info" sx={{ mb: 2, alignItems: "flex-start" }}>
+        <Alert severity="info" sx={{ alignItems: "flex-start" }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
             {t("booking.partner.dueToday")}
           </Typography>
@@ -315,68 +358,9 @@ export default function PartnerOrdersPage() {
         </Alert>
       ) : null}
 
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess || calendarsQuery.isError}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.grid.noCalendars")}
-        onRetry={() => void calendarsQuery.refetch()}
-        skeletonRows={3}
-      >
-        <AsyncSection
-          isLoading={ordersQuery.isLoading}
-          isSettled={ordersQuery.isSuccess || ordersQuery.isError}
-          error={ordersQuery.error}
-          isEmpty={orders.length === 0}
-          emptyText="Zatím žádná hromadná objednávka. Objednávka drží čas pro klub nebo firmu, dokud si ho nezaplní."
-          emptyAction={{
-            label: "Nová hromadná objednávka",
-            onClick: () => setCreating(true),
-          }}
-          onRetry={() => void ordersQuery.refetch()}
-          skeletonRows={4}
-        >
-          <FitBody scroll sx={{ gap: 2 }}>
-            <Box
-              role="list"
-              aria-label="Hromadné objednávky"
-              sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 400px), 1fr))", gap: 2, alignItems: "start" }}
-            >
-            {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                block={order.clubBlockId !== null ? (blockById.get(order.clubBlockId) ?? null) : null}
-                phone={phone}
-                onOpenBlock={() =>
-                  navigate("/clubs", {
-                    state: {
-                      clubId: order.clubId ?? blockById.get(order.clubBlockId ?? "")?.clubId ?? undefined,
-                      clubBlockId: order.clubBlockId ?? undefined,
-                    },
-                  })
-                }
-                busy={revoke.isPending}
-                onRelease={(w) => setReleasing({ order, window: w })}
-                onExtend={() => {
-                  setExtending(order);
-                  setNewDeadline("");
-                }}
-                onRevoke={() => {
-                  revoke.reset();
-                  setConfirmRevoke(order);
-                }}
-              />
-            ))}
-            </Box>
-          </FitBody>
-        </AsyncSection>
-      </AsyncSection>
-
       {/* Extending the deadline: 4.7 puts it on the order, not on one window. */}
       {extending ? (
-        <SoftCard tone="soft" sx={{ p: 2, mt: 2 }}>
+        <SoftCard tone="soft" sx={{ p: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             {t("booking.partner.extendTitle", { partner: extending.partnerName })}
           </Typography>
@@ -395,32 +379,90 @@ export default function PartnerOrdersPage() {
               label={t("booking.partner.newDeadline")}
               value={newDeadline}
               onChange={(e) => setNewDeadline(e.target.value)}
-              error={newDeadline !== "" && newDeadline < pragueDateKey(new Date())}
+              error={newDeadline !== "" && newDeadline < today}
               helperText={
-                newDeadline !== "" && newDeadline < pragueDateKey(new Date())
+                newDeadline !== "" && newDeadline < today
                   ? "Lhůta nemůže být v minulosti."
                   : undefined
               }
               slotProps={{
                 inputLabel: { shrink: true },
-                htmlInput: { min: pragueDateKey(new Date()) },
+                htmlInput: { min: today },
               }}
             />
             <Button
               variant="contained"
-              disabled={newDeadline === "" || newDeadline < pragueDateKey(new Date()) || extendDeadline.isPending}
+              sx={TARGET_SX}
+              disabled={newDeadline === "" || newDeadline < today || extendDeadline.isPending}
               onClick={() =>
                 extendDeadline.mutate({ order: extending, date: newDeadline })
               }
             >
               {t("booking.common.save")}
             </Button>
-            <Button variant="outlined" onClick={() => setExtending(null)}>
+            <Button variant="outlined" sx={TARGET_SX} onClick={() => setExtending(null)}>
               {t("booking.common.cancel")}
             </Button>
           </Stack>
         </SoftCard>
       ) : null}
+
+      {dueSoon.length > 0 && failedAny === null ? (
+        <Shelf id="partner-due-soon" title="Končí brzy" hint="Lhůta pro uvolnění je za nejvýše dva dny" count={dueSoon.length} countTone="beige" layout="row" fill minCardWidth={300} stagger={false}>
+          {dueSoon.map(({ order, window: w, daysLeft }) => (
+            <Box key={w.id} role="listitem" data-card="due-soon" sx={(th) => ({ ...cardSurface(th, false), p: 1.5, display: "flex", flexDirection: "column", gap: 0.75 })}>
+              <Typography component="div" sx={{ fontWeight: 700 }}>
+                {order.clubId ? <Box component="span" sx={{ display: "inline-flex", alignItems: "center", minHeight: 32 }}><EntityLink entity={{ kind: "club", id: order.clubId, label: order.partnerName }} /></Box> : order.partnerName}
+              </Typography>
+              <Typography variant="body2">
+                {formatDateOnly(w.date)} · {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "warning.main", fontWeight: 700 }}>
+                {t("booking.partner.deadline", { when: formatDateOnly(w.releaseDate ?? w.date) })} ⚠ {daysLeft < 0 ? "po lhůtě" : t("booking.partner.inDays", { count: daysLeft })}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, pt: 0.5 }}>
+                <Button size="small" variant="outlined" sx={TARGET_SX} onClick={() => setReleasing({ order, window: w })}>
+                  {t("booking.partner.release")}
+                </Button>
+                <Button size="small" variant="outlined" sx={TARGET_SX} onClick={() => startExtend(order)}>
+                  {t("booking.partner.extend")}
+                </Button>
+              </Stack>
+            </Box>
+          ))}
+        </Shelf>
+      ) : null}
+
+      <Shelf
+        id="partner-active"
+        title="Aktivní vyhrazení"
+        count={loadingAny || failedAny !== null || emptyAll ? undefined : activeOrders.length}
+        layout="grid"
+        minCardWidth={400}
+        stagger={false}
+        loading={loadingAny}
+        error={failedAny !== null ? errorText(failedAny, t) : false}
+        onRetry={retryAll}
+        empty={emptyAll}
+        emptyState={
+          calendars.length === 0
+            ? { text: t("booking.grid.noCalendars") }
+            : {
+                text: "Zatím žádná hromadná objednávka. Objednávka drží čas pro klub nebo firmu, dokud si ho nezaplní.",
+                action: { label: "Nová hromadná objednávka", onClick: () => setCreating(true) },
+              }
+        }
+      >
+        {activeOrders.map(orderCard)}
+      </Shelf>
+
+      {/* A revoked link stays in the list, marked as such: it says more than disappearing would. */}
+      {revokedOrders.length > 0 && failedAny === null && !loadingAny ? (
+        <Shelf id="partner-revoked" title="Zrušené odkazy" count={revokedOrders.length} layout="grid" minCardWidth={400} stagger={false}>
+          {revokedOrders.map(orderCard)}
+        </Shelf>
+      ) : null}
+      </Box>
 
       <PinnedActions>
         <Button variant="contained" disabled={chosen === ""} onClick={() => setCreating(true)}>
@@ -478,7 +520,7 @@ export default function PartnerOrdersPage() {
           onReleased={reload}
         />
       ) : null}
-    </FitPage>
+    </PageFrame>
   );
 }
 
@@ -517,7 +559,7 @@ function OrderCard({
         sx={{ alignItems: "center", flexWrap: "wrap", gap: 1, mb: 0.5 }}
       >
         <Typography component="h2" sx={{ fontSize: 17, fontWeight: 700 }}>
-          {order.partnerName}
+          {order.clubId ? <Box component="span" sx={{ display: "inline-flex", alignItems: "center", minHeight: 32 }}><EntityLink entity={{ kind: "club", id: order.clubId, label: order.partnerName }} /></Box> : order.partnerName}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {/* An unknown type is shown as unknown, not guessed at. */}

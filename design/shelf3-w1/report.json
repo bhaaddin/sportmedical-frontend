@@ -1,0 +1,106 @@
+{
+  "base": "http://localhost:3111",
+  "at": "2026-10-24T15:37:13.602Z",
+  "pages": {
+    "1440x900 clubs-fakturace": {
+      "regionScroll": 130,
+      "shelves": [
+        {
+          "id": "billing-figures",
+          "state": "ready",
+          "heading": "Souhrn"
+        },
+        {
+          "id": "awaiting-invoice",
+          "state": "ready",
+          "heading": "K vyfakturování"
+        },
+        {
+          "id": "billing-clubs",
+          "state": "ready",
+          "heading": "Podle klubu"
+        },
+        {
+          "id": "billing-invoices",
+          "state": "ready",
+          "heading": "Faktury"
+        }
+      ]
+    },
+    "1440x900 vyhrazeni": {
+      "regionScroll": 11325,
+      "shelves": [
+        {
+          "id": "partner-due-soon",
+          "state": "ready",
+          "heading": "Končí brzy"
+        },
+        {
+          "id": "partner-active",
+          "state": "ready",
+          "heading": "Aktivní vyhrazení"
+        },
+        {
+          "id": "partner-revoked",
+          "state": "ready",
+          "heading": "Zrušené odkazy"
+        }
+      ]
+    },
+    "390x844 clubs-fakturace": {
+      "regionScroll": 219,
+      "shelves": [
+        {
+          "id": "billing-figures",
+          "state": "ready",
+          "heading": "Souhrn"
+        },
+        {
+          "id": "awaiting-invoice",
+          "state": "ready",
+          "heading": "K vyfakturování"
+        },
+        {
+          "id": "billing-clubs",
+          "state": "ready",
+          "heading": "Podle klubu"
+        },
+        {
+          "id": "billing-invoices",
+          "state": "ready",
+          "heading": "Faktury"
+        }
+      ]
+    },
+    "390x844 vyhrazeni": {
+      "regionScroll": 29924,
+      "shelves": [
+        {
+          "id": "partner-due-soon",
+          "state": "ready",
+          "heading": "Končí brzy"
+        },
+        {
+          "id": "partner-active",
+          "state": "ready",
+          "heading": "Aktivní vyhrazení"
+        },
+        {
+          "id": "partner-revoked",
+          "state": "ready",
+          "heading": "Zrušené odkazy"
+        }
+      ]
+    }
+  },
+  "timing": {},
+  "accent": {},
+  "motion": {},
+  "failures": [],
+  "notes": [
+    "1440x900 clubs-fakturace: 4 target(s) under 32 px: a 63x17 FK Slaný | a 59x16 FK Slaný | a 138x16 INV-20261004-0003 | a 59x16 FK Slaný",
+    "1440x900 vyhrazeni: 13 identifier-shaped value(s) masked before the screenshot",
+    "1440x900 vyhrazeni: 60 target(s) under 32 px: a 63x23 FK Slaný | a 63x23 FK Slaný | a 63x23 FK Slaný | a 63x23 FK Slaný",
+    "390x844 vyhrazeni: 13 identifier-shaped value(s) masked before the screenshot"
+  ]
+}

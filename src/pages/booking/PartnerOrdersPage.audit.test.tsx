@@ -93,7 +93,9 @@ describe('the list', () => {
     const prague = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(new Date(now.getTime() + 86_400_000));
     listOrders.mockResolvedValue([order({ windows: [{ ...order().windows[0], releaseDate: prague }] })]);
     renderScreen(<PartnerOrdersPage />, '/vyhrazeni');
-    expect(await screen.findByText(/⚠/)).toBeInTheDocument();
+    /* Once on the order card and once on the "Končí brzy" shelf. */
+    expect((await screen.findAllByText(/⚠/)).length).toBe(2);
+    expect(screen.getByRole('region', { name: /Končí brzy/ })).toBeInTheDocument();
   });
 
   it('says which orders fall due today and that sending is not done here', async () => {
