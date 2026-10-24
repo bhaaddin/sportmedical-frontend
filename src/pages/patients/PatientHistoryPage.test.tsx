@@ -30,7 +30,7 @@ const renderPage = () =>
 
 beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
-  localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit']));
+  localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit', 'settings.clinic.manage']));
   listByEntity.mockReset().mockResolvedValue([]);
 });
 
@@ -64,11 +64,19 @@ describe('Historie karty', () => {
   });
 
   it('offers no edit without the permission', async () => {
-    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'settings.clinic.manage']));
     renderPage();
     const changes = await screen.findByRole('region', { name: 'Změny karty' });
     await within(changes).findByText('Zatím není zaznamenaná žádná změna tohoto pacienta.');
     expect(within(changes).queryByRole('link', { name: 'Upravit kartu' })).toBeNull();
+  });
+
+  it('asks nobody without settings.clinic.manage, and says who sees the history', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit']));
+    renderPage();
+    const changes = await screen.findByRole('region', { name: 'Změny karty' });
+    expect(within(changes).getByText('Historii změn karty vidí správce kliniky.')).toBeInTheDocument();
+    expect(listByEntity).not.toHaveBeenCalled();
   });
 
   it('says it could not load, with a retry', async () => {

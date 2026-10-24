@@ -20,17 +20,19 @@ import LockIcon from "@mui/icons-material/LockOutlined";
 import { toast } from "react-hot-toast";
 import client from "../api/client";
 import { patientsApi } from "../api/patients";
+import { auditApi, AUDIT_ENTITY } from "../api/audit";
 import { patientIdentityApi } from "../api/patientIdentity";
 import { issuePortalLink } from "../api/patientPortal";
 import { usePermission } from "../auth/usePermission";
 import type { InsuranceRegistrationKind, ResidenceType } from "../api/patientRegistry";
 import { parseBirthNumber } from "../services/patientRegistration/insuranceIdentifier";
 import type { MapySuggestion } from "../api/addressLookup";
-import { PageHeader, SectionLabel, SoftCard, StatusChip } from "../components/ui";
+import { SectionLabel, StatusChip } from "../components/ui";
+import { PageFrame, Shelf, TARGET_SX, entityTarget } from "../ui/shelf";
 import MapyAddressPicker from "../components/registration/MapyAddressPicker";
 import FormField from "../components/registration/FormField";
 import IssuedLinkCard from "../components/registration/IssuedLinkCard";
-import { FIT_SCROLL_SX, FitBody, FitPage } from "../components/ui/fit";
+import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody } from "../components/ui/fit";
 import StickyFormFooter from "../components/registration/StickyFormFooter";
 import { FieldCell, FieldGrid } from "../components/registration/FieldGrid";
 import { PHONE_TOUCH_TARGETS } from "../components/registration/touchTargets";
@@ -147,6 +149,13 @@ export default function PatientForm() {
    * and every save would be refused.
    */
   const maySeeIdentity = usePermission("patients.sensitive_identity.view");
+  /* The audit log answers only whoever oversees the clinic (`settings.clinic.manage`): nobody else is asked. */
+  const mayReadAudit = usePermission("settings.clinic.manage");
+  const auditQuery = useQuery({
+    queryKey: ["patient-audit", patientId],
+    queryFn: () => auditApi.listByEntity(AUDIT_ENTITY.patient, patientId!),
+    enabled: Boolean(patientId) && mayReadAudit,
+  });
   const phone = useIsPhone();
 
   /**
@@ -324,7 +333,7 @@ export default function PatientForm() {
     try {
       if (demographicsTouched && !(await saveDemographics())) return;
       if (profileTouched && !(await saveProfile())) return;
-      navigate(`/patients/${patientId}`);
+      navigate(entityTarget({ kind: "patient", id: patientId! }).to);
     } finally {
       setSavingAll(false);
     }
@@ -357,21 +366,27 @@ export default function PatientForm() {
   const fullName = loaded ? `${loaded.firstName} ${loaded.lastName}`.trim() : "";
   const busy = savingDemographics || savingProfile || savingAll;
 
-  return (
-    <FitPage
-      data-device={phone ? "phone" : "other"}
-      sx={[phone && PHONE_TOUCH_TARGETS]}
-    >
-      <PageHeader
-        title="Úprava karty"
-        subtitle={fullName !== "" ? `${fullName} · karta pacienta` : "Karta pacienta"}
-        actions={
-          <Button variant="outlined" onClick={() => navigate(`/patients/${patientId}`)}>
-            Zpět na kartu
-          </Button>
-        }
-      />
+  const cardPath = entityTarget({ kind: "patient", id: patientId ?? "" }).to;
 
+  return (
+    <PageFrame
+      fit
+      title="Úprava karty"
+      purpose={fullName !== "" ? `${fullName} · karta pacienta` : "Karta pacienta"}
+      entities={patientId !== undefined && fullName !== "" ? [{ kind: "patient", id: patientId, label: fullName }] : []}
+      actions={
+        <Button variant="outlined" onClick={() => navigate(cardPath)} sx={TARGET_SX}>
+          Zpět na kartu
+        </Button>
+      }
+    >
+    <Box
+      data-device={phone ? "phone" : "other"}
+      sx={[
+        { display: "flex", flexDirection: "column", gap: 2, minWidth: 0, ...(phone ? {} : FIT_FILL_SX) },
+        phone && PHONE_TOUCH_TARGETS,
+      ]}
+    >
       {/* From 1280 the form and the locked identity card stand side by side and each scrolls by itself. */}
       <FitBody
         scroll
@@ -385,8 +400,7 @@ export default function PatientForm() {
       >
         <Stack spacing={2} sx={{ minWidth: 0, "@media (min-width: 1280px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}>
           {/* 1. Name and demographics — route 1 */}
-          <SoftCard>
-            <SectionLabel>Základní údaje</SectionLabel>
+          <FormShelf id="basic" title="Základní údaje" hint="Změna jména nebo data narození se ukládá s důvodem a autorem">
             <FieldGrid>
               <FieldCell>
                 <FormField label="Jméno">
@@ -499,11 +513,10 @@ export default function PatientForm() {
                 </Button>
               </FieldCell>
             </FieldGrid>
-          </SoftCard>
+          </FormShelf>
 
           {/* 3. Everything else — route 2 */}
-          <SoftCard>
-            <SectionLabel>Ostatní</SectionLabel>
+          <FormShelf id="other" title="Ostatní">
             <FieldGrid>
               <FieldCell>
                 <FormField label="Povolání">
@@ -563,7 +576,7 @@ export default function PatientForm() {
                 </Button>
               </FieldCell>
             </FieldGrid>
-          </SoftCard>
+          </FormShelf>
         </Stack>
 
         {/* 2. Identity — read-only, changed through the governed routes */}
@@ -571,11 +584,11 @@ export default function PatientForm() {
           spacing={2}
           sx={{ minWidth: 0, "@media (min-width: 1280px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}
         >
-          <SoftCard>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
-              <SectionLabel sx={{ mb: 0 }}>Pojištění a adresa</SectionLabel>
-              <LockIcon sx={{ fontSize: 14, color: "text.secondary", ml: "auto" }} />
-            </Stack>
+          <FormShelf
+            id="identity"
+            title="Pojištění a adresa"
+            controls={<LockIcon aria-label="Jen se zdůvodněním" sx={{ fontSize: 16, color: "text.secondary" }} />}
+          >
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
               Mění se jen se zdůvodněním — každá změna se zapisuje s autorem a důvodem
               do registru pacientů.
@@ -609,15 +622,13 @@ export default function PatientForm() {
                 Opravit adresu
               </Button>
             </Stack>
-          </SoftCard>
+          </FormShelf>
 
-          <SoftCard>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
-              <SectionLabel sx={{ mb: 0 }}>Portál pacienta</SectionLabel>
-              {portalLink !== null && (
-                <StatusChip tone="green" size="sm" sx={{ ml: "auto" }}>Vytvořen</StatusChip>
-              )}
-            </Stack>
+          <FormShelf
+            id="portal"
+            title="Portál pacienta"
+            controls={portalLink !== null ? <StatusChip tone="green" size="sm">Vytvořen</StatusChip> : undefined}
+          >
             {portalLink === null ? (
               <>
                 <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
@@ -639,7 +650,36 @@ export default function PatientForm() {
                 note="Pošlete ho pacientovi. Nový odkaz ten předchozí zneplatní."
               />
             )}
-          </SoftCard>
+          </FormShelf>
+
+          {/* ── Poslední změny: who changed this card, when and why (the full list is the card's Historie) ── */}
+          {mayReadAudit && (
+            <Shelf
+              id="recent-changes"
+              title="Poslední změny"
+              count={auditQuery.data?.length}
+              layout="list"
+              stagger={false}
+              loading={auditQuery.isLoading}
+              error={auditQuery.isError ? "Historii změn se nepodařilo načíst." : false}
+              onRetry={() => void auditQuery.refetch()}
+              empty={(auditQuery.data ?? []).length === 0}
+              emptyState={{ text: "Karta se zatím neměnila." }}
+              viewAll={{ to: `${cardPath}/historie`, label: "Historie" }}
+            >
+              {(auditQuery.data ?? []).slice(0, 3).map((entry) => (
+                <Box key={entry.id} role="listitem" data-testid="recent-change" sx={{ px: 1.75, py: 1.25, "& + &": { borderTop: "1px solid", borderColor: "divider" } }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                    {entry.userEmail || "Systém"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                    {new Date(entry.timestamp).toLocaleString("cs-CZ")}
+                    {entry.notes ? ` · ${entry.notes}` : ""}
+                  </Typography>
+                </Box>
+              ))}
+            </Shelf>
+          )}
         </Stack>
       </FitBody>
 
@@ -650,7 +690,7 @@ export default function PatientForm() {
             : undefined
         }
       >
-        <Button variant="outlined" disabled={busy} onClick={() => navigate(`/patients/${patientId}`)}>
+        <Button variant="outlined" disabled={busy} onClick={() => navigate(cardPath)}>
           Zrušit
         </Button>
         <Button variant="contained" disabled={busy} onClick={() => { void saveAndContinue(); }}>
@@ -681,7 +721,21 @@ export default function PatientForm() {
           }}
         />
       ) : null}
-    </FitPage>
+    </Box>
+    </PageFrame>
+  );
+}
+
+/** One block of the form: a shelf (its title is the section's heading) holding a padded board. */
+function FormShelf({
+  id, title, hint, controls, viewAll, children,
+}: {
+  id: string; title: string; hint?: string; controls?: React.ReactNode; viewAll?: { to: string; label?: string }; children: React.ReactNode;
+}) {
+  return (
+    <Shelf id={id} title={title} hint={hint} controls={controls} viewAll={viewAll} layout="board" stagger={false}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 } }}>{children}</Box>
+    </Shelf>
   );
 }
 

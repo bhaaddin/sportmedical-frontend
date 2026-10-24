@@ -162,7 +162,7 @@ export default function IntakeReviewQueue() {
 
   return (
     <PageFrame
-      title="Fronta ke kontrole"
+      title="Kontrola registrací"
       purpose={
         loading
           ? 'Načítání…'

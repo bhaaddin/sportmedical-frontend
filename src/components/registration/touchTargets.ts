@@ -14,7 +14,7 @@ export const PHONE_TOUCH_TARGETS: SystemStyleObject<Theme> = {
     minWidth: 44,
   },
   '& .MuiInputBase-root': { minHeight: 44 },
-  '& .MuiCheckbox-root': { p: '10px' },
+  '& .MuiCheckbox-root': { p: '12px' },
   '& .MuiFormControlLabel-root': { minHeight: 44 },
   '& .MuiAutocomplete-root .MuiInputBase-root': { minHeight: 44 },
 };

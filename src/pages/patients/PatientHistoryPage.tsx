@@ -106,17 +106,20 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
 export default function PatientHistoryPage() {
   const { id } = useParams<{ id: string }>();
   const mayEdit = usePermission('patients.edit');
+  /* The audit log answers only whoever oversees the clinic (`settings.clinic.manage`); nobody else is asked, and the shelf
+     says why it is empty rather than failing. */
+  const mayRead = usePermission('settings.clinic.manage');
 
   const query = useQuery({
     queryKey: ['patient-audit', id],
     queryFn: () => auditApi.listByEntity(AUDIT_ENTITY.patient, id!),
-    enabled: id !== undefined,
+    enabled: id !== undefined && mayRead,
   });
 
   const entries = useMemo(() => query.data ?? [], [query.data]);
   const changed = useMemo(() => entries.filter((e) => !isAccess(e.action)), [entries]);
   const accessed = useMemo(() => entries.filter((e) => isAccess(e.action)), [entries]);
-  const settled = !query.isLoading && !query.isError;
+  const settled = mayRead && !query.isLoading && !query.isError;
 
   return (
     <Stack spacing={3} data-shelf-section="historie">
@@ -127,11 +130,11 @@ export default function PatientHistoryPage() {
         count={settled ? changed.length : undefined}
         layout="list"
         stagger={false}
-        loading={query.isLoading}
-        error={query.isError ? 'Historii se nepodařilo načíst.' : false}
+        loading={mayRead && query.isLoading}
+        error={mayRead && query.isError ? 'Historii se nepodařilo načíst.' : false}
         onRetry={() => void query.refetch()}
-        empty={changed.length === 0}
-        emptyState={{
+        empty={!mayRead || changed.length === 0}
+        emptyState={!mayRead ? { text: 'Historii změn karty vidí správce kliniky.' } : {
           text: 'Zatím není zaznamenaná žádná změna tohoto pacienta.',
           ...(id !== undefined && mayEdit ? { action: { label: 'Upravit kartu', to: `/patients/${id}/edit` } } : {}),
         }}
