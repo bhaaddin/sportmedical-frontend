@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultActivityColor } from '../../../colors/defaultActivityColors';
 import type { Activity, Calendar, DayAppointment, PreviewDay } from '../../../api/bookingContracts';
 import {
   activityInfoOf,
@@ -44,8 +45,8 @@ const activity = (id: string, name: string, over: Partial<Activity> = {}): Activ
 const catalogue: Catalogue = {
   activities: new Map(
     [
-      activityInfoOf(activity('a1', 'Základní', { effectiveColorHex: '#1565C0', sortOrder: 1 })),
-      activityInfoOf(activity('a2', 'Komplexní', { effectiveColorHex: '#0D47A1', sortOrder: 2, parallelCapacity: 2 })),
+      activityInfoOf(activity('a1', 'Základní', { colorHex: '#1565C0', sortOrder: 1 })),
+      activityInfoOf(activity('a2', 'Komplexní', { colorHex: '#0D47A1', sortOrder: 2, parallelCapacity: 2 })),
       activityInfoOf(activity('a3', 'Spiroergometrie', { clinicServiceId: 's2', sortOrder: 3 })),
       activityInfoOf(activity('a4', 'Stará', { isActive: false, clinicServiceId: 's2', sortOrder: 4 })),
     ].map((a) => [a.id, a] as const),
@@ -102,10 +103,10 @@ const appt = (id: string, activityId: string, over: Partial<DayAppointment> = {}
 });
 
 describe('colours of činnosti', () => {
-  it('uses the činnost’s effective colour, then its service’s, then the fallback', () => {
+  it('uses the činnost’s own colour, else its distinct default, then the fallback', () => {
     expect(colourOfActivity(catalogue, 'a1', '#999999')).toBe('#1565C0');
-    /* a3 sent no colour: the service s2 supplies it. */
-    expect(colourOfActivity(catalogue, 'a3', '#999999')).toBe('#2E7D32');
+    /* a3 has no colour of its own: its distinct default (R12), not its service's shade. */
+    expect(colourOfActivity(catalogue, 'a3', '#999999')).toBe(defaultActivityColor('a3'));
     expect(colourOfActivity(catalogue, 'nope', '#999999')).toBe('#999999');
     expect(colourOfActivity(catalogue, null, '#999999')).toBe('#999999');
   });
@@ -114,7 +115,7 @@ describe('colours of činnosti', () => {
     const a = activityInfoOf(activity('x', 'X', { effectiveColorHex: 'blue', colorHex: '#123456' }));
     expect(a.colorHex).toBe('#123456');
     const b = activityInfoOf(activity('y', 'Y', { effectiveColorHex: 'blue' }));
-    expect(b.colorHex).toBeNull();
+    expect(b.colorHex).toBe(defaultActivityColor('y'));
   });
 
   it('the service of an appointment comes through its činnost, else its calendar', () => {

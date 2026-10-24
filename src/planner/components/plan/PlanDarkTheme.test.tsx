@@ -36,11 +36,14 @@ describe('PlanDarkTheme', () => {
   });
 
   it.each(THEME_ACCENTS.flatMap((a) => (['light', 'dark'] as const).map((m) => [a.label, a.color, m] as const)))(
-    '%s (%s) with the app in %s mode: the popovers are dark and follow the accent',
+    '%s (%s) with the app in %s mode: the popovers follow the mode and the accent',
     (_label, color, mode) => {
       render(withPrefs(color, mode));
-      const expected = color === DEFAULT_ACCENT_HEX ? CYAN : shiftColor(CYAN, deriveShift(color));
-      expect(screen.getByTestId('p').textContent).toBe(`dark|${expected}|#001E2C`);
+      /* R15e: the planner stage follows the Světlý/Tmavý switch, so do its popovers: the accent itself in light, the shifted cyan in dark */
+      const dark = color === DEFAULT_ACCENT_HEX ? CYAN : shiftColor(CYAN, deriveShift(color));
+      const text = screen.getByTestId('p').textContent ?? '';
+      if (mode === 'dark') expect(text).toBe(`dark|${dark}|#001E2C`);
+      else expect(text.startsWith(`light|${color}|`)).toBe(true);
     },
   );
 
@@ -51,10 +54,10 @@ describe('PlanDarkTheme', () => {
     expect(screen.getByTestId('p').textContent).not.toBe(before);
   });
 
-  it('does not rebuild the theme when only the mode changes (the popovers are dark either way)', () => {
+  it('rebuilds the theme when the mode changes (the popovers turn light with the stage)', () => {
     const { rerender } = render(withPrefs('#7C3AED', 'dark'));
     const before = screen.getByTestId('p').textContent;
     rerender(withPrefs('#7C3AED', 'light'));
-    expect(screen.getByTestId('p').textContent).toBe(before);
+    expect(screen.getByTestId('p').textContent).not.toBe(before);
   });
 });

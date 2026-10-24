@@ -40,7 +40,7 @@ describe('planner.light.css is generated and current', () => {
 describe('the colour translation', () => {
   it('turns near-white text into the ink and keeps the accent chrome as accent ink', () => {
     expect(toLight(rgb('#f4faff'), 'text')).toBe('#1A1D21');
-    expect(toLight(rgb('#00e6e4'), 'text')).toContain('--sm-accent-ink');
+    expect(toLight(rgb('#00e6e4'), 'text')).toContain('--sm-planner-accent-ink');
   });
   it('keeps the contrast of AA text: every dark-theme text colour that read on the navy page reads on white', () => {
     for (const hex of ['#a3b9ce', '#bcd0e1', '#ffc857', '#ff7b98', '#6db5ff', '#b98bff', '#4df2da', '#7c93a8', '#d6eaf4']) {
@@ -58,7 +58,7 @@ describe('the colour translation', () => {
     expect(toLight({ r: 0, g: 0, b: 0, a: 0.6 }, 'surface')).toBe('rgba(20, 24, 28, 0.24)');
   });
   it('makes glows far fainter and the accent a halo', () => {
-    expect(translateValue('box-shadow', '0 0 21px #00d8dd2a')).toContain('--sm-accent');
+    expect(translateValue('box-shadow', '0 0 21px #00d8dd2a')).toContain('--sm-planner-accent');
     expect(translateValue('box-shadow', '0 7px 23px #0009')).toBe('0 7px 23px rgba(20, 24, 28, 0.096)');
   });
   it('leaves masks, urls and colourless values alone', () => {

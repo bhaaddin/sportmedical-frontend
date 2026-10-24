@@ -52,7 +52,7 @@ export const activity = (id: string, patch: Partial<Activity> = {}): Activity =>
   priceCzk: id === A_SPIRO ? 2400 : 1500,
   clinicServiceId: SVC,
   questionnaireDefinitionId: null,
-  colorHex: null,
+  colorHex: id === A_SPIRO ? '#aa5500' : '#112233',
   effectiveColorHex: id === A_SPIRO ? '#aa5500' : '#112233',
   parallelCapacity: 1,
   requiredDocumentTemplateIds: [],

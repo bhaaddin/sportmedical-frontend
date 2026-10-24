@@ -116,7 +116,7 @@ export default function PopoutGallery() {
         </Select>
       )}
       {kind === 'tooltip' && (
-        <Tooltip open title="Základní sportovní prohlídka · 30 min · 1 200 Kč" placement="bottom" arrow>
+        <Tooltip open title="Základní sportovní prohlídka · 30 min" placement="bottom" arrow>
           <IconButton aria-label="Informace"><InfoOutlined /></IconButton>
         </Tooltip>
       )}

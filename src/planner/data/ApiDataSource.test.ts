@@ -2,6 +2,7 @@
  * Contract tests of `ApiDataSource`: the application's API clients are replaced by fakes with the same shapes
  * (`../api/testSupport.ts`), so every mapping is checked against exact numbers without a server.
  */
+import { defaultActivityColor } from '../../colors/defaultActivityColors';
 import { describe, expect, it } from 'vitest';
 import { BookingApiError } from '../../api/apiError';
 import { ClubOrderError } from '../../api/clubOrders';
@@ -73,7 +74,7 @@ describe('catalogue', () => {
     expect(cat.clinicName).toBe('Klinika Test');
   });
 
-  it('colours from the činnost, then the služba, then a neutral grey - never per name', async () => {
+  it('colours from the činnost, else its own distinct default (R12) - never per name', async () => {
     const state = fakeState();
     state.activities = [
       { ...state.activities[0]!, effectiveColorHex: null, colorHex: null, color: 'blue' },
@@ -81,7 +82,7 @@ describe('catalogue', () => {
     ];
     const { source } = make(state);
     const cat = await source.getCatalogue();
-    expect(cat.categories.map((c) => c.color)).toEqual(['#445566', '#00ff00']);
+    expect(cat.categories.map((c) => c.color)).toEqual([defaultActivityColor(state.activities[0]!.id), '#00ff00']);
     const { source: none } = make(fakeState({ calendars: [] }));
     expect((await none.getCatalogue()).categories).toHaveLength(2);
   });

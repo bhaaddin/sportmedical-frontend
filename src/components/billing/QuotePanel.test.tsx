@@ -115,7 +115,7 @@ describe('QuotePanel', () => {
     expect(notice).toHaveTextContent('Nad limit — faktura půjde ke schválení');
     expect(notice).toHaveTextContent(/nejvýše 10\s%/);
     /* beige: the board's #FBF1E7 */
-    expect(getComputedStyle(notice).backgroundColor).toBe('rgb(251, 241, 231)');
+    expect(getComputedStyle(notice).backgroundColor).toBe('var(--sm-tone-beige-bg, #FBF1E7)');
   });
 
   it('says nothing about approval within the limit', () => {

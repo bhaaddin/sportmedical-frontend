@@ -649,7 +649,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
             minHeight: 36,
             '&:hover': { backgroundColor: hover },
             /* the aqua text, lifted only as far as AA on the selected item (the cyan wash over the glass) needs: a no-op for the default accent */
-            ...(light ? {} : { '&.Mui-selected': { backgroundColor: alpha(D.cyan, 0.14), color: liftToContrast(D.aqua, blend(pop.paper, parseColor(D.cyan) as Rgba, 0.14)) } }),
+            ...(light ? {} : { '&.Mui-selected': { backgroundColor: alpha(D.cyan, 0.14), color: liftToContrast(D.aqua, blend(pop.paper, parseColor(D.cyan) as Rgba, 0.32)) } }),
           },
         },
       },

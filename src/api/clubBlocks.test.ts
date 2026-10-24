@@ -145,12 +145,12 @@ describe('calls', () => {
 });
 
 describe('fetchBlockableActivities', () => {
-  it('reads effectiveColorHex, falling back to color, and drops inactive ones', async () => {
+  it('reads the činnost’s own colour (else its distinct default), and drops inactive ones', async () => {
     get.mockResolvedValue({
       data: {
         activities: [
-          { id: 'a-1', name: 'Základní', durationMinutes: 30, isActive: true, effectiveColorHex: '#112233', color: '#000000', parallelCapacity: 2, clinicServiceId: 's-1' },
-          { id: 'a-2', name: 'Spiro', durationMinutes: 60, isActive: true, color: '#445566' },
+          { id: 'a-1', name: 'Základní', durationMinutes: 30, isActive: true, effectiveColorHex: '#112233', colorHex: '#112233', color: '#000000', parallelCapacity: 2, clinicServiceId: 's-1' },
+          { id: 'a-2', name: 'Spiro', durationMinutes: 60, isActive: true, colorHex: '#445566' },
           { id: 'a-3', name: 'Starý', isActive: false },
         ],
       },
