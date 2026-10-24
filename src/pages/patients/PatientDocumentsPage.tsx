@@ -31,7 +31,7 @@ import { useIsPhone } from '../../layout/useDevice';
 import { MUTED_SX, Shelf, TARGET_SX } from '../../ui/shelf';
 import { formatDateOnly } from '../../utils/time';
 import {
-  NOTHING_REQUIRED_TEXT, expiringSoon, requirementLine, stillMissing, validityText,
+  expiringSoon, requirementLine, stillMissing, validityText,
 } from './paperworkStanding';
 import type { PatientContext } from './PatientLayout';
 import { ShelfRow } from './ShelfRow';
@@ -80,17 +80,17 @@ export default function PatientDocumentsPage() {
   };
   const focusPicker = () => pickerRef.current?.querySelector<HTMLElement>('[role="combobox"]')?.focus();
 
-  const requirementRow = (r: AppointmentRequirementDto, kind: 'missing' | 'expiring' | 'fine') => {
+  const requirementRow = (r: AppointmentRequirementDto, kind: 'missing' | 'expiring') => {
     const until = validityText(r, date);
-    const upload = kind === 'fine' ? undefined : uploadFor(r);
+    const upload = uploadFor(r);
     const detail = kind === 'missing'
       ? (r.blocksBooking === true ? 'Chybí — bez něj nejde objednat' : 'Chybí')
-      : `${kind === 'expiring' ? 'Brzy skončí platnost' : 'V pořádku'}${until === null ? '' : ` — ${until}`}`;
+      : `Brzy skončí platnost${until === null ? '' : ` — ${until}`}`;
     return (
       <ShelfRow
         key={`${kind}-${r.appointmentId}-${r.templateId}`}
         testId="requirement"
-        tone={kind === 'missing' ? 'red' : kind === 'expiring' ? 'beige' : undefined}
+        tone={kind === 'missing' ? 'red' : 'beige'}
         title={requirementLine(r, date)}
         detail={detail}
         trailing={upload !== undefined ? (
@@ -129,8 +129,10 @@ export default function PatientDocumentsPage() {
 
   return (
     <Stack spacing={3} data-shelf-section="dokumenty">
-      {/* ── Co chybí: what the booked appointments still ask for, each with its upload ── */}
-      <Box>
+      {/* ── Co chybí: what the booked appointments still ask for, each with its upload. Only while there is something to
+          do (or the answer is still on its way): "nothing is required" and "all in order" are already said once, in the
+          card's header, and saying them twice is clutter. ── */}
+      {(requirements === null || toDo > 0) && (
         <Shelf
           id="missing"
           title="Co chybí"
@@ -140,17 +142,11 @@ export default function PatientDocumentsPage() {
           layout="list"
           stagger={false}
           loading={requirements === null}
-          empty={requirements !== null && requirements.length === 0}
-          emptyState={{ text: NOTHING_REQUIRED_TEXT }}
         >
           {missing.map((r) => requirementRow(r, 'missing'))}
           {expiring.map((r) => requirementRow(r, 'expiring'))}
-          {requirements !== null && toDo === 0 && requirements.map((r) => requirementRow(r, 'fine'))}
         </Shelf>
-        <Typography variant="caption" sx={{ ...MUTED_SX, display: 'block', mt: 1 }}>
-          Zákonné souhlasy (zpracování údajů a souhlas se zákrokem) se potvrzují vždy a jsou v hlavičce karty.
-        </Typography>
-      </Box>
+      )}
 
       {/* ── Dokumenty: what the clinic holds, each with the template it is filed under ── */}
       <Shelf
@@ -203,6 +199,9 @@ export default function PatientDocumentsPage() {
           </Button>
         </Stack>
       </Shelf>
+      <Typography variant="caption" sx={{ ...MUTED_SX, display: 'block', mt: '8px !important' }}>
+        Zákonné souhlasy (zpracování údajů a souhlas se zákrokem) se potvrzují vždy a jsou v hlavičce karty.
+      </Typography>
 
       {/* ── Lékařské zprávy: from other doctors, never counted as a required document ── */}
       <Shelf

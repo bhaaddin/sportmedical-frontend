@@ -20,7 +20,7 @@
  * action in its header, pinned on a phone - never drawn twice.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Box, Stack, Typography } from '@mui/material';
 import { activitiesApi } from '../../api/activities';
@@ -204,7 +204,6 @@ const whenLabel = (a: PatientAppointment) =>
 
 export default function PatientAppointmentsPage() {
   const { patient, upcoming: bookingWindow } = useOutletContext<PatientContext>();
-  const navigate = useNavigate();
   const [all, setAll] = useState<PatientAppointment[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -261,9 +260,6 @@ export default function PatientAppointmentsPage() {
     return (a) => shownPrice(null, byName.get(a.eventName) ?? null);
   }, [activitiesQuery.data]);
 
-  /* The calendar opens its booking drawer on `newAppointment`, for this patient (the card's header carries the same
-     action; on a phone it is pinned there, so this page pins nothing of its own). */
-  const book = () => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } });
   const loading = all === null && !failed;
   const error = failed ? 'Termíny se nepodařilo načíst. Zkuste to prosím znovu.' : false;
   const retry = () => setAttempt((n) => n + 1);
@@ -283,7 +279,8 @@ export default function PatientAppointmentsPage() {
         error={error}
         onRetry={retry}
         empty={upcoming.length === 0}
-        emptyState={{ text: `${patient.firstName} nemá objednaný žádný termín.`, action: { label: 'Objednat termín', onClick: book } }}
+        /* No button here: "Objednat termín" is the card's primary action, right above (pinned on a phone). */
+        emptyState={{ text: `${patient.firstName} nemá objednaný žádný termín.` }}
       >
         {upcoming.map((a) => {
           const calendarId = calendarOf.get(a.id);

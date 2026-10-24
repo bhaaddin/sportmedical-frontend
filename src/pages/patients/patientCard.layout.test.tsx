@@ -176,7 +176,8 @@ describe('Dokumenty', () => {
     renderDocuments([], []);
 
     expect(await screen.findByText('Pacient zatím nemá žádný uložený dokument.')).toBeInTheDocument();
-    expect(screen.getByText(/Nemá objednaný termín/)).toBeInTheDocument();
+    /* the card's header says "Nemá objednaný termín ..." once; this page does not repeat it as a shelf */
+    expect(screen.queryByRole('region', { name: 'Co chybí' })).toBeNull();
     expect(screen.queryByText(/Povinné dokumenty/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Žádné povinné/)).not.toBeInTheDocument();
     /* the legal consent line stays on */
@@ -203,7 +204,7 @@ describe('Dokumenty as shelves', () => {
 
   it('draws Co chybí, Dokumenty, Nahrát dokument and Lékařské zprávy as named shelves', async () => {
     setViewport(VIEWPORTS.desktop);
-    renderDocuments([]);
+    renderDocuments([], [need({ standing: 'ExpiringSoon', daysLeft: 10, validUntil: '2026-11-12' })]);
     for (const name of ['Co chybí', 'Dokumenty', 'Nahrát dokument', 'Lékařské zprávy']) {
       expect(await screen.findByRole('region', { name })).toBeInTheDocument();
     }
@@ -377,7 +378,7 @@ describe('Výsledky as shelves', () => {
 
     const sessions = await screen.findByRole('region', { name: 'Sezení' });
     expect(await within(sessions).findByText('Zatím tu žádný výsledek není.')).toBeInTheDocument();
-    expect(within(sessions).getAllByRole('button', { name: 'Nové měření' }).length).toBeGreaterThan(0);
+    expect(within(sessions).getAllByRole('button', { name: 'Nové měření' })).toHaveLength(1);
     expect(screen.queryByRole('region', { name: 'Poslední sezení' })).toBeNull();
   });
 });

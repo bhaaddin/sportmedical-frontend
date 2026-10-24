@@ -9,8 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
 
@@ -222,18 +221,6 @@ describe('the price on every row', () => {
 
 /* The shelf page (docs/ui-shelf-system.md): Nadcházející, Minulé, Zrušené. */
 describe('the shelves', () => {
-  const renderRouted = () =>
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter initialEntries={['/patients/p1/terminy']}>
-          <Routes>
-            <Route path="/patients/p1/terminy" element={<PatientAppointmentsPage />} />
-            <Route path="/planovani" element={<p>Kalendář otevřen</p>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
   it('draws the upcoming and the past shelves, and no cancelled one when nothing was cancelled', async () => {
     get.mockResolvedValue({ data: { data: [
       appointment({ id: 'next', startTime: '2099-01-01T08:00:00Z', endTime: '2099-01-01T08:30:00Z' }),
@@ -271,13 +258,11 @@ describe('the shelves', () => {
     expect(card).toHaveAttribute('href', '/kalendar/cal-7/termin/next');
   });
 
-  it('offers to book when nothing is coming, and books this patient', async () => {
-    const user = userEvent.setup();
-    renderRouted();
-
+  it('draws no second "Objednat termín" when nothing is coming (the card header has it)', async () => {
+    renderPage();
     const upcoming = await screen.findByRole('region', { name: 'Nadcházející' });
-    await user.click(within(upcoming).getByRole('button', { name: 'Objednat termín' }));
-    expect(await screen.findByText('Kalendář otevřen')).toBeInTheDocument();
+    expect(within(upcoming).getByText(/Eva nemá objednaný žádný termín/)).toBeInTheDocument();
+    expect(within(upcoming).queryByRole('button')).toBeNull();
   });
 
   it('pins nothing of its own on a phone (the card header pins "Objednat termín")', async () => {

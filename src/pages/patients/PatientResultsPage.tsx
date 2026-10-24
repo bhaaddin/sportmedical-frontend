@@ -230,7 +230,8 @@ export default function PatientResultsPage() {
         error={query.isError ? 'Výsledky se nepodařilo načíst.' : false}
         onRetry={() => void query.refetch()}
         empty={sessions.length === 0}
-        emptyState={{ text: 'Zatím tu žádný výsledek není.', action: { label: 'Nové měření', onClick: newMeasurement } }}
+        /* The two ways to add one are in the header, right above: not drawn twice. */
+        emptyState={{ text: 'Zatím tu žádný výsledek není.' }}
       >
         <ResponsiveDataList
           rows={sessions}
