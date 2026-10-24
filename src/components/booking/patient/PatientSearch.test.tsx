@@ -70,7 +70,7 @@ describe('searching the database for a patient', () => {
     expect(within(results).getAllByRole('listitem')).toHaveLength(3);
     expect(within(results).queryByText('Petr Fehér')).not.toBeInTheDocument();
     expect(within(results).getByText('nar. 5. 5. 1985')).toBeInTheDocument();
-    expect(list).toHaveBeenLastCalledWith({ query: 'Fehér', page: 1, pageSize: 50 });
+    expect(list).toHaveBeenLastCalledWith({ query: 'Fehér', page: 1, pageSize: 50, includeCount: false });
   });
 
   it('gives every namesake an info button, and a unique name none', async () => {

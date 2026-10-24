@@ -342,7 +342,7 @@ export function toBlock(raw: unknown): ClubBlockView {
   };
 }
 
-const asList = (data: unknown): unknown[] => {
+export const asList = (data: unknown): unknown[] => {
   if (Array.isArray(data)) return data;
   if (isRecord(data)) {
     const inner = data.items ?? data.value ?? data.blocks;

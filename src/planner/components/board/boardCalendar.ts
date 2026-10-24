@@ -18,6 +18,7 @@
 import { useEffect, useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { appointmentsApi } from '../../../api/appointments';
+import { usePlannerScreenReady } from '../../api/usePlannerScreenReady';
 import { calendarsApi } from '../../../api/calendars';
 import { clinicServicesApi } from '../../../api/clinicServices';
 import { workingHoursApi } from '../../../api/workingHours';
@@ -93,6 +94,8 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
   const mayBlock = usePermission('bookings.edit');
   const from = days[0] ?? '';
   const to = days[days.length - 1] ?? '';
+  /* The server may answer the week's bookings, previews and blocks in one request (the planner screen); they wait for it. */
+  const screenReady = usePlannerScreenReady(from, to);
 
   const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
   const calendars = useMemo(() => (calendarsQuery.data ?? []).filter((c) => c.isActive), [calendarsQuery.data]);
@@ -108,7 +111,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
   const appointmentsQuery = useQuery({
     queryKey: ['day-range', from, to, allIds.join(',')],
     queryFn: () => appointmentsApi.range(from, to, allIds),
-    enabled: allIds.length > 0 && from !== '',
+    enabled: allIds.length > 0 && from !== '' && screenReady,
     placeholderData: (previous) => previous,
     refetchInterval: 60_000,
   });
@@ -124,7 +127,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
       );
       return new Map<string, Map<string, PreviewDay>>(perCalendar);
     },
-    enabled: allIds.length > 0 && from !== '',
+    enabled: allIds.length > 0 && from !== '' && screenReady,
     placeholderData: (previous) => previous,
   });
   const previewByCalendar = useMemo(
@@ -179,7 +182,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     queries: shown.map((calendar) => ({
       queryKey: ['blocks', calendar.id, from, to],
       queryFn: () => appointmentsApi.blocks(calendar.id, from, to),
-      enabled: from !== '',
+      enabled: from !== '' && screenReady,
       placeholderData: (previous: TimeBlock[] | undefined) => previous,
     })),
     combine: dataOfEach,

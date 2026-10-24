@@ -34,7 +34,10 @@ export interface PatientIdentityCorrection {
 /** One page of the register, and how many patients match in all. */
 export interface PatientPage {
   items: Patient[];
+  /** `-1` when the page was asked for without its count (`includeCount: false`); then `hasMore` says if another page exists. */
   totalCount: number;
+  /** Only when the server answered a page without its count. */
+  hasMore?: boolean;
   page: number;
   pageSize: number;
 }
@@ -68,17 +71,19 @@ export const patientsApi = {
    * so the answer is a page plus `totalCount`, never "every patient".
    */
   list: async (
-    params: { query?: string; page?: number; pageSize?: number } = {},
+    params: { query?: string; page?: number; pageSize?: number; includeCount?: boolean } = {},
   ): Promise<PatientPage> => {
     const page = params.page ?? 1;
     const pageSize = Math.min(params.pageSize ?? 20, PATIENT_PAGE_SIZE_MAX);
     const res = await client.get('/api/patients', {
-      params: { query: params.query?.trim() || undefined, page, pageSize },
+      /* `includeCount=false` saves the server its count statement (network plan b6); an older server ignores it and counts. */
+      params: { query: params.query?.trim() || undefined, page, pageSize, includeCount: params.includeCount === false ? false : undefined },
     });
     const items = extractItems<Patient>(res.data).map(withContacts);
     const totalCount =
       typeof res.data?.totalCount === 'number' ? res.data.totalCount : items.length;
-    return { items, totalCount, page, pageSize };
+    const hasMore = typeof res.data?.hasMore === 'boolean' ? res.data.hasMore : undefined;
+    return { items, totalCount, ...(hasMore === undefined ? {} : { hasMore }), page, pageSize };
   },
 
   getById: async (id: string): Promise<Patient> => {

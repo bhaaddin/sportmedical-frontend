@@ -88,3 +88,59 @@ describe('socketService.connect', () => {
     await service.stop();
   });
 });
+
+describe('socketService calendar groups', () => {
+  async function connected() {
+    const service = await freshService();
+    service.connect();
+    await vi.waitFor(() => expect(built).toHaveLength(1), { timeout: 3000 });
+    const connection = built[0] as unknown as { state: string; invoke: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
+    connection.invoke = vi.fn().mockResolvedValue([]);
+    connection.state = 'Connected';
+    return { service, connection };
+  }
+
+  it('joins once per calendar however many screens ask, and leaves when the last one goes', async () => {
+    const { service, connection } = await connected();
+    const one = service.watchCalendars(['a', 'b']);
+    const two = service.watchCalendars(['b', 'c']);
+    expect(connection.invoke.mock.calls).toEqual([
+      ['JoinCalendars', ['a', 'b']],
+      ['JoinCalendars', ['c']],
+    ]);
+    one();
+    one();
+    expect(connection.invoke).toHaveBeenLastCalledWith('LeaveCalendars', ['a']);
+    two();
+    expect(connection.invoke).toHaveBeenLastCalledWith('LeaveCalendars', ['b', 'c']);
+    await service.stop();
+  });
+
+  it('an older hub without the method, or one that refuses, is silent', async () => {
+    const { service, connection } = await connected();
+    connection.invoke.mockRejectedValue(new Error('Method does not exist'));
+    expect(() => service.watchCalendars(['a'])).not.toThrow();
+    await new Promise((r) => setTimeout(r, 10));
+    await service.stop();
+  });
+
+  it('asking before the hub is up is remembered and sent when it comes up', async () => {
+    const service = await freshService();
+    service.watchCalendars(['a']);
+    service.connect();
+    await vi.waitFor(() => expect(built).toHaveLength(1), { timeout: 3000 });
+    await service.stop();
+  });
+
+  it('relays calendarChanged to its listeners and ignores anything else', async () => {
+    const { service, connection } = await connected();
+    const seen: unknown[] = [];
+    service.on('calendarChanged', (m) => seen.push(m));
+    const handler = connection.on.mock.calls.find((c) => c[0] === 'calendarChanged')![1] as (m: unknown) => void;
+    handler({ calendarIds: ['a'], from: '2026-11-02', to: '2026-11-03', kinds: ['appointment'] });
+    handler('garbage');
+    handler(null);
+    expect(seen).toEqual([{ calendarIds: ['a'], from: '2026-11-02', to: '2026-11-03', kinds: ['appointment'] }]);
+    await service.stop();
+  });
+});

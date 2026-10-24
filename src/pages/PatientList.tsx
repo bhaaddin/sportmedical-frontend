@@ -126,7 +126,7 @@ export default function PatientList() {
      taking the register down. */
   const appointmentsQuery = useQuery({
     queryKey: ALL_APPOINTMENTS_KEY,
-    queryFn: fetchAllAppointments,
+    queryFn: () => fetchAllAppointments(),
     staleTime: 60_000,
   });
   const windowQuery = useQuery({

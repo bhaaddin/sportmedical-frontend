@@ -22,9 +22,13 @@ import type { DayAppointment } from '../../api/bookingContracts';
 import { addDaysToDateOnly, pragueDateKey } from '../../utils/time';
 import type { PatientAppointment } from './patientActivity';
 
-/** The clinic-wide list, as `PatientAppointmentsPage` has always read it. */
-export async function fetchAllAppointments(): Promise<PatientAppointment[]> {
-  const res = await client.get('/api/scheduling/appointments');
+/**
+ * The clinic-wide list, as `PatientAppointmentsPage` has always read it. With a `patientId` the server (network plan b6)
+ * filters in the database and answers only that patient's rows; an older server ignores the parameter and answers the
+ * whole list, so a caller that wants one patient still filters by `patientId` itself, as every caller here does.
+ */
+export async function fetchAllAppointments(patientId?: string): Promise<PatientAppointment[]> {
+  const res = await client.get('/api/scheduling/appointments', patientId ? { params: { patientId } } : undefined);
   const data = res.data?.data ?? res.data?.value ?? res.data ?? [];
   return Array.isArray(data) ? (data as PatientAppointment[]) : [];
 }

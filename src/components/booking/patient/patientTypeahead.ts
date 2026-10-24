@@ -146,7 +146,7 @@ export function usePatientTypeahead(input: string, enabled: boolean): PatientTyp
     queryKey: ['patient-typeahead', terms?.serverQuery ?? ''],
     queryFn: async () => {
       try {
-        return await patientsApi.list({ query: terms?.serverQuery, page: 1, pageSize: PAGE_SIZE });
+        return await patientsApi.list({ query: terms?.serverQuery, page: 1, pageSize: PAGE_SIZE, includeCount: false });
       } catch (error) {
         throw toBookingError(error);
       }
@@ -163,7 +163,7 @@ export function usePatientTypeahead(input: string, enabled: boolean): PatientTyp
   return {
     terms,
     hits,
-    truncated: (query.data?.totalCount ?? 0) > rows.length,
+    truncated: query.data?.hasMore ?? (query.data?.totalCount ?? 0) > rows.length,
     isFetching: query.isFetching || debounced !== input,
     isSettled: query.isSuccess || query.isError,
     error: query.error,

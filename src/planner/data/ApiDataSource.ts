@@ -352,7 +352,16 @@ export class ApiDataSource implements PlannerDataSource {
     return value;
   }
 
+  /** One request for a window's reads when the server can (see `plannerScreen.ts`); the board's reads wait for it. */
+  private screenFor(part: DateRange): Promise<void> {
+    return (this.deps.screen?.(part, this.explicitCalendarIds) ?? Promise.resolve()).catch(() => undefined);
+  }
+
   private async readCatalogue(): Promise<PlannerCatalogue> {
+    if (this.deps.screen) {
+      /* The look-ahead of the catalogue joins the reads of the same render in one request (the board's week, the month). */
+      await this.screenFor({ from: this.today, to: addDays(this.today, LOOKAHEAD_DAYS - 1) });
+    }
     await this.ensureLoaded();
     const [activities, services, display, clubSettings, clinicName, shown] = await Promise.all([
       this.deps.activities(),
@@ -394,6 +403,7 @@ export class ApiDataSource implements PlannerDataSource {
   private async lookAhead(calendarIds: string[]): Promise<Map<string, Map<string, PreviewDay>> | null> {
     if (calendarIds.length === 0) return null;
     try {
+      await this.screenFor({ from: this.today, to: addDays(this.today, LOOKAHEAD_DAYS - 1) });
       return await this.deps.previews(calendarIds, this.today, addDays(this.today, LOOKAHEAD_DAYS - 1));
     } catch {
       return null;
@@ -467,6 +477,8 @@ export class ApiDataSource implements PlannerDataSource {
 
   /** Everything on the shared calendar that is not a term of the order being planned. */
   private async externalSessions(range: DateRange): Promise<PlannerSession[]> {
+    /* Before the first read, so that what the server can answer in one request is already in the cache when they run. */
+    for (const part of chunk(range)) await this.screenFor(part);
     const shown = await this.shownCalendars();
     const ids = shown.map((c) => c.id);
     if (ids.length === 0) return [];
@@ -505,6 +517,7 @@ export class ApiDataSource implements PlannerDataSource {
   }
 
   async listDayMarks(range: DateRange): Promise<DayMark[]> {
+    for (const part of chunk(range)) await this.screenFor(part);
     const ids = (await this.shownCalendars()).map((c) => c.id);
     const years = [...new Set(eachDay(range.from, range.to).map((d) => Number(d.slice(0, 4))))];
     const [holidayLists, previews] = await Promise.all([

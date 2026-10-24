@@ -89,8 +89,9 @@ export default function PatientDetails() {
   /* The visits, the price list for their prices, and the invoices that say
      whether they were paid. None of the three blocks the card. */
   const appointmentsQuery = useQuery({
-    queryKey: ALL_APPOINTMENTS_KEY,
-    queryFn: fetchAllAppointments,
+    /* One patient's visits: under the clinic-wide key, so whatever invalidates that one reaches this too. */
+    queryKey: [...ALL_APPOINTMENTS_KEY, patient.id],
+    queryFn: () => fetchAllAppointments(patient.id),
     staleTime: 60_000,
   });
   const activitiesQuery = useQuery({

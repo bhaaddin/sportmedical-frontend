@@ -211,7 +211,7 @@ export default function PatientAppointmentsPage() {
   useEffect(() => {
     let cancelled = false;
     setFailed(false);
-    fetchAllAppointments()
+    fetchAllAppointments(patient.id)
       .then((rows) => {
         if (cancelled) return;
         setAll(rows);
@@ -223,14 +223,11 @@ export default function PatientAppointmentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, patient.id]);
 
   /*
-   * Filtered here because the server has no way to ask for one patient's
-   * appointments - `GET /api/scheduling/appointments` takes a date range and
-   * nothing else. It works, and it is the wrong shape: to show one person's
-   * appointments the browser is sent everybody's. Reported rather than worked
-   * around, since a filter is a server's job.
+   * Filtered here as well as on the server: `GET /api/scheduling/appointments?patientId=` narrows the answer on a
+   * server that has it (network plan b6); an older one ignores the parameter and sends everybody's.
    */
   const mine = useMemo(
     () => (all ?? []).filter((a) => a.patientId === patient.id),
