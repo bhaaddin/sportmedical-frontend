@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { statusTally } from '../../../api/bookingContracts';
 import { parseTimeOfDay, spanOnDay } from '../../../components/booking/grid/timeRange';
 import { pragueDateKey } from '../../../utils/time';
+import { usePermission } from '../../../auth/usePermission';
 import type { DayMark, IsoDate } from '../../model';
 import type { BoardCalendarData } from './boardCalendar';
 import type { BoardGeometry } from './boardGeometry';
@@ -57,6 +58,8 @@ export function useLunch(args: {
   const { calendar, days, dayMarks, geometry, boardRef, step, calendarOpen, paused, notify, refresh } = args;
   const mayEdit = calendar?.mayBlock ?? false;
   const mayBook = calendar?.mayBook ?? false;
+  /* The weekly lunch is the working hours' break: the server lets only a settings manager change it. */
+  const mayEditWeekly = usePermission('settings.clinic.manage');
 
   /* The layer is mounted only on a Stage 2 server (booking-slots carries the shared-worker fields; the same release carries the lunch
      routes), so an older server is never asked and nothing 404s into the console; one list call confirms the routes. */
@@ -108,6 +111,13 @@ export function useLunch(args: {
 
   const moveTo = useCallback(
     (day: IsoDate, startTime: string) => after((m) => m.moveLunchTo(targetsOf(day), day, startTime), LUNCH_TEXT.done.moved),
+    [after, targetsOf],
+  );
+  const moveWeekly = useCallback(
+    (day: IsoDate, startTime: string) => {
+      const every = LUNCH_TEXT.weekly.every[new Date(`${day}T12:00:00Z`).getUTCDay()]!;
+      return after((m) => m.moveWeeklyLunch(targetsOf(day), day, startTime), LUNCH_TEXT.weekly.done(every));
+    },
     [after, targetsOf],
   );
   const removeToday = useCallback((day: IsoDate) => after((m) => m.removeLunchToday(targetsOf(day), day), LUNCH_TEXT.done.removed), [after, targetsOf]);
@@ -200,12 +210,14 @@ export function useLunch(args: {
     supported,
     mayEdit,
     mayBook,
+    mayEditWeekly,
     bandOf,
     bandHandlers,
     drag,
     popover,
     closePopover: () => setOpen(null),
     moveTo,
+    moveWeekly,
     removeToday,
     restore,
   };

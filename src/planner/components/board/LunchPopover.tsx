@@ -28,13 +28,17 @@ export interface LunchPopoverProps {
   mayBook: boolean;
   point: { x: number; y: number };
   onMove: (startTime: string) => Promise<LunchAction>;
+  /** Per-weekday lunch: the weekly break of this weekday (settings.clinic.manage). Absent = not offered. */
+  onMoveWeekly?: (startTime: string) => Promise<LunchAction>;
+  /** 0 = Sunday; names the weekday on the weekly button. */
+  weekday?: number;
   onRemove: () => Promise<LunchAction>;
   onRestore: () => Promise<LunchAction>;
   onBook: (calendarId: string) => void;
   onClose: () => void;
 }
 
-export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdit, mayBook, point, onMove, onRemove, onRestore, onBook, onClose }: LunchPopoverProps) {
+export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdit, mayBook, point, onMove, onMoveWeekly, weekday, onRemove, onRestore, onBook, onClose }: LunchPopoverProps) {
   const [start, setStart] = useState(band.from);
   const [calendarId, setCalendarId] = useState(targets[0]?.id ?? '');
   const [busy, setBusy] = useState(false);
@@ -60,6 +64,8 @@ export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdi
     }
   };
   const removed = band.state === 'removed';
+  /* Only from the weekly lunch: a day that already carries an exception would keep it and hide the weekly change. */
+  const every = onMoveWeekly && weekday !== undefined && band.state === 'weekly' ? LUNCH_TEXT.weekly.every[weekday] : undefined;
 
   return (
     <Popover
@@ -73,7 +79,7 @@ export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdi
         <Typography sx={{ fontSize: 15, fontWeight: 700 }}>{`${LUNCH_TEXT.title(dateLabel)} · ${band.from}–${band.to}`}</Typography>
         <Typography data-testid="lunch-state" sx={{ fontSize: 12.5, fontWeight: 700, mt: 0.25 }}>{lunchBandLabel(band.state)}</Typography>
         {band.original ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{LUNCH_TEXT.original(band.original.from, band.original.to)}</Typography> : null}
-        <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>{LUNCH_TEXT.onlyToday}</Typography>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>{every ? LUNCH_TEXT.weekly.hint(every) : LUNCH_TEXT.onlyToday}</Typography>
 
         {error !== null ? <Alert severity="error" sx={{ mt: 1.25 }} data-testid="lunch-error">{error}</Alert> : null}
 
@@ -96,6 +102,11 @@ export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdi
                 {LUNCH_TEXT.moveGo}
               </Button>
             </Stack>
+            {every && onMoveWeekly ? (
+              <Button variant="outlined" disabled={busy || unchanged || minutes === null} onClick={() => void run(() => onMoveWeekly(clockOf(minutes ?? 0)))} sx={{ minHeight: 44, alignSelf: 'flex-start' }} data-testid="lunch-move-weekly">
+                {LUNCH_TEXT.weekly.go(every)}
+              </Button>
+            ) : null}
           </Stack>
         ) : null}
 

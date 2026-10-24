@@ -4,7 +4,7 @@
  * silently: a day where only some calendars took the change says so.
  */
 import { lunchExceptionsApi, lunchErrorText, isLunchRouteMissing } from '../../../api/lunchExceptions';
-import { LUNCH_TEXT } from './lunchModel';
+import { LUNCH_TEXT, clockOf, startMinutesOf } from './lunchModel';
 
 export interface LunchTarget {
   id: string;
@@ -34,9 +34,54 @@ export const removeLunchToday = (targets: readonly LunchTarget[], day: string, r
 export const restoreLunch = (targets: readonly LunchTarget[], day: string): Promise<LunchOutcome> =>
   eachTarget(targets, (id) => lunchExceptionsApi.restore(id, day));
 
+/** 0 = Sunday, as the working-hours rows count it. */
+export const weekdayOf = (day: string): number => new Date(`${day}T12:00:00Z`).getUTCDay();
+
+/** A refusal this side words itself (no period, no lunch on that weekday, the new lunch leaves the day's hours). */
+export class WeeklyLunchRefusal extends Error {}
+
+/**
+ * Per-weekday lunch (R17): the weekly break of that weekday, in the schedule period that holds the day, for every open calendar -
+ * every row of that weekday that has a break gets the new start and keeps its length. The day exceptions stay as they are.
+ */
+export async function moveWeeklyLunch(targets: readonly LunchTarget[], day: string, startTime: string): Promise<LunchOutcome> {
+  const { workingHoursApi } = await import('../../../api/workingHours');
+  const dow = weekdayOf(day);
+  const start = startMinutesOf(startTime);
+  return eachTarget(targets, async (calendarId) => {
+    if (start === null) throw new WeeklyLunchRefusal(LUNCH_TEXT.badStart);
+    const periods = await workingHoursApi.listPeriods(calendarId);
+    const period = periods.find((p) => p.validFrom <= day && (p.validTo === null || p.validTo >= day));
+    if (!period) throw new WeeklyLunchRefusal(LUNCH_TEXT.weekly.noPeriod);
+    const rows = (await workingHoursApi.listWorkingHours(calendarId, period.id)).filter((r) => r.dayOfWeek === dow && r.breakStart && r.breakEnd);
+    if (rows.length === 0) throw new WeeklyLunchRefusal(LUNCH_TEXT.weekly.noLunch);
+    for (const r of rows) {
+      const length = (startMinutesOf(r.breakEnd!) ?? 0) - (startMinutesOf(r.breakStart!) ?? 0);
+      const from = startMinutesOf(r.startTime) ?? 0;
+      const to = startMinutesOf(r.endTime) ?? 0;
+      if (start < from || start + length > to) throw new WeeklyLunchRefusal(LUNCH_TEXT.outsideHours(clockOf(from), clockOf(to)));
+    }
+    for (const r of rows) {
+      const length = (startMinutesOf(r.breakEnd!) ?? 0) - (startMinutesOf(r.breakStart!) ?? 0);
+      await workingHoursApi.updateWorkingHour(calendarId, r.id, {
+        dayOfWeek: r.dayOfWeek,
+        startTime: r.startTime,
+        endTime: r.endTime,
+        breakStart: clockOf(start),
+        breakEnd: clockOf(start + length),
+        repeatEveryNWeeks: r.repeatEveryNWeeks,
+        weekOffset: r.weekOffset,
+        workerUserId: r.workerUserId,
+        isActive: r.isActive,
+      });
+    }
+  });
+}
+
 /** The sentence after a write: success words, the partial warning, or the first refusal worded by its code. */
 export function lunchOutcomeText(outcome: LunchOutcome, success: string): { text: string; tone: 'info' | 'error' } {
   if (outcome.errors.length === 0) return { text: success, tone: 'info' };
   if (outcome.done > 0) return { text: LUNCH_TEXT.partial(outcome.done, outcome.total), tone: 'error' };
-  return { text: lunchErrorText(outcome.errors[0]), tone: 'error' };
+  const first = outcome.errors[0];
+  return { text: first instanceof WeeklyLunchRefusal ? first.message : lunchErrorText(first), tone: 'error' };
 }

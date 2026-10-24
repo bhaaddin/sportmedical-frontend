@@ -48,6 +48,15 @@ export const LUNCH_TEXT = {
   overlapBooking: 'V tomto čase už je rezervace. Přesuňte nejdřív ji, nebo zvolte jiný čas oběda.',
   outsideHours: (from: string, to: string) => `Oběd musí zůstat v pracovní době (${from}–${to}).`,
   badStart: 'Zadejte čas začátku oběda, například 13:00.',
+  weekly: {
+    /** "každý pátek" - the weekday as the button and the sentence say it (0 = neděle). */
+    every: ['každou neděli', 'každé pondělí', 'každé úterý', 'každou středu', 'každý čtvrtek', 'každý pátek', 'každou sobotu'] as readonly string[],
+    go: (every: string) => `Přesunout ${every}`,
+    hint: (every: string) => `„Přesunout oběd“ platí jen pro tento den. „Přesunout ${every}“ změní týdenní rozvrh všech otevřených kalendářů.`,
+    done: (every: string) => `Oběd přesunut ${every}.`,
+    noPeriod: 'Kalendář nemá pro tento den platný rozvrh. Upravte ho v Otevírací době.',
+    noLunch: 'V týdenním rozvrhu tento den oběd nemá. Upravte ho v Otevírací době.',
+  },
 } as const;
 
 /** The band a day mark describes, or null when the day has no lunch to click (closed, no hours, no lunch and none removed). */

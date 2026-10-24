@@ -87,6 +87,8 @@ export default function LunchLayer({ calendar, days, dayMarks, shades, geometry,
           mayBook={ctl.mayBook}
           point={ctl.popover.point}
           onMove={(startTime) => ctl.moveTo(ctl.popover!.band.day, startTime)}
+          onMoveWeekly={ctl.mayEditWeekly ? (startTime) => ctl.moveWeekly(ctl.popover!.band.day, startTime) : undefined}
+          weekday={new Date(`${ctl.popover.band.day}T12:00:00Z`).getUTCDay()}
           onRemove={() => ctl.removeToday(ctl.popover!.band.day)}
           onRestore={() => ctl.restore(ctl.popover!.band.day)}
           onBook={(calendarId) => {
