@@ -100,7 +100,7 @@ describe('Pokladna', () => {
     expect(links[0]).toHaveAttribute('href', '/patients/p1');
     /* One request per patient, not per row. */
     expect(getPatient).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('region', { name: 'Dnešní tržba' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Dnes' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Dnešní transakce' })).toBeInTheDocument();
     localStorage.clear();
   });

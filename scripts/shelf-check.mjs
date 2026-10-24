@@ -4,7 +4,7 @@
  *     node scripts/shelf-check.mjs
  *     env: BASE=http://localhost:3000   DEV_LOGIN=<file with "E-mail:" / "Password:" lines>   OUT_DIR=design/shelf
  *          PLAYWRIGHT_CORE=<folder of playwright-core>   CHROME_PATH=<chrome.exe>
- *          VP=390x844,820x1180,1440x900,1920x1080   PAGES=prehled,patients,patient   POPULATED=0 (skip the mocked pass)
+ *          VP=390x844,820x1180,1440x900,1920x1080   PAGES=prehled,patients,patient (+ billing, cashier, export, cenik, patient-faktury)   THEME=dark|light   POPULATED=0 (skip the mocked pass)
  *
  * It uses its OWN headless Chromium (never the shared browser pane), signs in once, then for each viewport x page
  * (Přehled /prehled, Pacienti /patients, a patient's card /patients/:id):
@@ -144,7 +144,8 @@ const smallTargets = (min) => {
 
 /** A patient to open, read through the real API (a phone's register draws cards, not links). */
 async function patientPath(page) {
-  await page.goto(`${BASE}/prehled`);
+  /* Přehled has no shelves since Stage 4: the register does. */
+  await page.goto(`${BASE}/patients`);
   await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
   const id = await page.evaluate(async () => {
     const token = localStorage.getItem('token');
@@ -155,10 +156,17 @@ async function patientPath(page) {
   return id === null ? null : `/patients/${id}`;
 }
 
-const PAGE_PATH = { prehled: '/prehled', patients: '/patients' };
+const PAGE_PATH = {
+  prehled: '/prehled', patients: '/patients',
+  billing: '/billing', cashier: '/cashier', export: '/accounting-export', cenik: '/nastaveni/cenik',
+};
+/* Pages under one patient's card: `<name>` = the card's sub-path. */
+const PATIENT_SUB = { 'patient-faktury': '/faktury' };
+/* THEME=dark|light seeds the theme mode before the page loads (screenshots get a "-dark" / "-light" suffix). */
+const THEME = process.env.THEME ?? '';
 
 async function openPage(page, name, patientHref) {
-  const path = name === 'patient' ? patientHref : PAGE_PATH[name];
+  const path = name === 'patient' ? patientHref : name in PATIENT_SUB ? `${patientHref}${PATIENT_SUB[name]}` : PAGE_PATH[name];
   await page.goto(`${BASE}${path}`);
   await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
   /* let the data arrive, the cascade finish and the count-ups settle */
@@ -180,18 +188,20 @@ function watch(page, bucket) {
 async function checkPage(ctxFactory, vp, name, label = '') {
   const where = `${vp.label} ${name}${label}`;
   const ctx = await ctxFactory(vp);
+  if (THEME !== '') await ctx.addInitScript((mode) => localStorage.setItem('sm-theme-mode-v2', mode), THEME);
   const page = await ctx.newPage();
   const problems = [];
   watch(page, problems);
-  const href = name === 'patient' ? await patientPath(page) : null;
-  if (name === 'patient' && href === null) {
+  const forPatient = name === 'patient' || name in PATIENT_SUB;
+  const href = forPatient ? await patientPath(page) : null;
+  if (forPatient && href === null) {
     fail(where, 'no patient to open');
     await ctx.close();
     return;
   }
   await openPage(page, name, href);
 
-  const shot = join(OUT, `${name}${label}-${vp.label}.jpg`);
+  const shot = join(OUT, `${name}${label}${THEME === '' ? '' : `-${THEME}`}-${vp.label}.jpg`);
   await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };

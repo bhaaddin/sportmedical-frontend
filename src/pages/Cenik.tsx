@@ -213,8 +213,8 @@ export default function Cenik() {
     <PageFrame
       fit
       title="Ceník"
-      purpose="Položky a ceny, které vidí pacient i kalendář. Cenu určuje jen ceník — kalendář, faktury i web ji berou odtud."
-      breadcrumb={[{ label: 'Nastavení', to: '/settings' }, { label: 'Ceník' }]}
+      /* The shell already draws the way back (Nastavení / Služby a ceny) on this route: no breadcrumb of its own. */
+      purpose="Cenu určuje jen ceník — kalendář, faktury i web ji berou odtud."
       /* In the header on every device (a setup screen, not a desk one), 44 px everywhere. */
       actions={mayEdit && services.length > 0 ? newButton : undefined}
     >

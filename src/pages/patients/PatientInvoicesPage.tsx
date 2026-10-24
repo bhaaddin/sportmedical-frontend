@@ -103,7 +103,7 @@ export default function PatientInvoicesPage() {
   ];
 
   const issue = (
-    <Button variant="contained" onClick={() => navigate('/billing', { state: issueState })} sx={{ minHeight: 44 }}>
+    <Button variant="outlined" onClick={() => navigate('/billing', { state: issueState })} sx={{ minHeight: 44 }}>
       Vystavit doklad
     </Button>
   );

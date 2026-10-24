@@ -309,14 +309,15 @@ export default function Billing() {
 
   return (
     <PageFrame fit title="Fakturace" purpose="Doklady, platby a přehled tržeb" primaryAction={primaryAction}>
-      {/* ── The month's figures: two across on a phone ── */}
+      {/* ── The month's figures: a row that swipes on a phone (two in view), a grid from a tablet up ── */}
       {!loadFailed && (
         <Shelf
           id="metrics"
           title="Přehled tržeb"
           hint={monthYear(now)}
-          layout="grid"
-          minCardWidth={phone ? 140 : 180}
+          layout={phone ? 'row' : 'grid'}
+          minCardWidth={180}
+          phoneWidth="min(42vw, 170px)"
           cardHeight={104}
           skeletons={canApprove ? 5 : 4}
           loading={loading}

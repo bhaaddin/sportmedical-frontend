@@ -28,6 +28,7 @@ import { PageFrame, Shelf, TARGET_SX } from '../ui/shelf';
 import { PEEK_KEYS } from '../ui/shelf/peekKeys';
 import { czk } from './billing/money';
 import { doklady, issuedBetween } from './billing/invoiceView';
+import { pragueDateKey } from '../utils/time';
 import { ExportGate } from '../components/ui/ExportGate';
 import { download, isExportForbidden, EXPORT_FORBIDDEN_MESSAGE } from '../utils/download';
 
@@ -54,8 +55,9 @@ const TYPE_LABELS: Record<ExportForm['type'], string> = {
 const madeAt = (h: ExportResult) => new Date(h.exportedAt).toLocaleString('cs-CZ');
 
 export default function AccountingExportPage() {
-  const today = new Date().toISOString().split('T')[0];
-  const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  /* The clinic's days, not UTC ones: `toISOString` of local midnight on the 1st used to give the 30th/31st of the month before. */
+  const today = pragueDateKey(new Date());
+  const firstDay = `${today.slice(0, 8)}01`;
   const device = useDevice();
   const touch = useTouchSx();
   const { data: history = [], isLoading, isError, refetch } = useExportHistory();

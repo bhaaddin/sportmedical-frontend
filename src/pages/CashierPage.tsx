@@ -245,12 +245,13 @@ export default function CashierPage() {
       primaryAction={{ label: 'Nová platba', icon: <Add />, onClick: () => setDialogOpen(true) }}
       actions={<Button variant="outlined" startIcon={<Refresh />} onClick={load} sx={touch}>Obnovit</Button>}
     >
-      {/* The day's figures: two across on a phone. */}
+      {/* The day's figures: a row that swipes on a phone (two in view), a grid from a tablet up. */}
       <Shelf
         id="today"
-        title="Dnešní tržba"
-        layout="grid"
-        minCardWidth={device === 'phone' ? 140 : 180}
+        title="Dnes"
+        layout={device === 'phone' ? 'row' : 'grid'}
+        minCardWidth={160}
+        phoneWidth="min(42vw, 170px)"
         cardHeight={104}
         skeletons={4}
         loading={loading}
