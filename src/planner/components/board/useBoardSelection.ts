@@ -95,6 +95,8 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     const a = latest.current;
     if (!a.enabled || event.button !== 0) return;
+    /* A press inside a pop-out the board opened (a portal: it is elsewhere in the DOM, React still bubbles it here) is not on the board. */
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if ((event.target as HTMLElement).closest('[data-board-item], .schedule-event, .term-resize-handle, .board-chip')) return;
     const at = locate(event);
     if (!at) return;
