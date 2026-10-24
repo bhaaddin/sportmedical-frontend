@@ -8,7 +8,8 @@
  */
 import { useEffect, useRef } from 'react';
 import { Box, Divider, Skeleton, Stack, Typography } from '@mui/material';
-import { SoftCard, StatusChip } from '../../components/ui';
+import { StatusChip } from '../../components/ui';
+import { cardSurface } from '../../ui/shelf/shelfStyle';
 import type { ChipTone } from '../../components/ui';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { useClubSummary } from '../../components/clubs/orders/ClubSummaryCard';
@@ -78,16 +79,15 @@ export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = tru
     ? { seats: summary.totalSeats, registered: summary.registered, remaining: summary.remaining }
     : row.seatTotals !== null ? { seats: row.seatTotals.seats, registered: row.seatTotals.registered, remaining: Math.max(0, row.seatTotals.seats - row.seatTotals.registered) } : null;
   return (
-    <SoftCard
+    <Box
       role="listitem"
-      sx={{
-        p: 2.5,
-        cursor: 'pointer',
+      data-card="club"
+      sx={(t) => ({
+        ...cardSurface(t, true),
+        p: 2.25,
         minHeight: 44,
-        transition: 'border-color 120ms',
-        '&:hover, &:focus-visible': { borderColor: 'primary.main', outline: 'none' },
         ...(row.club.isActive ? {} : { opacity: 0.6 }),
-      }}
+      })}
       tabIndex={0}
       onMouseEnter={showIntent}
       onMouseLeave={cancelIntent}
@@ -103,7 +103,7 @@ export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = tru
     >
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 0.75 }}>
         <ClubAvatar name={row.club.name} color={row.color} />
-        <Typography component="h2" sx={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, minWidth: 0, flex: 1 }} noWrap>
+        <Typography component="h3" sx={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, minWidth: 0, flex: 1 }} noWrap>
           {row.club.name}
         </Typography>
         {ordersLoading && row.status === 'none' ? (
@@ -127,7 +127,7 @@ export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = tru
           <Figure value={billableCzk === undefined ? '…' : billableCzk === null ? '—' : formatCzk(billableCzk)} label="k fakturaci" />
         </Box>
       </Stack>
-    </SoftCard>
+    </Box>
   );
 }
 

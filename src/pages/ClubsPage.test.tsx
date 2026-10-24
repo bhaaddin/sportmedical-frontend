@@ -253,8 +253,11 @@ describe('ClubsPage', () => {
     ]);
     try {
       render(<Wrap><ClubsPage /></Wrap>);
-      const cards = await screen.findAllByRole('listitem');
+      /* the Requested order is also an inquiry (Čeká na vás): the club cards are the ones in the Kluby list */
+      await screen.findAllByRole('listitem');
+      const cards = within(await screen.findByRole('list', { name: 'Kluby' })).getAllByRole('listitem');
       await waitFor(() => expect(within(cards[0]).getByTestId('club-card-billable')).toHaveTextContent(/4\s600\sKč/));
+      expect(within(screen.getByRole('region', { name: 'Čeká na vás' })).getByText('Poptávky klubů')).toBeInTheDocument();
       expect(within(cards[1]).getByTestId('club-card-billable')).toHaveTextContent('—');
       expect(clubOrdersApi.list).toHaveBeenCalledTimes(1);
       expect(clubOrdersApi.list).toHaveBeenCalledWith({});
@@ -478,5 +481,45 @@ describe('ClubsPage summaries', () => {
     expect(screen.getByText('1 / 20')).toBeInTheDocument();
     expect(fetchSummaries).toHaveBeenCalledTimes(1);
     expect(clubSummary).toHaveBeenCalledTimes(2);
+  });
+});
+
+/* ── S-4: the shelf page ── */
+
+describe('ClubsPage as shelves', () => {
+  it('is one page frame (one h1) with the clubs as a shelf named "Kluby" and its count', async () => {
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const shelf = screen.getByRole('region', { name: 'Kluby' });
+    expect(within(shelf).getByLabelText('Počet: 2')).toBeInTheDocument();
+    expect(within(shelf).getByRole('group', { name: 'Filtr klubů' })).toBeInTheDocument();
+    expect(within(shelf).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['FK Slaný', 'HC Kladno']);
+  });
+
+  it('draws no "Čeká na vás" while no club waits for an answer', async () => {
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    expect(screen.queryByRole('region', { name: 'Čeká na vás' })).not.toBeInTheDocument();
+  });
+
+  it('an empty clinic offers "Nový klub" as the next step', async () => {
+    getAll.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    expect(await screen.findByText(/Zatím tu žádný klub není/)).toBeInTheDocument();
+    const shelf = screen.getByRole('region', { name: 'Kluby' });
+    await user.click(within(shelf).getByRole('button', { name: 'Nový klub' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('a filter that matches nothing says so and offers to show every club again', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    await user.type(screen.getByLabelText('Hledat klub'), 'zzz');
+    expect(await screen.findByText('Tomuto filtru neodpovídá žádný klub.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zobrazit všechny' }));
+    expect(await screen.findByRole('heading', { name: 'FK Slaný' })).toBeInTheDocument();
   });
 });
