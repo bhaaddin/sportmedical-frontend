@@ -3,13 +3,19 @@ import {
   DEFAULT_ACCENT_HEX,
   IDENTITY_SHIFT,
   accentInk,
+  blend,
+  contrastRatio,
   deriveShift,
+  liftToContrast,
+  parseColor,
   lightTints,
   onAccentText,
   sanitizeAccent,
   shiftCssColors,
   tintOf,
+  toHex,
   type AccentShift,
+  type Rgba,
 } from './accent';
 
 /*
@@ -146,6 +152,8 @@ export const ACCENT_SOFT = {
 
 /** The border of an input / select, >= 3:1 against every surface a field sits on (WCAG 1.4.11): the prototype's #22546A was 2.3:1, the board's #E2E6EA 1.2:1. */
 export const FIELD_EDGE = { light: '#7C858F', dark: '#4A8BA5' } as const;
+/** A hovered field's border in light: darker than the resting one, still neutral (the accent at 50 % was 2.2:1). */
+const FIELD_EDGE_HOVER = '#4A5564';
 
 export type DarkTokens = Widen<typeof DARK>;
 
@@ -315,6 +323,12 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
   /* What floats (menus, popovers, dialogs): the board's white with a shadow, the prototype's lit glass in dark. */
   const floating = light ? {} : { backgroundImage: D.floating };
   const pop = popoutTokens(accentColor, mode);
+  /* a hovered field in dark: the primary at 50 % as the prototype has it - stronger only where that would be under 3:1 (a lifted orange or purple) */
+  const fieldHoverDark = (() => {
+    const base = parseColor(D.cyan) as Rgba;
+    const alphaOk = [0.5, 0.6, 0.7, 0.85, 1].find((a) => [D.field, pop.paper, D.glass].every((s) => contrastRatio(toHex(blend(s, base, a)), s) >= 3)) ?? 1;
+    return alpha(D.cyan, alphaOk);
+  })();
   const toneFor = (tone: keyof typeof DESIGN.tone) => (light ? DESIGN.tone[tone] : D.tone[tone]);
 
   return createTheme({
@@ -634,7 +648,8 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
             fontSize: 14,
             minHeight: 36,
             '&:hover': { backgroundColor: hover },
-            ...(light ? {} : { '&.Mui-selected': { backgroundColor: alpha(D.cyan, 0.14), color: D.aqua } }),
+            /* the aqua text, lifted only as far as AA on the selected item (the cyan wash over the glass) needs: a no-op for the default accent */
+            ...(light ? {} : { '&.Mui-selected': { backgroundColor: alpha(D.cyan, 0.14), color: liftToContrast(D.aqua, blend(pop.paper, parseColor(D.cyan) as Rgba, 0.14)) } }),
           },
         },
       },
@@ -681,7 +696,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
             borderRadius: DESIGN.radius.lg,
             backgroundColor: light ? paper : D.field,
             '& .MuiOutlinedInput-notchedOutline': { borderColor: FIELD_EDGE[mode] },
-            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(primary, 0.5) },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: light ? FIELD_EDGE_HOVER : fieldHoverDark },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: primary },
             ...(light ? {} : { '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(D.cyan, 0.14)}` } }),
           },

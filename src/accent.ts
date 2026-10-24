@@ -141,6 +141,19 @@ export function blend(bottom: string | Rgba, top: string | Rgba, alpha: number):
   return { r: b.r + (t.r - b.r) * alpha, g: b.g + (t.g - b.g) * alpha, b: b.b + (t.b - b.b) * alpha, a: 1 };
 }
 
+/**
+ * `fg` lifted toward white, a step at a time, until it reads at `target` on `bg` (a colour that already does is returned unchanged,
+ * so a default look is never touched).
+ */
+export function liftToContrast(fg: string, bg: string | Rgba, target = AA): string {
+  let color = normalizeHex(fg) ?? fg;
+  const bgRgb = typeof bg === 'string' ? (parseColor(bg) as Rgba) : bg;
+  for (let step = 0; step < 40 && contrastRatio(color, bgRgb) < target; step++) {
+    color = toHex(blend(color, '#FFFFFF', 0.05));
+  }
+  return color;
+}
+
 /* ------------------------------ the shift ------------------------------ */
 
 /**
@@ -156,11 +169,21 @@ export function isIdentityShift(shift: AccentShift): boolean {
   return shift.dh === 0 && shift.ds === 1 && shift.kl === 0;
 }
 
+/**
+ * How much of the lightness lift a colour takes: none for the DARK teal surfaces of the prototype (pills, pins, avatar chips, the
+ * sunk fields - lightness below 24), all of it from lightness 36 up (the cyan text, lines and bright fills the lift exists for), a
+ * ramp between. Without this an orange or purple accent lifted a dark teal pill to a bright one and the light text on it read 1.5:1.
+ * The default accent has kl = 0, so nothing moves for it.
+ */
+export function liftWeight(l: number): number {
+  return clamp((l - 24) / 12, 0, 1);
+}
+
 export function shiftHsl({ h, s, l }: Hsl, shift: AccentShift): Hsl {
   return {
     h: (((h + shift.dh) % 360) + 360) % 360,
     s: clamp(s * shift.ds, 0, 100),
-    l: l + (100 - l) * shift.kl,
+    l: l + (100 - l) * shift.kl * liftWeight(l),
   };
 }
 
@@ -186,7 +209,7 @@ export function shiftCssColors(text: string, shift: AccentShift): string {
 /** The value of `--sm-hsl`: the three channels of the shift, as `hsl(from ...)` reads them. */
 export function shiftExpression(shift: AccentShift): string {
   const n = (v: number) => trimNum(v);
-  return `calc(h + ${n(shift.dh)}) calc(s * ${n(shift.ds)}) calc(l + (100 - l) * ${n(shift.kl)})`;
+  return `calc(h + ${n(shift.dh)}) calc(s * ${n(shift.ds)}) calc(l + (100 - l) * ${n(shift.kl)} * clamp(0, (l - 24) / 12, 1))`;
 }
 
 /** A colour that follows the accent in CSS: the old literal with the shift applied by the browser (identity when `--sm-hsl` is unset). */

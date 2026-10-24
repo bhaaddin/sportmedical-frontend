@@ -32,6 +32,8 @@ import {
   shiftCssColors,
   shiftExpression,
   shiftHsl,
+  liftWeight,
+  liftToContrast,
   tintOf,
   toHex,
   toRgbString,
@@ -210,6 +212,32 @@ describe('isAccentChrome - what moves with the accent', () => {
   });
 });
 
+describe('liftToContrast', () => {
+  it('leaves a colour that already reads, lifts one that does not toward white until it does', () => {
+    expect(liftToContrast('#F4FAFF', '#042C3D')).toBe('#F4FAFF');
+    const lifted = liftToContrast('#9CBAF0', '#274E70');
+    expect(lifted).not.toBe('#9CBAF0');
+    expect(contrastRatio(lifted, '#274E70')).toBeGreaterThanOrEqual(4.5);
+  });
+  it('gives up after a bounded number of steps instead of looping (an impossible target ends at white)', () => {
+    expect(liftToContrast('#101010', '#FFFFFF', 30)).toMatch(/^#[0-9A-F]{6}$/);
+  });
+});
+
+describe('liftWeight: dark teal surfaces are not lifted (an orange accent used to turn a dark pill bright under its light text)', () => {
+  it.each([[0, 0], [16, 0], [24, 0], [30, 0.5], [36, 1], [45, 1], [90, 1]])('l = %i takes %f of the lift', (l, w) => {
+    expect(liftWeight(l)).toBeCloseTo(w, 6);
+  });
+  it('a dark teal surface keeps its lightness at any shift; the cyan text is lifted exactly as before', () => {
+    const shift = { dh: 20, ds: 0.8, kl: 0.6 };
+    expect(shiftHsl({ h: 185, s: 90, l: 17 }, shift).l).toBe(17);
+    expect(shiftHsl({ h: 180, s: 100, l: 45 }, shift).l).toBeCloseTo(45 + 55 * 0.6, 6);
+  });
+  it('the CSS expression is the same formula (clamp of the ramp inside the calc)', () => {
+    expect(shiftExpression({ dh: 0, ds: 1, kl: 0.6 })).toContain('* 0.6 * clamp(0, (l - 24) / 12, 1)');
+  });
+});
+
 describe('shiftHsl and shiftColor', () => {
   it('the identity shift changes nothing and is recognised', () => {
     expect(isIdentityShift(IDENTITY_SHIFT)).toBe(true);
@@ -277,8 +305,8 @@ describe('shiftCssColors', () => {
 
 describe('the CSS side', () => {
   it('writes the shift as the three channels hsl(from ...) reads', () => {
-    expect(shiftExpression({ dh: 40.5, ds: 0.83, kl: 0.51 })).toBe('calc(h + 40.5) calc(s * 0.83) calc(l + (100 - l) * 0.51)');
-    expect(shiftExpression(IDENTITY_SHIFT)).toBe('calc(h + 0) calc(s * 1) calc(l + (100 - l) * 0)');
+    expect(shiftExpression({ dh: 40.5, ds: 0.83, kl: 0.51 })).toBe('calc(h + 40.5) calc(s * 0.83) calc(l + (100 - l) * 0.51 * clamp(0, (l - 24) / 12, 1))');
+    expect(shiftExpression(IDENTITY_SHIFT)).toBe('calc(h + 0) calc(s * 1) calc(l + (100 - l) * 0 * clamp(0, (l - 24) / 12, 1))');
   });
 
   it('wraps a colour so the unset variable is the identity', () => {

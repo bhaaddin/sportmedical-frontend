@@ -405,7 +405,7 @@
       "borderWidth": 2
      },
      "&:hover .MuiOutlinedInput-notchedOutline": {
-      "borderColor": "rgba(13, 92, 82, 0.5)"
+      "borderColor": "#4A5564"
      },
      "backgroundColor": "#FFFFFF",
      "borderRadius": 10

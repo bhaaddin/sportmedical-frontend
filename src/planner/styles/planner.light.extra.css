@@ -1,0 +1,45 @@
+/*
+ * HAND-WRITTEN fixes on top of the generated light layer (planner.light.css, scripts/planner-light-css.mjs): what a mechanical
+ * translation of the dark colours cannot know. Every rule hangs on html[data-sm-mode="light"], so dark is untouched.
+ * Loaded on demand after the generated file (see AccentRootVars).
+ * Light = the earlier light look: page #EFF1F4, white cards, ink #1A1D21, hairlines #E2E6EA, the picked accent.
+ */
+
+/* the page the stage stands on */
+html[data-sm-mode="light"] .sm-planner,
+html[data-sm-mode="light"] .sm-planner #dashboard.live-mode { background-color: transparent; }
+
+/* a closed day / weekend: a calm light grey block with ink, not the dark slate of the dark board (the holiday stays its strong red;
+   the fill is set inline as a custom property, so the stylesheet needs !important to out-rank it) */
+html[data-sm-mode="light"] .sm-planner .is-lock-closed,
+html[data-sm-mode="light"] .sm-planner .board-shade.board-lock:not(.is-holiday) {
+  --lock-fill: #D9DEE4 !important;
+  --lock-ink: #1A1D21 !important;
+}
+
+/* a field's boundary reads at 3:1 (WCAG 1.4.11), like the MUI fields' FIELD_EDGE; the focused field keeps the planner's own focus ring.
+   (The generated field rules are more specific than a plain selector, hence !important.) */
+html[data-sm-mode="light"] .sm-planner select:not(:focus),
+html[data-sm-mode="light"] .sm-planner textarea:not(:focus),
+html[data-sm-mode="light"] .sm-planner input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(:focus) {
+  border-color: #7C858F !important;
+}
+
+/* the mini calendar: a closed day's number and an other-month holiday read at 4.5:1 (the dark board's #9AA7B4 / 72 % opacity were 2.3:1 on white) */
+/* (the number carries its colour as an inline style, hence !important) */
+html[data-sm-mode="light"] .sm-planner .day-cell.spectrum-day .day-number[data-lock="closed"] { color: #4B535C !important; }
+html[data-sm-mode="light"] .sm-planner .day-cell.spectrum-day .day-number[data-lock="holiday"] { opacity: 1 !important; }
+html[data-sm-mode="light"] .sm-planner .day-cell.spectrum-day.is-closed.other-month .day-number { opacity: 0.9; }
+html[data-sm-mode="light"] .sm-planner .day-cell.spectrum-day.other-month .day-number { color: #5A636D; }
+
+/* a booking card / session block: the činnost's colour as a pale tint with ink (dark: the colour sunk into the navy, white ink) */
+html[data-sm-mode="light"] .sm-planner .schedule-event.schedule-event {
+  background: linear-gradient(120deg, var(--ev-bg-lt, #EEF2F4), var(--ev-bg2-lt, #F4F6F8));
+  color: #1A1D21;
+}
+
+/* a cancelled booking is dimmed, but its text still reads (ink at 50 % over a pale card was 3:1) */
+html[data-sm-mode="light"] .sm-planner .schedule-event.is-cancelled { opacity: 0.72; }
+
+/* the activity filter is a bare <select> in a bordered label: the label is the boundary */
+html[data-sm-mode="light"] .sm-planner .filter-select { border-color: #7C858F; }

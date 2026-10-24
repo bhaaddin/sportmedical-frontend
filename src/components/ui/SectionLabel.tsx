@@ -20,7 +20,7 @@ export function SectionLabel({
       sx={[
         (t) => ({
           color: 'text.primary',
-          opacity: 0.78,
+          opacity: 0.88,
           fontSize: 12,
           letterSpacing: '0.1em',
           display: 'block',

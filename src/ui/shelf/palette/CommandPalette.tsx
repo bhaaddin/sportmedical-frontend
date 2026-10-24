@@ -189,7 +189,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
         {search.sections.map(renderSection)}
         {noAnswer && (
           <Box role="status" sx={{ p: 3, textAlign: 'center' }}>
-            <ContentPasteSearch sx={{ fontSize: 28, color: 'text.disabled' }} />
+            <ContentPasteSearch sx={{ fontSize: 28, color: 'text.secondary' }} />
             <Typography sx={{ fontWeight: 650, mt: 0.5 }}>Nic jsme nenašli pro „{query.trim()}“</Typography>
             <Typography sx={{ ...MUTED_SX, fontSize: 13, mt: 0.5 }}>
               {search.withheld

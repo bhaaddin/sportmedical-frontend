@@ -149,7 +149,7 @@ export default function Admin() {
   };
 
   const adornment = (icon: React.ReactNode) => (
-    <Box sx={{ mr: 1, color: 'text.disabled', display: 'flex' }}>{icon}</Box>
+    <Box sx={{ mr: 1, color: 'text.secondary', display: 'flex' }}>{icon}</Box>
   );
 
   return (

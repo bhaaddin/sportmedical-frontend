@@ -149,7 +149,7 @@ export function PlannerTintEditor({
           aria-label="Výběr barvy plánovače"
           value={shown.toLowerCase()}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value.toUpperCase())}
-          sx={{ width: 44, height: 40, p: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, bgcolor: 'transparent', cursor: 'pointer' }}
+          sx={{ width: 44, height: 44, p: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, bgcolor: 'transparent', cursor: 'pointer' }}
         />
       </Stack>
 

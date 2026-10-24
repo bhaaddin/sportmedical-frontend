@@ -129,7 +129,7 @@ function PatientInfoCard({
                 <Typography
                   component="dd"
                   variant="body2"
-                  sx={{ m: 0, color: row.value ? "text.primary" : "text.disabled", wordBreak: "break-word" }}
+                  sx={{ m: 0, color: row.value ? "text.primary" : "text.secondary", wordBreak: "break-word" }}
                 >
                   {row.value ?? "neuvedeno"}
                 </Typography>

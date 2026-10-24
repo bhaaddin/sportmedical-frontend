@@ -373,7 +373,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   sx={{ color: 'text.secondary', textTransform: 'none', minHeight: 44 }}
                 >
                   Nastavení
-                  <Box component="span" sx={{ mx: 0.75, color: 'text.disabled' }}>/</Box>
+                  <Box component="span" sx={{ mx: 0.75, color: 'text.secondary' }}>/</Box>
                   <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
                     {settingsHere.section.label}
                   </Box>

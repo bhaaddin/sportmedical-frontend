@@ -281,8 +281,8 @@ export function toneVars(hex: string): Record<string, string> {
     '--ev-bg2': mixHex(base, '#001521', 0.2),
     '--ev-glow': withAlpha(base, 0.46),
     /* light mode's card: the colour as a pale tint (planner.light.extra.css reads these; dark never does) */
-    '--ev-bg-lt': mixHex(base, '#FFFFFF', 0.86),
-    '--ev-bg2-lt': mixHex(base, '#FFFFFF', 0.92),
+    '--ev-bg-lt': mixHex(base, '#FFFFFF', 0.14),
+    '--ev-bg2-lt': mixHex(base, '#FFFFFF', 0.08),
   };
 }
 

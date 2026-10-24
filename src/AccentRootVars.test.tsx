@@ -9,6 +9,7 @@ const root = document.documentElement;
 afterEach(() => {
   cleanup();
   root.removeAttribute('style');
+  root.removeAttribute('data-sm-mode');
 });
 
 const prefs = (accent: string, mode: 'light' | 'dark') => ({ accent, mode, setAccent: () => undefined, setMode: () => undefined });
@@ -83,5 +84,35 @@ describe('AccentRootVars', () => {
     console.error = () => undefined;
     expect(() => render(<AccentRootVars />)).toThrow(/ThemePrefsContext/);
     console.error = spy;
+  });
+});
+
+describe('AccentRootVars - the mode attribute the light stylesheet of the planner hangs on (R15e)', () => {
+  it.each(['light', 'dark'] as const)('puts data-sm-mode="%s" on the document root and removes it on unmount', (mode) => {
+    const { unmount } = mount(DEFAULT_ACCENT_HEX, mode);
+    expect(root.getAttribute('data-sm-mode')).toBe(mode);
+    unmount();
+    expect(root.hasAttribute('data-sm-mode')).toBe(false);
+  });
+
+  it('follows the Světlý/Tmavý switch without remounting', () => {
+    const { rerender } = mount('#EA580C', 'dark');
+    expect(root.getAttribute('data-sm-mode')).toBe('dark');
+    rerender(
+      <ThemePrefsContext.Provider value={prefs('#EA580C', 'light')}>
+        <AccentRootVars />
+      </ThemePrefsContext.Provider>,
+    );
+    expect(root.getAttribute('data-sm-mode')).toBe('light');
+  });
+
+  it('reads the planner tint from the preferences: the planner variables follow it, the accent stays', () => {
+    render(
+      <ThemePrefsContext.Provider value={{ ...prefs('#2563EB', 'light'), plannerTint: '#EA580C' }}>
+        <AccentRootVars />
+      </ThemePrefsContext.Provider>,
+    );
+    expect(root.style.getPropertyValue('--sm-planner-accent')).toBe('#EA580C');
+    expect(root.style.getPropertyValue('--sm-accent')).toBe('#2563EB');
   });
 });

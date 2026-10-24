@@ -343,7 +343,7 @@ export default function RuianAddressPicker({
                 '&:hover': { bgcolor: 'action.hover' },
               }}
             >
-              <PlaceIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+              <PlaceIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="body2">{point.formattedAddress}</Typography>
               </Box>

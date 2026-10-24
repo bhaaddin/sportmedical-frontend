@@ -7,7 +7,7 @@
  */
 import type { SxProps, Theme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { DARK, darkOf, toneColors, tintsOf } from '../../theme';
+import { DARK, accentInkOf, darkOf, toneColors, tintsOf } from '../../theme';
 
 export type ShelfTone = 'green' | 'beige' | 'red' | 'grey' | 'blue' | 'primary';
 
@@ -21,7 +21,7 @@ export function toneOf(t: Theme, tone: ShelfTone): { fg: string; bg: string; lin
   if (tone !== 'primary') return toneColors(t, tone);
   const dark = t.palette.mode === 'dark';
   return {
-    fg: dark ? t.palette.primary.light : t.palette.primary.main,
+    fg: dark ? t.palette.primary.light : accentInkOf(t),
     bg: alpha(accentOf(t), dark ? 0.14 : 0.1),
     line: alpha(accentOf(t), dark ? 0.5 : 0.35),
   };

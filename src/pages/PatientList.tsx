@@ -213,7 +213,7 @@ export default function PatientList() {
   const standingNode = (p: Patient) => {
     const standing = standingOf(p);
     return standing === null
-      ? <Typography variant="caption" sx={{ color: 'text.disabled' }}>{activityKnown ? '—' : '…'}</Typography>
+      ? <Typography variant="caption" sx={{ color: 'text.secondary' }}>{activityKnown ? '—' : '…'}</Typography>
       : <StatusChip tone={standing.tone}>{standing.label}</StatusChip>;
   };
   const nextText = (p: Patient) => {

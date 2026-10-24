@@ -55,6 +55,18 @@ describe.each(COMBOS)('pop-out surface %s (%s) %s', (_key, accent, mode) => {
     for (const s of surfaces) expect(contrastRatio(FIELD_EDGE[mode], s)).toBeGreaterThanOrEqual(3);
   });
 
+  it('the selected menu item (dark: lifted aqua on the cyan wash) and a hovered field border read for every accent', () => {
+    if (mode === 'dark') {
+      const item = (theme.components?.MuiMenuItem?.styleOverrides?.root as Record<string, Record<string, string>>)['&.Mui-selected'];
+      const wash = over(pop.paper, item.backgroundColor);
+      expect(contrastRatio(item.color, wash)).toBeGreaterThanOrEqual(AA);
+    }
+    const field = (theme.components?.MuiOutlinedInput?.styleOverrides?.root as Record<string, Record<string, string>>)['&:hover .MuiOutlinedInput-notchedOutline'].borderColor;
+    for (const s of [...pop.stops, theme.palette.background.paper, theme.palette.background.default]) {
+      expect(contrastRatio(over(s, field), s), `hover border on ${s}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('the CSS custom properties the theme sets on :root are these tokens', () => {
     const root = (theme.components?.MuiCssBaseline?.styleOverrides as Record<string, Record<string, string>>)[':root'];
     expect(root['--sm-pop-paper']).toBe(pop.paper);

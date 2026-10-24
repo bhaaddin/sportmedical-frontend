@@ -226,7 +226,7 @@ export default function UploadDocumentDialog({
               }}
               onClick={() => fileInput.current?.click()}
             >
-              <CloudUpload sx={{ fontSize: 40, color: 'text.disabled' }} />
+              <CloudUpload sx={{ fontSize: 40, color: 'text.secondary' }} />
               <Typography sx={{ fontWeight: 600, mt: 1 }}>
                 Přetáhněte sem soubor nebo klikněte
               </Typography>

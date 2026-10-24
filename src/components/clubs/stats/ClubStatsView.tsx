@@ -139,7 +139,7 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
           <XAxis type="number" allowDecimals={false} tick={axis} stroke={gridLine} />
           <YAxis type="category" dataKey="label" width={phone ? 96 : 140} tick={axis} stroke={gridLine} interval={0} />
           <Tooltip {...tooltipStyle} />
-          <Legend />
+          <Legend formatter={(value) => <span style={{ color: theme.palette.text.primary }}>{value}</span>} />
           <Bar dataKey="Zapsáno" stackId="s" fill={theme.palette.primary.main} />
           <Bar dataKey="Chybí" stackId="s" fill={missingFill} />
         </BarChart>

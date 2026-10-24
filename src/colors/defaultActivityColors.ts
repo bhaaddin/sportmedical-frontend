@@ -16,7 +16,7 @@
  * Until the list is known (a test, a screen that renders before /api/activities answered) the hue comes from a hash of the
  * id alone, so the colour is still the same one every time.
  */
-import { contrastRatio, hslToRgb, relativeLuminance, toHex } from '../accent';
+import { hslToRgb, relativeLuminance, toHex } from '../accent';
 
 /** Relative luminance every default colour is solved to. */
 export const TARGET_LUMINANCE = 0.17;
@@ -43,8 +43,12 @@ export function hashHue(id: string): number {
   return (h >>> 0) % 360;
 }
 
-/** The `#RRGGBB` of a hue at the target luminance (bisection on lightness; luminance rises monotonically with it). */
+const hueCache = new Map<number, string>();
+
+/** The `#RRGGBB` of a hue at the target luminance (bisection on lightness; luminance rises monotonically with it). Memoised: the board asks per card. */
 export function colorForHue(hue: number): string {
+  const cached = hueCache.get(hue);
+  if (cached !== undefined) return cached;
   let lo = 0;
   let hi = 100;
   for (let i = 0; i < 24; i++) {
@@ -53,16 +57,17 @@ export function colorForHue(hue: number): string {
     if (lum < TARGET_LUMINANCE) lo = mid;
     else hi = mid;
   }
-  return toHex(hslToRgb({ h: hue, s: SATURATION, l: (lo + hi) / 2 }));
+  const hex = toHex(hslToRgb({ h: hue, s: SATURATION, l: (lo + hi) / 2 }));
+  hueCache.set(hue, hex);
+  return hex;
 }
 
 /** The hues of n consecutive činnosti, as the sequence gives them. */
 export const huesOfFirst = (n: number): number[] => Array.from({ length: n }, (_, i) => Math.round(vanDerCorput(i) * 360) % 360);
 
 let order: ReadonlyMap<string, number> = new Map();
-const listeners = new Set<() => void>();
 
-/** Tells the palette which činnosti exist (every read of /api/activities calls this). Idempotent; a changed list re-renders subscribers. */
+/** Tells the palette which činnosti exist (every read of /api/activities calls this). Idempotent; the known set only ever grows. */
 export function registerActivityIds(ids: readonly string[]): void {
   const sorted = [...new Set(ids.filter((id) => id !== ''))].sort();
   const same = sorted.length === order.size && sorted.every((id, i) => order.get(id) === i);
@@ -72,28 +77,15 @@ export function registerActivityIds(ids: readonly string[]): void {
   const next = [...merged].sort();
   if (next.length === order.size && next.every((id, i) => order.get(id) === i)) return;
   order = new Map(next.map((id, i) => [id, i]));
-  listeners.forEach((l) => l());
 }
 
 /** For tests: forget the known činnosti. */
 export function resetActivityIds(): void {
   order = new Map();
-  listeners.forEach((l) => l());
 }
-
-export function subscribeActivityIds(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-export const activityIdsVersion = (): number => order.size;
 
 /** The default colour of one činnost. */
 export function defaultActivityColor(id: string): string {
   const index = order.get(id);
   return colorForHue(index === undefined ? hashHue(id) : Math.round(vanDerCorput(index) * 360) % 360);
-}
-
-/** Self-check used by the tests and the settings screen: the swatch reads on both surfaces. */
-export function defaultColorReads(hex: string): { onDark: number; onLight: number; withWhiteText: number } {
-  return { onDark: contrastRatio(hex, '#001421'), onLight: contrastRatio(hex, '#FFFFFF'), withWhiteText: contrastRatio(hex, '#FFFFFF') };
 }

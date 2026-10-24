@@ -5,6 +5,7 @@
  * Czech typography: a non-breaking space before "min" and "Kč", the thousands
  * separator `Intl` writes for `cs-CZ` (also a non-breaking space).
  */
+import { contrastRatio } from '../../accent';
 import type { ActivitySeat, BlockAnalysis, Calculation, ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
 import { formatDateRange } from '../../pages/clubs/clubOrders';
 
@@ -157,9 +158,9 @@ export function clubColorOf(
 export function inkOn(hex: string): '#14181C' | '#FFFFFF' {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (m === null) return '#14181C';
-  const n = parseInt(m[1], 16);
-  const luminance = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-  return luminance > 0.6 ? '#14181C' : '#FFFFFF';
+  /* the text that reads better on the colour by WCAG contrast (the perceived-brightness rule put white on #EA580C at 3.6:1) */
+  const fill = `#${m[1]}`;
+  return contrastRatio('#14181C', fill) >= contrastRatio('#FFFFFF', fill) ? '#14181C' : '#FFFFFF';
 }
 
 /** "Jan Novák · Komplexní prohlídka · po 26. 10. 11:00" for a conflict line. */

@@ -160,7 +160,7 @@ export default function AuditLog() {
               {filteredEntries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <HistoryIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                    <HistoryIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
                     <Typography color="text.secondary">Žádné záznamy</Typography>
                   </TableCell>
                 </TableRow>

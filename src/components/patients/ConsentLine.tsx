@@ -89,7 +89,7 @@ export default function ConsentLine({ patientId }: { patientId: string }) {
   if (state === 'never-asked') {
     return (
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-        <HelpOutlined sx={{ fontSize: 18, color: 'text.disabled' }} />
+        <HelpOutlined sx={{ fontSize: 18, color: 'text.secondary' }} />
         <Typography variant="body2" color="text.secondary">
           Souhlas se zpracováním zdravotních údajů: <strong>nebyl dotázán</strong>
         </Typography>

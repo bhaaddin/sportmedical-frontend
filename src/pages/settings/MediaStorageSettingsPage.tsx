@@ -182,7 +182,7 @@ export default function MediaStorageSettingsPage() {
         </Stack>
       </SoftCard>
 
-      <Typography sx={[TYPE.caption, { color: DESIGN.muted }]}>
+      <Typography sx={[TYPE.caption, { color: 'text.secondary' }]}>
         Zapnutím úložiště se nic nenahrává — soubory se posílají, až když je na obrazovce Média a texty nahrajete.
       </Typography>
     </Stack>

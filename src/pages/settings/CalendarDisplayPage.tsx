@@ -10,6 +10,7 @@
    refuses anything it cannot draw — this screen keeps no copy of the rules.
    ══════════════════════════════════════════════════════════════ */
 
+import { FIELD_EDGE } from '../../theme';
 import { useState } from 'react';
 import {
   Alert,
@@ -223,7 +224,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.nowLineColor) ? draft.nowLineColor : '#000000'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('nowLineColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 
@@ -243,7 +244,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : DEFAULT_HOLIDAY_COLOR}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('holidayColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 
@@ -263,7 +264,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.lunchColor) ? draft.lunchColor : '#E11D48'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('lunchColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 

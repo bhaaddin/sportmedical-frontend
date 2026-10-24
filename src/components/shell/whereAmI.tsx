@@ -119,7 +119,7 @@ export function Trail({ crumbs, nowrap = false }: { crumbs: Crumb[]; nowrap?: bo
             component="span"
             sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, ...(nowrap && last ? { overflow: 'hidden' } : {}) }}
           >
-            {i > 0 && <Box component="span" sx={{ color: 'text.disabled' }}>›</Box>}
+            {i > 0 && <Box component="span" sx={{ color: 'text.secondary' }}>›</Box>}
             {c.to && !last ? (
               <Box component={Link} to={c.to} sx={{ color: 'text.secondary', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>{c.label}</Box>
             ) : (

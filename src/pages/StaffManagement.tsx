@@ -51,6 +51,8 @@ const ROLE_COLORS: Record<UserAccountRole, string> = {
   Administrator: '#D32F2F',
   Staff: '#0288D1',
 };
+/** A role's category colour (data); an unknown role gets a neutral blue-grey. */
+const roleColor = (role: string): string => (ROLE_COLORS as Record<string, string>)[role] ?? '#90A4AE';
 
 const nameOf = (a: UserAccount) => a.displayName || a.email;
 
@@ -320,7 +322,7 @@ export default function StaffManagement() {
               {accounts.length === 0 && !loadFailed ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                    <PersonIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                    <PersonIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
                     <Typography color="text.secondary">Žádné účty</Typography>
                   </TableCell>
                 </TableRow>
@@ -337,7 +339,7 @@ export default function StaffManagement() {
                     >
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ bgcolor: ROLE_COLORS[acc.role] ?? '#90A4AE', width: 36, height: 36, fontSize: 14 }}>
+                          <Avatar sx={{ bgcolor: roleColor(acc.role), color: (t) => t.palette.getContrastText(roleColor(acc.role)), width: 36, height: 36, fontSize: 14 }}>
                             {initialsOf(acc)}
                           </Avatar>
                           <Typography sx={{ fontWeight: 600 }}>{name}</Typography>

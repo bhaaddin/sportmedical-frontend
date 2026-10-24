@@ -82,7 +82,7 @@ export function VisitHistoryTable({
                   {formatCzk(price)}
                 </Typography>
                 {paid === null ? (
-                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>—</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>—</Typography>
                 ) : (
                   <StatusChip tone={paid ? 'green' : 'red'}>{paid ? 'Zaplaceno' : 'Nezaplaceno'}</StatusChip>
                 )}

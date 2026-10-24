@@ -344,7 +344,7 @@ export default function NotificationCenter({
           </Box>
         ) : notifications.length === 0 ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Notifications sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Notifications sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>Žádná oznámení</Typography>
           </Box>
         ) : (

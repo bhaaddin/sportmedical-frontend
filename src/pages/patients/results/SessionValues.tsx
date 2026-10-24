@@ -28,7 +28,7 @@ export default function SessionValues({ session }: { session: DiagnosticSession 
             <Typography
               component="dd"
               variant="body2"
-              sx={{ m: 0, overflowWrap: 'anywhere', color: r.value === MISSING ? 'text.disabled' : 'text.primary', fontWeight: r.value === MISSING ? 400 : 600 }}
+              sx={{ m: 0, overflowWrap: 'anywhere', color: r.value === MISSING ? 'text.secondary' : 'text.primary', fontWeight: r.value === MISSING ? 400 : 600 }}
             >
               {r.value}
             </Typography>
