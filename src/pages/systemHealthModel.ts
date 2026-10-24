@@ -7,6 +7,7 @@
  * the outgoing queue, whether an e-mail server is set up and how much room the document
  * store has - which are exactly the things an owner opens "Zdraví systému" to learn.
  */
+import type { AttentionGroup, AttentionItem } from '../ui/shelf/attention';
 
 export interface HealthView {
   status: 'ok' | 'warning' | 'error' | 'unknown';
@@ -81,4 +82,42 @@ export function waitText(minutes: number | null): string {
   const days = Math.floor(hours / 24);
   const rest = hours % 24;
   return rest === 0 ? `${days} dní` : `${days} dní ${rest} h`;
+}
+
+/* ───────────────────────────── "Vyžaduje pozornost" on Zdraví systému ───────────────────────────── */
+
+
+/**
+ * What the measured answer says needs a person, each case a link to the screen that fixes it. Only from the health answer
+ * this screen already reads; `null` (not measured, or nothing wrong) draws no card - it never claims "all is well" for
+ * an answer that did not come. A problem with no screen to fix it in the application (the database, a migration) is not
+ * listed here: the status card says it.
+ */
+export function healthAttention(health: HealthView | null): AttentionGroup | null {
+  if (health === null) return null;
+  const items: AttentionItem[] = [];
+  const failed = health.outboxFailed ?? 0;
+  if (failed > 0) {
+    items.push({ id: 'outbox-failed', title: `Neodeslané zprávy: ${failed}`, detail: 'Zprávy, které se nepodařilo odeslat. Zkontrolujte e-mailový server.', to: '/nastaveni/email' });
+  }
+  if (health.smtpConfigured === false) {
+    items.push({ id: 'smtp', title: 'E-mailový server není nastaven', detail: 'Připomínky a potvrzení se nikam neodesílají.', to: '/nastaveni/email' });
+  }
+  if ((health.outboxPending ?? 0) > 0 && (health.outboxOldestMinutes ?? 0) >= 60 && health.smtpConfigured !== false) {
+    items.push({ id: 'outbox-old', title: 'Zprávy čekají dlouho', detail: `Nejstarší čeká ${waitText(health.outboxOldestMinutes)}.`, to: '/nastaveni/email' });
+  }
+  if (health.storageWritable === false) {
+    items.push({ id: 'storage', title: 'Do úložiště nejde zapisovat', detail: 'Nové dokumenty se neuloží.', to: '/nastaveni/uloziste-medii' });
+  }
+  if (items.length === 0) return null;
+  const high = health.storageWritable === false || failed > 0;
+  return {
+    id: 'systemProblems',
+    severity: high ? 'high' : 'medium',
+    title: 'Systém',
+    count: items.length,
+    items,
+    summary: items.length === 1 ? 'Jedna věc potřebuje nastavit.' : `${items.length} věci potřebují nastavit.`,
+    action: { label: 'Otevřít nastavení', to: items[0].to },
+  };
 }

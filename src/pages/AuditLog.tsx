@@ -1,25 +1,31 @@
 /* ══════════════════════════════════════════════════════════════
    AUDIT LOG — PLAN-01 Feature A31-A40
-   - Virtualized table with thousands of entries
-   - Search by user, entity, action
-   - Date range filter
-   - Expandable rows for JSON diff
+   - The latest 100 entries
+   - Search by user, entity, action, id, notes
+   - Expandable rows for the value before and after
+
+   Shelf look (Phase 2, S-5): "Nejčastější akce" (a figure per
+   action), then "Události" - the search in its header, the table
+   taking the height that is left (a stack of cards on a phone);
+   an entry about a patient, an invoice, a club ... names it with a
+   connected chip.
    ══════════════════════════════════════════════════════════════ */
-import { Fragment } from 'react';
-import { StackTable } from "../components/ui/StackTable";
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import {
-  Alert, Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, Grid, IconButton, Tooltip, Skeleton,
+  Box, Button, Typography, Paper, Table, TableBody, TableCell,
+  TableHead, TableRow, TextField, Grid, IconButton, InputAdornment,
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon, Search as SearchIcon, History as HistoryIcon,
-  ExpandMore as ExpandIcon, ExpandLess as CollapseIcon
+  Refresh as RefreshIcon, Search as SearchIcon,
+  ExpandMore as ExpandIcon, ExpandLess as CollapseIcon,
 } from '@mui/icons-material';
 import client from '../api/client';
-import { TONE_CSS, KpiCard, StatusChip, type ChipTone } from '../components/ui';
+import { StackTable } from '../components/ui/StackTable';
+import { TONE_CSS, StatusChip, type ChipTone } from '../components/ui';
+import { useIsPhone } from '../layout/useDevice';
+import { EntityChip, MetricCard, MUTED_SX, Shelf, TARGET_SX } from '../ui/shelf';
 import { SettingsScreen } from './settings/SettingsFrame';
-import { stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
+import { auditSubject, stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
 
 /* ── Types ── */
 interface AuditEntry {
@@ -45,6 +51,7 @@ const toneOf = (action: string): ChipTone => toneOfAction(action);
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function AuditLog() {
+  const phone = useIsPhone();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -53,7 +60,7 @@ export default function AuditLog() {
 
   /* ── Load audit log ── */
   useEffect(() => {
-    loadAuditLog();
+    void loadAuditLog();
   }, []);
 
   const loadAuditLog = async () => {
@@ -71,6 +78,7 @@ export default function AuditLog() {
       setLoading(false);
     }
   };
+  const reload = () => { void loadAuditLog(); };
 
   /* ── Filter entries ── */
   const filteredEntries = entries.filter(entry => {
@@ -85,23 +93,22 @@ export default function AuditLog() {
       entry.notes?.toLowerCase().includes(q)
     );
   });
+  const top = topActions(entries);
 
-  /* Loading keeps the frame: the title and the way back are on screen while the log fills in. */
-  if (loading) {
-    return (
-      <SettingsScreen
-        title="Auditní log"
-        subtitle="Kdo co změnil a kdy — včetně přístupů k citlivým údajům"
-        aside={false}
-        related={false}
-      >
-        <Box aria-busy="true" aria-label="Načítám auditní log">
-          <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2, mb: 2.5 }} />
-          <Skeleton variant="rounded" height={360} sx={{ borderRadius: 3 }} />
-        </Box>
-      </SettingsScreen>
-    );
-  }
+  const searchField = (
+    <TextField
+      size="small"
+      placeholder="Hledat v auditním logu — uživatel, akce, entita"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      disabled={loading || loadError}
+      slotProps={{
+        htmlInput: { 'aria-label': 'Hledat v auditním logu' },
+        input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={MUTED_SX} /></InputAdornment> },
+      }}
+      sx={{ width: { xs: '100%', sm: 380 }, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+    />
+  );
 
   return (
     <SettingsScreen
@@ -111,64 +118,68 @@ export default function AuditLog() {
       related={false}
       scope={false}
       actions={
-        <Tooltip title="Obnovit">
-          <IconButton aria-label="Obnovit" onClick={loadAuditLog}><RefreshIcon /></IconButton>
-        </Tooltip>
+        <Button
+          variant="outlined"
+          color="inherit"
+          aria-label="Obnovit"
+          startIcon={<RefreshIcon />}
+          onClick={reload}
+          disabled={loading}
+          sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
+        >
+          Obnovit
+        </Button>
       }
     >
-      {loadError && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2.5 }}
-          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={loadAuditLog} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
+      {/* The section fills its column: "Události" takes what is left and scrolls inside (tablet, desktop). */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, ...(phone ? {} : { height: '100%', minHeight: 0 }) }}>
+        {!loadError && (loading || top.length > 0) && (
+          <Shelf id="audit-top" title="Nejčastější akce" hint="V posledních 100 záznamech" layout="grid" minCardWidth={170} cardHeight={96} skeletons={4} loading={loading} stagger={false}>
+            {top.map(({ action, count }) => (
+              <MetricCard key={action} label={action} value={count} tone={toneOf(action) === 'red' ? 'red' : 'grey'} />
+            ))}
+          </Shelf>
+        )}
+
+        <Shelf
+          id="audit-events"
+          title="Události"
+          count={loading || loadError ? undefined : filteredEntries.length}
+          layout="free"
+          grow
+          controls={searchField}
+          loading={loading}
+          error={loadError ? 'Auditní log se nepodařilo načíst.' : false}
+          onRetry={reload}
+          empty={filteredEntries.length === 0}
+          emptyState={
+            search !== ''
+              ? { text: 'Žádné záznamy', action: { label: 'Zrušit hledání', onClick: () => setSearch('') } }
+              : { text: 'Žádné záznamy', action: { label: 'Historie změn', to: '/nastaveni/historie-zmen' } }
+          }
         >
-          Auditní log se nepodařilo načíst.
-        </Alert>
-      )}
-
-      {/* Search */}
-      <TextField fullWidth size="small" placeholder="Hledat v auditním logu — uživatel, akce, entita"
-        value={search} onChange={(e) => setSearch(e.target.value)}
-        slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} fontSize="small" /> } }}
-        sx={{ mb: 2.5 }} />
-
-      {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {topActions(entries).map(({ action, count }) => (
-          <Grid key={action} size={{ xs: 6, sm: 4, md: 2 }}>
-            <KpiCard label={action} value={count} tone={toneOf(action) === 'red' ? 'red' : 'ink'} />
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Table */}
-      <div>
-        <StackTable component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: 40 }} />
-                <TableCell>Čas</TableCell>
-                <TableCell>Uživatel</TableCell>
-                <TableCell>Akce</TableCell>
-                <TableCell>Entita</TableCell>
-                <TableCell>ID</TableCell>
-                <TableCell>Poznámky</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredEntries.length === 0 ? (
+          <StackTable
+            component={Paper}
+            sx={phone ? undefined : { flex: '1 1 0', minHeight: 0, overflow: 'auto', overscrollBehavior: 'contain' }}
+          >
+            <Table stickyHeader={!phone} aria-label="Události">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <HistoryIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                    <Typography color="text.secondary">Žádné záznamy</Typography>
-                  </TableCell>
+                  <TableCell sx={{ width: 40 }} />
+                  <TableCell>Čas</TableCell>
+                  <TableCell>Uživatel</TableCell>
+                  <TableCell>Akce</TableCell>
+                  <TableCell>Entita</TableCell>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Poznámky</TableCell>
                 </TableRow>
-              ) : (
-                filteredEntries.map((entry) => {
+              </TableHead>
+              <TableBody>
+                {filteredEntries.map((entry) => {
                   const before = stateBefore(entry);
                   const after = stateAfter(entry);
                   const hasDiff = before !== null || after !== null;
+                  const subject = auditSubject(entry);
                   return (
                     <Fragment key={entry.id}>
                       <TableRow hover>
@@ -179,13 +190,14 @@ export default function AuditLog() {
                               aria-label="Zobrazit změnu"
                               aria-expanded={expandedRow === entry.id}
                               onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}
+                              sx={TARGET_SX}
                             >
                               {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
                             </IconButton>
                           )}
                         </TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" sx={MUTED_SX}>
                             {new Date(entry.timestamp).toLocaleString('cs-CZ')}
                           </Typography>
                         </TableCell>
@@ -201,12 +213,16 @@ export default function AuditLog() {
                         </TableCell>
                         <TableCell>{entry.entity}</TableCell>
                         <TableCell>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>
-                            {entry.entityId?.slice(0, 8)}
-                          </Typography>
+                          {subject !== null ? (
+                            <EntityChip entity={subject} size="sm" />
+                          ) : (
+                            <Typography variant="body2" sx={{ ...MUTED_SX, fontFamily: 'monospace', fontSize: 11 }}>
+                              {entry.entityId?.slice(0, 8)}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" sx={MUTED_SX}>
                             {entry.notes || '—'}
                           </Typography>
                         </TableCell>
@@ -221,7 +237,7 @@ export default function AuditLog() {
                                   <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="overline" sx={{ color: TONE_CSS.red.fg }}>Před</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
                                         {JSON.stringify(before, null, 2)}
                                       </pre>
                                     </Paper>
@@ -231,7 +247,7 @@ export default function AuditLog() {
                                   <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="overline" sx={{ color: TONE_CSS.green.fg }}>Po</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
                                         {JSON.stringify(after, null, 2)}
                                       </pre>
                                     </Paper>
@@ -244,12 +260,12 @@ export default function AuditLog() {
                       )}
                     </Fragment>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </StackTable>
-      </div>
+                })}
+              </TableBody>
+            </Table>
+          </StackTable>
+        </Shelf>
+      </Box>
     </SettingsScreen>
   );
 }

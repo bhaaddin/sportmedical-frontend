@@ -158,7 +158,8 @@ describe('Auditní log', () => {
 
   it('counts the real actions, most frequent first', async () => {
     await open([audit(1), audit(2), audit(3, { action: 'account.session_created' })]);
-    const labels = screen.getAllByText(/^(settings\.changed|account\.session_created)$/, { selector: '.MuiTypography-overline' }).map((e) => e.textContent);
+    const top = screen.getByRole('region', { name: 'Nejčastější akce' });
+    const labels = within(top).getAllByText(/^(settings\.changed|account\.session_created)$/).map((e) => e.textContent);
     expect(labels).toEqual(['settings.changed', 'account.session_created']);
   });
 
@@ -179,6 +180,24 @@ describe('Auditní log', () => {
     await open([audit(1, { entityId: '0d3f7c2a-5c1e-4b8e-9a44-2f5e1c9b0a03' })]);
     expect(screen.getByText('0d3f7c2a')).toBeInTheDocument();
     expect(screen.queryByText('0d3f7c2a-5c1e-4b8e-9a44-2f5e1c9b0a03')).toBeNull();
+  });
+
+  it('names an entry about a patient with a connected chip, and keeps a setting plain', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage', 'patients.view']));
+    await open([audit(1, { entity: 'Patient', entityId: 'aa11bb22-0000-4000-8000-000000000001' }), audit(2, { entityId: 'cc33dd44-1' })]);
+    expect(screen.getByRole('link', { name: /aa11bb22/ })).toHaveAttribute('href', '/patients/aa11bb22-0000-4000-8000-000000000001');
+    expect(screen.queryByRole('link', { name: /cc33dd44/ })).toBeNull();
+    expect(screen.getByText('cc33dd44')).toBeInTheDocument();
+  });
+
+  it('draws the events as a shelf with its count, and an empty search offers Zrušit hledání', async () => {
+    await open([audit(1), audit(2)]);
+    const events = screen.getByRole('region', { name: 'Události' });
+    expect(within(events).getByLabelText('Počet: 2')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Hledat v auditním logu/), 'zzzzzz');
+    await userEvent.click(screen.getByRole('button', { name: 'Zrušit hledání' }));
+    expect(screen.getByPlaceholderText(/Hledat v auditním logu/)).toHaveValue('');
+    expect(within(screen.getByRole('region', { name: 'Události' })).getByLabelText('Počet: 2')).toBeInTheDocument();
   });
 
   it('says the load failed and tries again on request', async () => {
@@ -215,7 +234,8 @@ describe('Zdraví systému', () => {
     wrap(<SystemHealth />, '/system-health');
     await screen.findByText('Odezva databáze');
   };
-  const card = (label: string) => (screen.getByText(label, { selector: '.MuiTypography-overline' }).parentElement as HTMLElement);
+  /* A figure is a MetricCard on the "Stav" shelf. */
+  const card = (label: string) => within(screen.getByRole('region', { name: 'Stav' })).getByText(label).closest('[data-card="metric"]') as HTMLElement;
 
   it('shows the database latency from database.latencyMs, not "undefined ms"', async () => {
     serveHealth();
@@ -271,7 +291,7 @@ describe('Zdraví systému', () => {
     await open();
     expect(screen.getByText('jana@ordinace.cz')).toBeInTheDocument();
     expect(screen.getByText('account.authentication_failed')).toBeInTheDocument();
-    expect(screen.getByText('Aktivní relace (1)')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Relace' })).getByLabelText('Počet: 1')).toBeInTheDocument();
   });
 
   it('says "Žádné chyby" and "Žádné aktivní relace" when there are none', async () => {
@@ -286,6 +306,44 @@ describe('Zdraví systému', () => {
     wrap(<SystemHealth />, '/system-health');
     expect(await screen.findByText('Stav systému se nepodařilo načíst.')).toBeInTheDocument();
     expect(screen.getByText('jana@ordinace.cz')).toBeInTheDocument();
+  });
+
+  it('shows the shelves: Stav, Relace, Poslední chyby, and no attention card when nothing is wrong', async () => {
+    serveHealth({ ...HEALTH, status: 'ok', outbox: { pending: 0, failed: 0, oldestPendingAgeMinutes: null }, smtp: { configured: true } });
+    await open();
+    for (const name of ['Stav', 'Relace', 'Poslední chyby']) expect(screen.getByRole('region', { name })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Vyžaduje pozornost' })).toBeNull();
+  });
+
+  it('Vyžaduje pozornost lists what the answer says is wrong, each a link to its fix', async () => {
+    serveHealth({ ...HEALTH, outbox: { pending: 3, failed: 2, oldestPendingAgeMinutes: 30 }, storage: { writable: false, freeBytes: 1 } });
+    await open();
+    const shelf = screen.getByRole('region', { name: 'Vyžaduje pozornost' });
+    expect(within(shelf).getByRole('link', { name: /Neodeslané zprávy: 2/ })).toHaveAttribute('href', '/nastaveni/email');
+    expect(within(shelf).getByRole('link', { name: /E-mailový server není nastaven/ })).toHaveAttribute('href', '/nastaveni/email');
+    expect(within(shelf).getByRole('link', { name: /Do úložiště nejde zapisovat/ })).toHaveAttribute('href', '/nastaveni/uloziste-medii');
+  });
+
+  it('a failed health call draws no attention card (never an all-clear, never a guess)', async () => {
+    serveHealth(new Error('down'));
+    wrap(<SystemHealth />, '/system-health');
+    expect(await screen.findByText('Stav systému se nepodařilo načíst.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Vyžaduje pozornost' })).toBeNull();
+  });
+
+  it('an empty errors shelf offers the audit log as the next step', async () => {
+    serveHealth();
+    await open();
+    expect(within(screen.getByRole('region', { name: 'Poslední chyby' })).getByRole('link', { name: 'Auditní log' })).toHaveAttribute('href', '/audit-log');
+  });
+
+  it('on a phone the sessions are cards, not a table', async () => {
+    setViewport(VIEWPORTS.phone);
+    serveHealth(HEALTH, { items: [{ id: 's1', email: 'jana@ordinace.cz', displayName: 'Jana Nová', createdAt: '2026-10-20T08:00:00Z', expiresAt: '2026-10-20T16:00:00Z' }] });
+    await open();
+    const shelf = screen.getByRole('region', { name: 'Relace' });
+    expect(within(shelf).queryByRole('table')).toBeNull();
+    expect(within(shelf).getByRole('listitem')).toHaveTextContent('Jana Nová');
   });
 
   it('the refresh button asks all three again', async () => {

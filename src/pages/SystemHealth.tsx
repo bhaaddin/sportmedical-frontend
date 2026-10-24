@@ -4,21 +4,21 @@
    nothing else: database round trip, signed-in sessions and the
    latest failed operations from the audit log. A section whose
    call failed says so instead of showing anything in its place.
+
+   Shelf look (Phase 2, S-5): "Stav" (the measured figures),
+   "Vyžaduje pozornost" (only what the health answer says is wrong,
+   each a link to the screen that fixes it), then "Relace" and
+   "Poslední chyby" - tables on a desktop, cards on a phone.
    ══════════════════════════════════════════════════════════════ */
-import { StackTable } from "../components/ui/StackTable";
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Box, Typography, Grid, Card, CardContent, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Skeleton, Alert, Button, IconButton, Tooltip,
-} from '@mui/material';
-import {
-  People, ErrorOutlined, Refresh, CheckCircle,
-} from '@mui/icons-material';
+import { Box, Button, Typography } from '@mui/material';
+import { Refresh } from '@mui/icons-material';
 import { DESKTOP_UP } from '../components/settings/settingsStyle';
 import client from '../api/client';
-import { KpiCard } from '../components/ui';
+import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
+import { AttentionCard, MetricCard, MUTED_SX, Shelf, TARGET_SX } from '../ui/shelf';
 import { SettingsScreen } from './settings/SettingsFrame';
-import { STATUS_TEXT, gigabytes, readHealth, waitText, type HealthView } from './systemHealthModel';
+import { STATUS_TEXT, gigabytes, healthAttention, readHealth, waitText, type HealthView } from './systemHealthModel';
 
 /* ── What the server sends (api/client.ts has already unwrapped the envelope) ── */
 
@@ -44,6 +44,19 @@ interface SystemErrorDto {
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString('cs-CZ');
 }
+
+const SESSION_COLUMNS: DataColumn<SystemSessionDto>[] = [
+  { key: 'user', header: 'Uživatel', cell: (s) => <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{s.displayName}</Typography>, tablet: true },
+  { key: 'email', header: 'E-mail', cell: (s) => s.email, tablet: true },
+  { key: 'created', header: 'Přihlášen', cell: (s) => <Typography variant="body2" sx={MUTED_SX}>{formatDateTime(s.createdAt)}</Typography>, tablet: true },
+  { key: 'expires', header: 'Platnost do', cell: (s) => <Typography variant="body2" sx={MUTED_SX}>{formatDateTime(s.expiresAt)}</Typography> },
+];
+
+const ERROR_COLUMNS: DataColumn<SystemErrorDto>[] = [
+  { key: 'time', header: 'Čas', cell: (e) => <Typography variant="body2" sx={{ ...MUTED_SX, whiteSpace: 'nowrap' }}>{formatDateTime(e.timestamp)}</Typography> },
+  { key: 'action', header: 'Akce', cell: (e) => e.action },
+  { key: 'entity', header: 'Záznam', cell: (e) => e.entity },
+];
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function SystemHealth() {
@@ -101,28 +114,8 @@ export default function SystemHealth() {
     await fetchAll();
     setRefreshing(false);
   };
-
-  /* Loading keeps the frame: the title and the way back are on screen while the numbers arrive. */
-  if (loading) {
-    return (
-      <SettingsScreen
-        title="Zdraví systému"
-        subtitle="Odezva databáze, přihlášení uživatelé a poslední chyby"
-        aside={false}
-        related={false}
-      >
-        <Box aria-busy="true" aria-label="Načítám stav systému">
-          <Grid container spacing={3}>
-            {[1, 2].map(i => (
-              <Grid key={i} size={{ xs: 12, sm: 6 }}>
-                <Skeleton variant="rounded" height={120} />
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      </SettingsScreen>
-    );
-  }
+  const retry = () => { void handleRefresh(); };
+  const attention = healthAttention(health);
 
   return (
     <SettingsScreen
@@ -134,183 +127,141 @@ export default function SystemHealth() {
       related={false}
       scope={false}
       actions={
-        <Tooltip title="Obnovit data">
-          <span>
-            <IconButton aria-label="Obnovit data" onClick={() => { void handleRefresh(); }} disabled={refreshing}>
-              <Refresh sx={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+        <Button
+          variant="outlined"
+          color="inherit"
+          aria-label="Obnovit data"
+          startIcon={<Refresh />}
+          onClick={retry}
+          disabled={refreshing || loading}
+          sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
+        >
+          {refreshing ? 'Obnovuji…' : 'Obnovit'}
+        </Button>
       }
     >
-      {/* ── Measured values ── */}
-      {healthFailed ? (
-        <Alert severity="error" sx={{ mb: 3 }} action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>
-          Stav systému se nepodařilo načíst.
-        </Alert>
-      ) : health && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard
-              label="Stav systému"
-              value={STATUS_TEXT[health.status]}
-              tone={health.status === 'ok' ? 'green' : health.status === 'unknown' ? 'ink' : 'red'}
-              hint={health.version ?? undefined}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard
-              label="Odezva databáze"
-              value={health.dbLatencyMs === null ? '—' : `${health.dbLatencyMs} ms`}
-              hint={health.dbReachable === false ? 'Databáze neodpovídá' : 'Jedna otázka databázi a zpět'}
-              tone={health.dbReachable === false ? 'red' : 'ink'}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard label="Aktivní relace" value={health.activeSessions ?? '—'} hint="Kdo je právě přihlášený" />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard
-              label="Fronta zpráv"
-              value={health.outboxPending ?? '—'}
-              tone={(health.outboxFailed ?? 0) > 0 ? 'red' : 'ink'}
-              hint={
-                health.outboxPending
-                  ? `Nejstarší čeká ${waitText(health.outboxOldestMinutes)}${(health.outboxFailed ?? 0) > 0 ? ` · selhalo ${health.outboxFailed}` : ''}`
-                  : 'Nic nečeká na odeslání'
-              }
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard
-              label="E-mailový server"
-              value={health.smtpConfigured === null ? '—' : health.smtpConfigured ? 'Nastaven' : 'Nenastaven'}
-              tone={health.smtpConfigured === false ? 'red' : 'ink'}
-              hint={health.smtpConfigured === false ? 'Zprávy se nikam neodesílají' : undefined}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <KpiCard
-              label="Úložiště dokumentů"
-              value={gigabytes(health.storageFreeBytes)}
-              tone={health.storageWritable === false ? 'red' : 'ink'}
-              hint={health.storageWritable === false ? 'Nejde do něj zapisovat' : 'Volné místo'}
-            />
-          </Grid>
-        </Grid>
-      )}
+      <Box sx={{ display: 'grid', gap: 3 }}>
+        {/* ── Measured values ── */}
+        <Shelf
+          id="health-status"
+          title="Stav"
+          layout="grid"
+          minCardWidth={210}
+          cardHeight={112}
+          skeletons={6}
+          loading={loading}
+          error={healthFailed ? 'Stav systému se nepodařilo načíst.' : false}
+          onRetry={retry}
+          stagger={false}
+        >
+          {health !== null && (
+            <>
+              <MetricCard
+                label="Stav systému"
+                value={STATUS_TEXT[health.status]}
+                tone={health.status === 'ok' ? 'green' : health.status === 'unknown' ? 'grey' : 'red'}
+                hint={health.version ?? undefined}
+              />
+              <MetricCard
+                label="Odezva databáze"
+                value={health.dbLatencyMs === null ? '—' : `${health.dbLatencyMs} ms`}
+                hint={health.dbReachable === false ? 'Databáze neodpovídá' : 'Jedna otázka databázi a zpět'}
+                tone={health.dbReachable === false ? 'red' : 'grey'}
+              />
+              <MetricCard label="Aktivní relace" value={health.activeSessions ?? '—'} hint="Kdo je právě přihlášený" />
+              <MetricCard
+                label="Fronta zpráv"
+                value={health.outboxPending ?? '—'}
+                tone={(health.outboxFailed ?? 0) > 0 ? 'red' : 'grey'}
+                hint={
+                  health.outboxPending
+                    ? `Nejstarší čeká ${waitText(health.outboxOldestMinutes)}${(health.outboxFailed ?? 0) > 0 ? ` · selhalo ${health.outboxFailed}` : ''}`
+                    : 'Nic nečeká na odeslání'
+                }
+              />
+              <MetricCard
+                label="E-mailový server"
+                value={health.smtpConfigured === null ? '—' : health.smtpConfigured ? 'Nastaven' : 'Nenastaven'}
+                tone={health.smtpConfigured === false ? 'red' : 'grey'}
+                hint={health.smtpConfigured === false ? 'Zprávy se nikam neodesílají' : undefined}
+              />
+              <MetricCard
+                label="Úložiště dokumentů"
+                value={gigabytes(health.storageFreeBytes)}
+                tone={health.storageWritable === false ? 'red' : 'grey'}
+                hint={health.storageWritable === false ? 'Nejde do něj zapisovat' : 'Volné místo'}
+              />
+            </>
+          )}
+        </Shelf>
 
-      {/* Sessions and errors side by side from 1280, one under the other below. */}
-      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: 'minmax(0, 1fr)', alignItems: 'start', [DESKTOP_UP]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } }}>
-      {/* ── Active Sessions ── */}
-      <div>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              <People sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Aktivní relace{sessionsFailed ? '' : ` (${sessions.length})`}
-            </Typography>
-            {sessionsFailed ? (
-              <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Aktivní relace se nepodařilo načíst.</Alert>
-            ) : (
-              <StackTable>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Uživatel</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>E-mail</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Přihlášen</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Platnost do</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {sessions.map((session) => (
-                      <TableRow key={session.id} hover>
-                        <TableCell>{session.displayName}</TableCell>
-                        <TableCell>{session.email}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {formatDateTime(session.createdAt)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {formatDateTime(session.expiresAt)}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {sessions.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                          <Typography color="text.secondary">Žádné aktivní relace</Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </StackTable>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        {/* Only what the answer says is wrong, each case a link to its fix; nothing when the answer did not come. */}
+        {attention !== null && (
+          <Shelf id="health-attention" title="Vyžaduje pozornost" count={attention.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+            <AttentionCard group={attention} />
+          </Shelf>
+        )}
 
-      {/* ── Recent failures from the audit log ── */}
-      <div>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              <ErrorOutlined sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Poslední chyby
-            </Typography>
-            {errorsFailed ? (
-              <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Poslední chyby se nepodařilo načíst.</Alert>
-            ) : (
-              <StackTable>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Čas</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Akce</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Záznam</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {errors.map((error) => (
-                      <TableRow key={error.id} hover>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {formatDateTime(error.timestamp)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{error.action}</TableCell>
-                        <TableCell>{error.entity}</TableCell>
-                      </TableRow>
-                    ))}
-                    {errors.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
-                          <CheckCircle sx={{ fontSize: 48, color: 'success.main', opacity: 0.35, mb: 1 }} />
-                          <Typography color="text.secondary">Žádné chyby</Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </StackTable>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        {/* Sessions and errors side by side from 1280, one under the other below. */}
+        <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: 'minmax(0, 1fr)', alignItems: 'start', [DESKTOP_UP]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } }}>
+          <Shelf
+            id="health-sessions"
+            title="Relace"
+            hint="Kdo je přihlášený"
+            count={loading || sessionsFailed ? undefined : sessions.length}
+            layout="free"
+            loading={loading}
+            error={sessionsFailed ? 'Aktivní relace se nepodařilo načíst.' : false}
+            onRetry={retry}
+            empty={sessions.length === 0}
+            emptyState={{ text: 'Žádné aktivní relace', action: { label: 'Uživatelé a práva', to: '/staff-management' } }}
+          >
+            <ResponsiveDataList
+              rows={sessions}
+              rowKey={(s) => s.id}
+              columns={SESSION_COLUMNS}
+              ariaLabel="Aktivní relace"
+              renderCard={(s) => (
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 15, fontWeight: 650 }}>{s.displayName}</Typography>
+                  <Typography sx={{ ...MUTED_SX, fontSize: 13, overflowWrap: 'anywhere' }}>{s.email}</Typography>
+                  <Typography sx={{ ...MUTED_SX, fontSize: 12.5, mt: 0.5 }}>
+                    {`Přihlášen ${formatDateTime(s.createdAt)} · do ${formatDateTime(s.expiresAt)}`}
+                  </Typography>
+                </Box>
+              )}
+            />
+          </Shelf>
+
+          {/* ── Recent failures from the audit log ── */}
+          <Shelf
+            id="health-errors"
+            title="Poslední chyby"
+            count={loading || errorsFailed ? undefined : errors.length}
+            countTone="red"
+            layout="free"
+            loading={loading}
+            error={errorsFailed ? 'Poslední chyby se nepodařilo načíst.' : false}
+            onRetry={retry}
+            empty={errors.length === 0}
+            emptyState={{ text: 'Žádné chyby', action: { label: 'Auditní log', to: '/audit-log' } }}
+            viewAll={errors.length > 0 ? { to: '/audit-log', label: 'Auditní log' } : undefined}
+          >
+            <ResponsiveDataList
+              rows={errors}
+              rowKey={(e) => e.id}
+              columns={ERROR_COLUMNS}
+              ariaLabel="Poslední chyby"
+              renderCard={(e) => (
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 14.5, fontWeight: 650, overflowWrap: 'anywhere' }}>{e.action}</Typography>
+                  <Typography sx={{ ...MUTED_SX, fontSize: 13 }}>{`${e.entity} · ${formatDateTime(e.timestamp)}`}</Typography>
+                </Box>
+              )}
+            />
+          </Shelf>
+        </Box>
       </Box>
-
-      {/* ── Spin animation for refresh ── */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </SettingsScreen>
   );
 }
