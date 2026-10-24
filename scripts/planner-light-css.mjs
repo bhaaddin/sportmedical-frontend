@@ -48,6 +48,8 @@ export const SOURCES = [
   'src/planner/components/dialogs/board/board-dialogs.css',
   'src/planner/components/dialogs/generic/generic.css',
   'src/planner/components/dialogs/leftover/leftover.css',
+  'src/planner/guide/guide.base.css',
+  'src/planner/guide/guide.css',
 ];
 export const OUT = 'src/planner/styles/planner.light.css';
 /* Every light rule gains the same (0,1,1) over the dark rule it copies, so the cascade BETWEEN rules (board.css's "repeat the class
