@@ -2,6 +2,17 @@
    vitest's expect. Without this they exist but throw at the call site. */
 import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
+import { configure } from '@testing-library/react';
+
+/*
+ * How long findBy / waitFor keep looking. Testing Library's default is 1 s,
+ * which a debounced price (ClubOrderForm), a hover peek or the planner's lunch
+ * band meets alone but misses inside the full suite on a busy machine - the
+ * tests then failed for a reason that is not the one they check. A passing
+ * wait returns the moment its condition holds, so a longer limit costs only a
+ * failing test's time; it never slows a green run.
+ */
+configure({ asyncUtilTimeout: 10_000 });
 
 /* The notification bells keep the last list for a few seconds; a test must never start from the previous test's. */
 afterEach(() => (globalThis as { __smResetNotificationFeed?: () => void }).__smResetNotificationFeed?.());

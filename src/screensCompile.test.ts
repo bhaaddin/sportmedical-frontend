@@ -59,9 +59,13 @@ describe('every screen parses', () => {
    * inside the full suite on a machine shared with other work, against a
    * 30 s limit. A parse error throws at once whatever the limit is, so the
    * limit only has to stop a hang.
+   *
+   * It cried again in Stage 2 (22. 10. 2026): one cold parse took 220 s inside
+   * a full suite while another agent's tests ran. The limit is now 5 minutes -
+   * still a hang guard, no longer a load meter.
    */
   it.each(paths)('%s', async (path) => {
     const loaded = await modules[path]();
     expect(loaded).toBeTypeOf('object');
-  }, 60_000);
+  }, 300_000);
 });

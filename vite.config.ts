@@ -120,6 +120,8 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    /* Above the 10 s wait limit in the setup file, so a wait that fails says what it waited for. */
+    testTimeout: 30_000,
     /* Only our own tests. Without this vitest also walks node_modules. */
     include: ['src/**/*.test.{ts,tsx}'],
   },
