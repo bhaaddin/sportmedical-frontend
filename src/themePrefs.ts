@@ -15,6 +15,12 @@ export interface ThemePrefs {
    */
   plannerTint?: string | null;
   setPlannerTint?: (color: string | null) => void;
+  /**
+   * The clinic's planner tint (`calendar-display.plannerTintColor`, a server that has the field), fed by `ClinicPlannerTint`.
+   * The planner uses this browser's own tint first, then the clinic's, then the accent.
+   */
+  clinicPlannerTint?: string | null;
+  setClinicPlannerTint?: (color: string | null) => void;
 }
 
 export const ACCENT_STORAGE_KEY = 'sm-theme-accent';

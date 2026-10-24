@@ -25,6 +25,10 @@ export function ThemePrefsProvider({ children }: { children: ReactNode }) {
   const [accent, setAccentState] = useState<string>(readStoredAccent);
   const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
   const [plannerTint, setPlannerTintState] = useState<string | null>(readStoredPlannerTint);
+  const [clinicPlannerTint, setClinicPlannerTintState] = useState<string | null>(null);
+  const setClinicPlannerTint = useCallback((color: string | null) => {
+    setClinicPlannerTintState(color === null ? null : sanitizeAccent(color));
+  }, []);
 
   const setAccent = useCallback((color: string) => {
     /* Only a usable colour is kept: a junk value would otherwise be stored and read back as the default next time anyway. */
@@ -57,7 +61,10 @@ export function ThemePrefsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const activeTheme = useMemo(() => buildTheme(accent, mode), [accent, mode]);
-  const value = useMemo(() => ({ accent, mode, setAccent, setMode, plannerTint, setPlannerTint }), [accent, mode, setAccent, setMode, plannerTint, setPlannerTint]);
+  const value = useMemo(
+    () => ({ accent, mode, setAccent, setMode, plannerTint, setPlannerTint, clinicPlannerTint, setClinicPlannerTint }),
+    [accent, mode, setAccent, setMode, plannerTint, setPlannerTint, clinicPlannerTint, setClinicPlannerTint],
+  );
   return (
     <ThemePrefsContext.Provider value={value}>
       <ThemeProvider theme={activeTheme}>{children}</ThemeProvider>

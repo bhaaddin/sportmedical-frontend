@@ -115,4 +115,18 @@ describe('AccentRootVars - the mode attribute the light stylesheet of the planne
     expect(root.style.getPropertyValue('--sm-planner-accent')).toBe('#EA580C');
     expect(root.style.getPropertyValue('--sm-accent')).toBe('#2563EB');
   });
+  it('the clinic tint applies when this browser has none of its own; a browser tint wins over it', () => {
+    const { rerender } = render(
+      <ThemePrefsContext.Provider value={{ ...prefs('#2563EB', 'light'), plannerTint: null, clinicPlannerTint: '#7C3AED' }}>
+        <AccentRootVars />
+      </ThemePrefsContext.Provider>,
+    );
+    expect(root.style.getPropertyValue('--sm-planner-accent')).toBe('#7C3AED');
+    rerender(
+      <ThemePrefsContext.Provider value={{ ...prefs('#2563EB', 'light'), plannerTint: '#EA580C', clinicPlannerTint: '#7C3AED' }}>
+        <AccentRootVars />
+      </ThemePrefsContext.Provider>,
+    );
+    expect(root.style.getPropertyValue('--sm-planner-accent')).toBe('#EA580C');
+  });
 });

@@ -50,6 +50,11 @@ export interface CalendarDisplaySettings {
    */
   lunchFrom?: string;
   lunchTo?: string;
+  /**
+   * `#RRGGBB` - the planner's tint for the whole clinic; `null` = follow the accent. ABSENT on a server that predates the field
+   * (the tint then lives per browser only). A PUT that sends `''` clears it; one that leaves it out keeps it.
+   */
+  plannerTintColor?: string | null;
 }
 
 /** One fact the hover card may show, as the server describes it. */

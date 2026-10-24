@@ -12,6 +12,7 @@ import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import NetworkBanner from './components/NetworkBanner';
 import { startPrefetching } from './prefetchRoutes';
 import { AccentRootVars } from './AccentRootVars';
+import { ClinicPlannerTint } from './ClinicPlannerTint';
 import { isLabHost } from './motion/lab/labHost';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/*" element={
               <AuthGuard>
                 <AccentRootVars />
+                <ClinicPlannerTint />
                 <Suspense fallback={<StaffShellPlaceholder />}>
                   <StaffApp />
                 </Suspense>

@@ -30,6 +30,8 @@ import { calendarsApi, calendarToInput } from '../../api/calendars';
 import { activitiesApi, activityToInput } from '../../api/activities';
 import type { Activity, Calendar } from '../../api/bookingContracts';
 import { DEFAULT_ACCENT, ThemePrefsContext } from '../../themePrefs';
+import { CALENDAR_DISPLAY_QUERY_KEY, readCalendarDisplay, saveCalendarDisplay } from '../../api/displaySettings';
+import { usePermission } from '../../auth/usePermission';
 import { PlannerTintEditor, TINT_TEXT } from './colors/PlannerTintEditor';
 import { CalendarColorList, defaultCalendarColor } from './colors/CalendarColorList';
 import { useDevice } from '../../layout/useDevice';
@@ -121,6 +123,29 @@ export default function ServiceColorsPage() {
   const accent = prefs?.accent ?? DEFAULT_ACCENT;
   const plannerTint = prefs?.plannerTint ?? null;
   const setPlannerTint = prefs?.setPlannerTint;
+  /*
+   * The tint is the clinic's when the server keeps it (`plannerTintColor` present) and this person may change clinic settings:
+   * a pick is saved for everybody and this browser's own tint is dropped. Otherwise it stays per browser, as before.
+   */
+  const mayManageClinic = usePermission('settings.clinic.manage');
+  const displayQuery = useQuery({ queryKey: CALENDAR_DISPLAY_QUERY_KEY, queryFn: readCalendarDisplay, staleTime: 5 * 60 * 1000, retry: false });
+  const clinicTintKept = displayQuery.data !== undefined && displayQuery.data.settings.plannerTintColor !== undefined;
+  const clinicWide = mayManageClinic && clinicTintKept;
+  const clinicTint = displayQuery.data?.settings.plannerTintColor ?? null;
+  const editorTint = clinicWide ? clinicTint : plannerTint;
+  const saveTint = useMutation({
+    mutationFn: (hex: string | null) => saveCalendarDisplay({ ...displayQuery.data!.settings, plannerTintColor: hex ?? '' }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(CALENDAR_DISPLAY_QUERY_KEY, next);
+      setPlannerTint?.(null);
+      toast.success(TINT_TEXT.savedClinic);
+    },
+    onError: (error) => toast.error(problemMessageOf(error, TINT_TEXT.saveFailed)),
+  });
+  const pickTint = (hex: string | null) => {
+    if (clinicWide) saveTint.mutate(hex);
+    else setPlannerTint?.(hex);
+  };
 
   const saved = paletteQuery.data;
   const baseRows = useMemo<PaletteRow[] | null>(() => (saved === undefined ? null : toRows(saved.palette)), [saved]);
@@ -214,12 +239,21 @@ export default function ServiceColorsPage() {
             <Typography id="barvy-planovac" component="h2" sx={TYPE.sectionTitle}>{TINT_TEXT.title}</Typography>
             <Box sx={{ mt: 1 }}>
               <PlannerTintEditor
-                key={plannerTint ?? 'follow'}
-                value={plannerTint ?? accent}
-                followed={plannerTint === null}
+                key={editorTint ?? 'follow'}
+                value={editorTint ?? accent}
+                followed={editorTint === null}
                 palette={palette}
-                onChange={(hex) => { setPlannerTint?.(hex); }}
+                onChange={pickTint}
               />
+              <Typography data-testid="tint-scope" sx={[TYPE.caption, { mt: 1 }]}>
+                {clinicWide ? TINT_TEXT.scopeClinic : clinicTintKept ? TINT_TEXT.scopeBrowserNoRight : TINT_TEXT.scopeBrowser}
+              </Typography>
+              {clinicWide && plannerTint !== null ? (
+                <Alert severity="info" sx={{ mt: 1 }} data-testid="tint-browser-own"
+                  action={<Button color="inherit" size="small" onClick={() => setPlannerTint?.(null)} sx={{ minHeight: 44 }}>{TINT_TEXT.useClinic}</Button>}>
+                  {TINT_TEXT.browserOwn(plannerTint)}
+                </Alert>
+              ) : null}
             </Box>
           </SoftCard>
 

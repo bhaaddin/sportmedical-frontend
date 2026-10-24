@@ -32,7 +32,9 @@ function loadLightLayer(): void {
  * again. The default accent sets nothing but the mode - the stylesheets' own fallbacks are then the default look.
  */
 export function AccentRootVars() {
-  const { accent, mode, plannerTint = null } = useThemePrefs();
+  const { accent, mode, plannerTint: own = null, clinicPlannerTint = null } = useThemePrefs();
+  /* This browser's own tint first, then the clinic's, then the accent (`accentVariables` falls back to it on null). */
+  const plannerTint = own ?? clinicPlannerTint;
   useLayoutEffect(() => {
     const root = document.documentElement;
     const vars = accentVariables(accent, mode, plannerTint);

@@ -11,7 +11,8 @@
  *   náhled        live: a mini planner header in dark and in light with the tint as its primary button, tab and ring;
  *   výchozí       "Sledovat barvu aplikace": no tint of its own.
  *
- * Remembered in this browser (like the accent); the clinic-wide copy needs one backend field, see docs/stage3b-2026-10.md.
+ * The clinic's, saved in the calendar display settings (`plannerTintColor`), when the server keeps it and the person may change clinic
+ * settings; otherwise remembered in this browser (like the accent). A browser's own tint wins over the clinic's.
  */
 import { useMemo, useState } from 'react';
 import { Box, Button, Stack, TextField, Typography } from '@mui/material';
@@ -38,6 +39,13 @@ export const TINT_TEXT = {
   notHex: 'Zadejte barvu jako #RRGGBB, například #2563EB.',
   followsNow: 'Plánovač sleduje barvu aplikace',
   ownNow: 'Plánovač má vlastní barvu',
+  scopeClinic: 'Platí pro celou kliniku, na všech počítačích.',
+  scopeBrowser: 'Platí jen v tomto prohlížeči.',
+  scopeBrowserNoRight: 'Platí jen v tomto prohlížeči. Barvu pro celou kliniku mění správce nastavení.',
+  browserOwn: (hex: string) => `Tento prohlížeč má vlastní barvu plánovače (${hex}), která má přednost před barvou kliniky.`,
+  useClinic: 'Použít barvu kliniky',
+  savedClinic: 'Barva plánovače uložena pro celou kliniku.',
+  saveFailed: 'Barvu plánovače se nepodařilo uložit. Zkuste to prosím znovu.',
 } as const;
 
 const fmt = (n: number): string => n.toFixed(1).replace('.', ',');
