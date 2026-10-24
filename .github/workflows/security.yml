@@ -1,0 +1,70 @@
+# Security baseline for any repo (copy to .github/workflows/security.yml).
+# Free tools only, run as plain CLIs from the projects' own release pages, pinned and checksum-verified
+# (gitleaks-action has a custom licence, so the CLI is used instead). Actions are pinned by commit SHA.
+# Replace claude/clean, main with the repo's real branches. Schedules only fire from the default branch.
+name: Security
+
+on:
+  push:
+    branches: [claude/clean, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          V=8.30.1
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${V}"
+          curl -sSfL -o gitleaks.tgz "${base}/gitleaks_${V}_linux_x64.tar.gz"
+          curl -sSfL -o gitleaks.sums "${base}/gitleaks_${V}_checksums.txt"
+          awk -v f="gitleaks_${V}_linux_x64.tar.gz" '$2 == f { print $1 "  gitleaks.tgz" }' gitleaks.sums | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+      - name: Scan history
+        run: |
+          args="--source . --redact --no-banner"
+          [ -f .gitleaks.toml ] && args="$args --config .gitleaks.toml"
+          [ -f .gitleaks-baseline.json ] && args="$args --baseline-path .gitleaks-baseline.json"
+          ./gitleaks detect $args
+
+  dependencies:
+    name: Known vulnerabilities (osv-scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install osv-scanner (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          V=2.7.0
+          base="https://github.com/google/osv-scanner/releases/download/v${V}"
+          curl -sSfL -o osv-scanner "${base}/osv-scanner_linux_amd64"
+          curl -sSfL -o osv.sums "${base}/osv-scanner_SHA256SUMS"
+          awk '$2 == "osv-scanner_linux_amd64" { print $1 "  osv-scanner" }' osv.sums | sha256sum -c -
+          chmod +x osv-scanner
+      - name: Scan lockfiles
+        run: ./osv-scanner scan source -r .
+
+  review:
+    name: Dependency review (pull requests)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

@@ -1,0 +1,16 @@
+# Copy to .gitleaks.toml. Uses the default rules and only silences obvious test data.
+# Never allow-list a real secret: rotate it instead (git history keeps it forever).
+title = "baseline"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test fixtures and sample values"
+paths = [
+  '''(^|/)(tests?|__tests__|fixtures?)/''',
+  '''\.(test|spec)\.[cm]?[jt]sx?$''',
+  '''(^|/)fixtures?\.[cm]?[jt]s$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)packages\.lock\.json$''',
+]
