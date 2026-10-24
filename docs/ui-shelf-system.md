@@ -494,3 +494,31 @@ added or changed hold 249 tests (`src/ui/shelf/*`, `UniversalSearch`, `Dashboard
 **Not verified**: Safari, Firefox, a real phone or touch (the pointer rules are tested with a mouse and synthetic touch events); a production build
 under load (the numbers are a dev server); the settings pages (Phase 2); a screen reader (the structure - regions, headings, `combobox` /
 `option`, named controls - is asserted, but nobody listened to it).
+
+## Phase 2 - Settings frame and hub (S-7 / S-6 hub, branch `shelf2/settings`)
+
+**One change, ~35 screens.** `src/pages/settings/SettingsFrame.tsx` (`SettingsScreen`) now has the anatomy of `PageFrame`: the
+breadcrumb "Nastavení / Skupina / Položka" (13 px quiet links; on a phone a "Zpět" button to the group), one h1 (24/28, 800), one
+line of purpose (15 muted), the actions top right (Zahodit · Uložit, live only while there is a change; pinned at the bottom on a
+phone), **the rail** under the header, the screen's content as a region named by the h1 (`data-shelf="settings"`), and the right
+column as shelves (`SettingsAsideCard` "Náhled", "Související nastavení": a 15/700 heading over one board on `cardSurface`).
+Every outlined board a screen draws inside the frame gets the shelf radius (16 px). "Poslední změny" (`components/settings/RecentChanges`)
+is a `Shelf` (`list`, with its count). Kept: `SettingsNav` (the shell's settings rail; the active chip uses `primary.contrastText`),
+search, permissions, two columns from 1280, loading/error states, rendering outside a router. New: under 1280 the column stack
+scrolls as one (before, a short form left a window-high gap above the right-hand shelves on a tablet).
+
+**The hub** (`src/pages/Settings.tsx`): a `PageFrame` with one shelf per catalogue group whose cards are the group's screens
+(name + one quiet line = the catalogue's description; "Zabezpečení a zálohy" also shows its light once the lights answered),
+"Celá skupina" to `/settings/:group`, then Osobní (Vzhled, Můj účet) as a shelf. A phone swipes each group's row; tablet and desktop
+wrap a grid. No icons on cards (R18). The search box is drawn when the shell's rail has none (tablet, phone); on a desktop the rail's
+box is the one search and drives the hub. A search shows one "Výsledky hledání" shelf (group as overline; empty state "Zrušit hledání").
+**"Vyžaduje nastavení"** (`settings/hubModel.ts`, pure, tested) is drawn only from the security lights the app already reads
+(`GET /api/system/security/lights`), only for a person who may open that screen (never requested otherwise), and only for a red or
+amber light - unknown, failed or green draw nothing. Company data / calendars without hours were not added: the hub does not read
+them. **The group page** `/settings/:group`: crumbs, `PageFrame`, one "Položky" shelf with the whole descriptions.
+
+Files: `pages/settings/SettingsFrame.tsx`, `pages/Settings.tsx`, `pages/settings/hubModel.ts` (+ test), `components/settings/RecentChanges.tsx`,
+`components/settings/SecurityStatusChip.tsx` (`useSecurityLights`, `SecurityLightChip`), tests `Settings.test.tsx`, `Settings.audit.test.tsx`,
+`Settings.shelf.test.tsx` (new), `settings/SettingsFrame.test.tsx`. `scripts/shelf-check.mjs`: settings pages in `PAGE_PATH`
+(`settings`, `settings-system`, `set-firma`, `set-hours`, `set-2fa`) and `MODE=dark|light`. Screenshots: `design/shelf2/`.
+Known: `/working-hours`' own purpose line has two inline text links (výjimkách, svátcích) under 44 px - the screen's text, not the frame.
