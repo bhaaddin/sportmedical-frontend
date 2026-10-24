@@ -96,6 +96,9 @@
   outline: 1px solid var(--club, #6e91a5);
 }
 .sm-planner .day-cell .mini-clubs i[data-hold='expired'] { outline-style: dashed; }
+/* R22: given to the club but not confirmed / answered yet - lighter than a confirmed hold, dashed (offered: dotted and lighter still) */
+.sm-planner .day-cell .mini-clubs i[data-hold='requested'] { outline-style: dashed; opacity: 0.7; }
+.sm-planner .day-cell .mini-clubs i[data-hold='offered'] { outline-style: dotted; opacity: 0.45; }
 
 /* ---------------------------------------------------------------------------------------------------------------------------
    R16a / R20: the LIQUID of a mini-calendar day moves, and its činnosti are bands in their own colours.

@@ -38,6 +38,11 @@ import { boardSettings, useBoardSettings, type FacetCalendar, type FacetEmployee
 import { aliasMap, serviceGroups, type GroupActivity } from './serviceGroups';
 import { BOOKING_SLOTS_QUERY_KEY, hasSingleWorkerSetting, readBookingSlots } from '../../../api/bookingSlots';
 import type { RosterWorker } from './workerClash';
+import { clubOrdersApi, type ClubOrderView } from '../../../api/clubOrders';
+import { enrichClubBlocks, pendingHoldBlocks } from '../../model/pendingHolds';
+import { useBoardConfig } from './boardConfig';
+
+const NO_ORDERS: readonly ClubOrderView[] = [];
 
 export interface BoardCalendarData {
   /** Calendars and bookings have been read at least once. */
@@ -65,7 +70,12 @@ export interface BoardCalendarData {
   calendarById: ReadonlyMap<string, Calendar>;
   /** The bookings the filters leave on screen, any day of the window. */
   appointments: DayAppointment[];
+  /** Blocks that REFUSE a booking: the real ones (completed from the order list on an older server) and the requested-day stand-ins. */
   blocksByCalendar: ReadonlyMap<string, TimeBlock[]>;
+  /** R22: the same plus the offered-day stand-ins, which are only drawn (a booking there warns, it is not refused). */
+  drawBlocksByCalendar: ReadonlyMap<string, TimeBlock[]>;
+  /** R22: the club orders behind the stand-ins (empty on the club planner and on a server without the list). */
+  clubOrders: readonly ClubOrderView[];
   previewByCalendar: ReadonlyMap<string, ReadonlyMap<string, PreviewDay>>;
   catalogue: Catalogue;
   display: CalendarDisplaySettings;
@@ -174,11 +184,38 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     })),
     combine: dataOfEach,
   });
-  const blocksByCalendar = useMemo(() => {
-    const map = new Map<string, TimeBlock[]>();
-    shown.forEach((calendar, i) => map.set(calendar.id, blockLists[i] ?? []));
-    return map;
-  }, [shown, blockLists]);
+  /* R22: the MAIN calendar shows time a club was given but has not finished; the club planner draws its own and is left alone. */
+  const holdsOn = useBoardConfig().mode === 'standard';
+  const ordersQuery = useQuery({
+    queryKey: ['club-orders', 'inquiries'],
+    queryFn: () => clubOrdersApi.list({}),
+    enabled: holdsOn,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const clubOrders = holdsOn && Array.isArray(ordersQuery.data) ? ordersQuery.data : NO_ORDERS;
+  const daysKey = days.join(',');
+  const { blocksByCalendar, drawBlocksByCalendar } = useMemo(() => {
+    const real = new Map<string, TimeBlock[]>();
+    shown.forEach((calendar, i) => real.set(calendar.id, enrichClubBlocks(blockLists[i] ?? [], clubOrders)));
+    if (clubOrders.length === 0) return { blocksByCalendar: real, drawBlocksByCalendar: real };
+    const pending = pendingHoldBlocks(clubOrders, {
+      calendars: shown.map((c) => ({ id: c.id, clinicServiceId: c.clinicServiceId })),
+      days: daysKey === '' ? [] : daysKey.split(','),
+      hoursOf: (calendarId, day) => {
+        const row = previewByCalendar.get(calendarId)?.get(day);
+        return row && row.isOpen && row.startTime && row.endTime ? { from: row.startTime, to: row.endTime } : null;
+      },
+    });
+    const hard = new Map<string, TimeBlock[]>();
+    const draw = new Map<string, TimeBlock[]>();
+    for (const [id, list] of real) {
+      const extra = pending.get(id) ?? [];
+      hard.set(id, extra.length ? [...list, ...extra.filter((b) => b.pendingHold === 'requested')] : list);
+      draw.set(id, extra.length ? [...list, ...extra] : list);
+    }
+    return { blocksByCalendar: hard, drawBlocksByCalendar: draw };
+  }, [shown, blockLists, clubOrders, previewByCalendar, daysKey]);
 
   const { settings: display } = useCalendarDisplay();
 
@@ -257,6 +294,8 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     calendarById,
     appointments,
     blocksByCalendar,
+    drawBlocksByCalendar,
+    clubOrders,
     previewByCalendar,
     catalogue: catalogue ?? EMPTY_CATALOGUE,
     display,

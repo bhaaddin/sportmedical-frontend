@@ -29,6 +29,7 @@ import { selectActivePreview } from '../state/selectors';
 import { Icon } from './Icons';
 import { useQuery } from '@tanstack/react-query';
 import { clubBlocksApi } from '../../api/clubBlocks';
+import { clubOrdersApi } from '../../api/clubOrders';
 import { activitiesApi } from '../../api/activities';
 import { activityInfoOf, type Catalogue } from '../../components/booking/calendar/model';
 import { clubDaysOf } from './left/miniClubs';
@@ -107,7 +108,12 @@ export function MiniCalendarPanel() {
     () => ({ activities: new Map((activitiesQ.data?.activities ?? []).map((a) => [a.id, activityInfoOf(a)])), services: new Map() }),
     [activitiesQ.data],
   );
-  const clubsByDay = useMemo(() => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks, bookingCatalogue), [cells, clubBlocks.data, dayMarks, bookingCatalogue]);
+  /* R22: the same order list the board reads (one shared query) gives the requested / offered days */
+  const ordersQ = useQuery({ queryKey: ['club-orders', 'inquiries'], queryFn: () => clubOrdersApi.list({}), enabled: clubsOn, staleTime: 30_000, retry: false });
+  const clubsByDay = useMemo(
+    () => clubDaysOf(cells, clubBlocks.data ?? [], dayMarks, bookingCatalogue, Array.isArray(ordersQ.data) ? ordersQ.data : []),
+    [cells, clubBlocks.data, dayMarks, bookingCatalogue, ordersQ.data],
+  );
 
   /* R20: the liquid only moves while the days are on screen and the tab is visible (a closed drawer / sheet is off screen) */
   const daysRef = useRef<HTMLDivElement | null>(null);

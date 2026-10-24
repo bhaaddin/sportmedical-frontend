@@ -528,8 +528,13 @@ describe('the phone: Den is an agenda of the day under the week\'s strip', () =>
   it('is a list, not the grid: bookings, club windows and blocks in the order they start, with what each is', async () => {
     await openAgenda();
     const list = await within(agenda()).findByTestId('phone-day-list');
-    await waitFor(() => expect(within(list).getAllByRole('button')).toHaveLength(3));
-    const rows = within(list).getAllByRole('button');
+    /* R22: the order o1 has asked for this day (no block yet), so the agenda also lists the club's pending hold */
+    await waitFor(() => expect(within(list).getAllByRole('button')).toHaveLength(4));
+    const all = within(list).getAllByRole('button');
+    const pending = all.filter((r) => /Čeká na (potvrzení|odpověď)/.test(r.textContent ?? ''));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toHaveTextContent('Rezervováno pro klub');
+    const rows = all.filter((r) => !pending.includes(r));
     expect(rows.map((r) => r.getAttribute('data-kind'))).toEqual(['club', 'booking', 'block']);
     expect(rows[0]).toHaveTextContent('08:00–12:00');
     expect(rows[0]).toHaveTextContent('FK Slaný');
@@ -589,8 +594,9 @@ describe('the phone: Den is an agenda of the day under the week\'s strip', () =>
     cleanup();
     await openAgenda();
     await within(agenda()).findByTestId('phone-entry-b2');
-    await waitFor(() => expect(within(agenda()).getAllByRole('button').some((b) => b.getAttribute('data-kind') === 'club')).toBe(true));
-    fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'club')!);
+    const realClub = () => within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'club' && !/Čeká na (potvrzení|odpověď)/.test(b.textContent ?? ''));
+    await waitFor(() => expect(realClub()).toBeTruthy());
+    fireEvent.click(realClub()!);
     expect(JSON.parse((await screen.findByTestId('club-popover')).dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubName: 'FK Slaný' });
     fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'block')!);
     expect(await screen.findByRole('dialog', { name: /Zablokovaný čas/ })).toHaveTextContent('Školení');
@@ -676,3 +682,65 @@ describe('the other layouts keep the file\'s own list and tiles', () => {
 
 void act;
 void actions;
+
+/* ------------------------------------------------------------------------ */
+/* R22: time given to a club that has not finished is drawn in the main calendar */
+/* ------------------------------------------------------------------------ */
+
+describe('R22: a club that was given time shows in the main calendar even unfinished', () => {
+  const winsOf = (day: string) => Array.from(document.querySelectorAll<HTMLElement>(`[data-testid^="board-window-"][data-testid$="-${day}"]`));
+
+  it('a Requested order is a hatched hold "Rezervováno pro klub X", an Invited one "Nabídnuto klubu X"; confirmed and cancelled orders add none', async () => {
+    clubOrders = [
+      order({ id: 'o1', clubName: 'Dukla', status: 'Requested', requestedDates: ['2026-12-10'] }),
+      order({ id: 'o2', clubName: 'Slavia', status: 'Invited', offeredDates: ['2026-12-11'] }),
+      order({ id: 'o3', clubName: 'Sparta', status: 'Confirmed', requestedDates: ['2026-12-10'] }),
+      order({ id: 'o4', clubName: 'Baník', status: 'Cancelled', requestedDates: ['2026-12-10'], offeredDates: ['2026-12-10'] }),
+    ];
+    mount();
+    await screen.findByTestId('day-inquiry-2026-12-10');
+    await waitFor(() => expect(winsOf('2026-12-10')).toHaveLength(1));
+    const requested = winsOf('2026-12-10')[0]!;
+    expect(requested).toHaveClass('is-requested');
+    expect(requested).toHaveAttribute('data-hold', 'requested');
+    expect(requested).toHaveTextContent('Rezervováno pro klub Dukla');
+    expect(requested).toHaveTextContent('Čeká na potvrzení');
+    expect(requested).toHaveTextContent('08:00–16:00'.replace('–', '–'));
+    const offered = winsOf('2026-12-11')[0]!;
+    expect(offered).toHaveClass('is-offered');
+    expect(offered).toHaveTextContent('Nabídnuto klubu Slavia');
+    expect(offered).toHaveTextContent('Čeká na odpověď');
+    expect(document.body.textContent).not.toContain('Baník');
+    expect(document.body.textContent).not.toContain('Sparta');
+    /* a click opens the club order */
+    fireEvent.click(requested);
+    expect(JSON.parse((await screen.findByTestId('club-popover')).dataset.pick!)).toMatchObject({ clubName: 'Dukla', block: { clubOrderId: 'o1', pendingHold: 'requested' } });
+  });
+
+  it('the requested and the offered stand-ins are different kinds (the refusal itself is in pendingHolds.test.ts and the Playwright check)', async () => {
+    clubOrders = [
+      order({ id: 'o1', clubName: 'Dukla', status: 'Requested', requestedDates: ['2026-12-10'] }),
+      order({ id: 'o2', clubName: 'Slavia', status: 'Invited', offeredDates: ['2026-12-11'] }),
+    ];
+    mount();
+    await waitFor(() => expect(winsOf('2026-12-10')).toHaveLength(1));
+    expect(winsOf('2026-12-10')[0]).toHaveAttribute('data-hold', 'requested');
+    expect(winsOf('2026-12-11')[0]).toHaveAttribute('data-hold', 'offered');
+    expect(winsOf('2026-12-11')[0]).not.toHaveClass('is-requested');
+  });
+
+  it('an older server (no stage 2 fields): a confirmed order with no players still says it waits for them', async () => {
+    blocks = [{ id: 'b1', startUtc: '2026-12-10T07:00:00Z', endUtc: '2026-12-10T15:00:00Z', reason: 'Dukla', kind: 'club', clubBlockId: 'cb1', clubName: 'Dukla', colorHex: '#EA580C' } as TimeBlock];
+    clubOrders = [order({ id: 'o1', clubName: 'Dukla', status: 'Confirmed', blocks: [{ id: 'cb1', seats: 20, registered: 0 } as never] })];
+    mount();
+    await waitFor(() => expect(winsOf('2026-12-10')).toHaveLength(1));
+    await waitFor(() => expect(winsOf('2026-12-10')[0]).toHaveTextContent('Čeká na hráče'));
+  });
+
+  it('the club planner (mode club) is left alone: no stand-ins there', async () => {
+    clubOrders = [order({ id: 'o1', clubName: 'Dukla', status: 'Requested', requestedDates: ['2026-12-10'] })];
+    mount({ config: { mode: 'club' } });
+    await screen.findByTestId('day-inquiry-2026-12-10');
+    expect(winsOf('2026-12-10')).toHaveLength(0);
+  });
+});

@@ -654,6 +654,8 @@
 .sm-planner .board-window .win-hold[data-hold='full'] { color: #b6f2a2; }
 .sm-planner .board-window .win-hold[data-hold='waiting'] { color: #ffe08a; }
 .sm-planner .board-window .win-hold[data-hold='expired'] { color: #ffb4a8; }
+.sm-planner .board-window .win-hold[data-hold='requested'] { color: #cfe4f3; }
+.sm-planner .board-window .win-hold[data-hold='offered'] { color: #b4cbdc; border-style: dashed; }
 .sm-planner .board-window[data-hold='expired'] { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
 /* R13: a club's day in the month is a hatched, locked bar in the club's colour (the colour is a mark, the words say the state) */
 .sm-planner .month-tile .tile-club.is-held {
@@ -820,3 +822,15 @@
 .sm-planner .board-undo button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 9px; border: 1px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); background: transparent; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); font: inherit; font-weight: 800; cursor: pointer; }
 .sm-planner .board-undo button.undo-dismiss { border-color: transparent; color: inherit; font-size: 18px; }
 .sm-planner .board-undo button:disabled { opacity: 0.55; cursor: progress; }
+
+/* R22 - time given to a club that has not confirmed (requested) or answered (offered): a lighter hatch than a confirmed hold, never solid */
+.sm-planner .board-window.is-club.is-pending { border-width: 2px; border-left-width: 4px; border-style: dashed; border-left-style: solid; }
+.sm-planner .board-window.is-club.is-offered { border-style: dotted; border-left-style: dashed; }
+.sm-planner .board-window.is-pending .win-label { font-style: italic; }
+.offered-ask p { margin: 6px 0 10px; font-size: 13px; line-height: 1.35; }
+.offered-ask-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sm-planner .month-tile .tile-club.is-held[data-hold='requested'] { border-top: 1px dashed var(--club, #6e91a5); border-right: 1px dashed var(--club, #6e91a5); border-bottom: 1px dashed var(--club, #6e91a5); background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--club, #6e91a5) 15%, transparent) 0 6px, color-mix(in srgb, var(--club, #6e91a5) 4%, transparent) 6px 12px); }
+.sm-planner .month-tile .tile-club.is-held[data-hold='offered'] { border-top: 1px dotted var(--club, #6e91a5); border-right: 1px dotted var(--club, #6e91a5); border-bottom: 1px dotted var(--club, #6e91a5); border-left-style: dashed; background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--club, #6e91a5) 9%, transparent) 0 6px, color-mix(in srgb, var(--club, #6e91a5) 3%, transparent) 6px 12px); }
+/* R22: an OFFERED day only warns, it does not refuse - a press on the free part of it marks time as everywhere else (and asks first); only the label opens the order */
+.sm-planner .board-window.is-offered { pointer-events: none; }
+.sm-planner .board-window.is-offered .board-sticky { pointer-events: auto; cursor: pointer; }

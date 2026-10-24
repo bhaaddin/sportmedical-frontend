@@ -17,7 +17,7 @@ import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
 import { distinctActivities, frameSubs } from './clubFrame';
 import { EMPTY_CATALOGUE, type Catalogue } from '../../../components/booking/calendar/model';
-import { clubColourOf, clubItemText, holdLabel, holdStateOf, type ClubDayItem } from './clubHold';
+import { HOLD_TEXT, clubColourOf, clubItemText, holdLabel, holdStateOf, type ClubDayItem } from './clubHold';
 import { lockedDayLook, type LockedDayLook } from '../../../colors/dayLock';
 import { agendaSlotLabel } from '../../model';
 import { groupDayRows, type BoardWindowModel, type DayRowModel, type MonthTileModel } from './boardModel';
@@ -97,7 +97,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       id: w.key,
       sortStart: w.start,
       timeLabel: w.timeLabel,
-      title: w.label,
+      title: club && w.block.pendingHold ? HOLD_TEXT.pendingTitle(w.block.pendingHold, w.label) : w.label,
       sub: club ? [w.block.orderCode, holdStateOf(w.block) ? holdLabel(holdStateOf(w.block)!) : null].filter(Boolean).join(' · ') || null : w.calendarName,
       tail: null,
       priceText: null,

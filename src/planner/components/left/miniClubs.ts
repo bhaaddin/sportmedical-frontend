@@ -8,6 +8,8 @@ import type { ClubBlockView } from '../../../api/clubBlocks';
 import type { DayMark, IsoDate } from '../../model';
 import type { Catalogue } from '../../../components/booking/calendar/model';
 import { frameActivities, type FrameActivity } from '../board/clubFrame';
+import type { ClubOrderView } from '../../../api/clubOrders';
+import { pendingDaysOf } from '../../model/pendingHolds';
 import { clubColourOf, holdStateOf, type HoldState } from '../board/clubHold';
 
 export interface MiniClubMark {
@@ -20,7 +22,7 @@ export interface MiniClubMark {
   activities: FrameActivity[];
 }
 
-export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockView[], marks: Readonly<Record<string, DayMark>>, catalogue?: Catalogue): Map<IsoDate, MiniClubMark[]> {
+export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockView[], marks: Readonly<Record<string, DayMark>>, catalogue?: Catalogue, orders: readonly ClubOrderView[] = []): Map<IsoDate, MiniClubMark[]> {
   const out = new Map<IsoDate, MiniClubMark[]>();
   for (const day of days) {
     if (marks[day]?.closed) continue;
@@ -41,6 +43,11 @@ export function clubDaysOf(days: readonly IsoDate[], blocks: readonly ClubBlockV
           registered: b.registered,
         }),
       }));
+    /* R22: days a club asked for (Requested) or the desk offered (Invited) - no block yet, still given to the club */
+    for (const order of orders) {
+      const hit = pendingDaysOf(order).find((p) => p.day === day);
+      if (hit) here.push({ key: `pending:${order.id}`, club: order.clubName || 'Klub', colour: clubColourOf(order.clubColorHex), orderCode: null, activities: [], hold: hit.kind });
+    }
     if (here.length > 0) out.set(day, here);
   }
   return out;

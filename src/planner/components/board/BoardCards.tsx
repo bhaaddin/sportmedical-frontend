@@ -20,7 +20,7 @@ import { patientsApi } from '../../../api/patients';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { DOUBLE_TAP_MS, DRAG_THRESHOLD_PX } from '../../../components/booking/grid/moveDrag';
 import { Icon } from '../Icons';
-import { holdLabel, holdStateOf, seatsLabel } from './clubHold';
+import { HOLD_TEXT, holdLabel, holdStateOf, seatsLabel } from './clubHold';
 import { accentCss } from '../../../accent';
 import { distinctActivities, stripesCss, subTitle } from './clubFrame';
 import { toneVars, withAlpha, type BookingCardModel, type BoardWindowModel, type SessionCardModel } from './boardModel';
@@ -255,19 +255,23 @@ export function BookingCard({
 export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; onOpen: (w: BoardWindowModel, point: { x: number; y: number }) => void }) {
   const manual = w.kind === 'manual';
   const hold = manual ? null : holdStateOf(w.block);
+  /* R22: time given to a club that has not confirmed / answered: lighter than a confirmed hold, and it says so */
+  const pending = manual ? null : w.block.pendingHold ?? null;
+  const title0 = pending ? HOLD_TEXT.pendingTitle(pending, w.label) : w.label;
+  const lightness = pending === 'offered' ? 0.4 : pending === 'requested' ? 0.62 : 1;
   const style = {
     left: w.left,
     width: w.width,
     top: `${w.top}px`,
     height: `${w.height}px`,
-    '--win-line': manual ? 'rgba(180, 203, 220, 0.5)' : withAlpha(w.colour, 0.8),
-    '--win-hatch': `repeating-linear-gradient(135deg, ${withAlpha(w.colour, manual ? 0.1 : 0.24)} 0px, ${withAlpha(w.colour, manual ? 0.1 : 0.24)} 7px, ${withAlpha(w.colour, 0.06)} 7px, ${withAlpha(w.colour, 0.06)} 14px)`,
+    '--win-line': manual ? 'rgba(180, 203, 220, 0.5)' : withAlpha(w.colour, 0.8 * lightness),
+    '--win-hatch': `repeating-linear-gradient(135deg, ${withAlpha(w.colour, manual ? 0.1 : 0.24 * lightness)} 0px, ${withAlpha(w.colour, manual ? 0.1 : 0.24 * lightness)} 7px, ${withAlpha(w.colour, 0.06 * lightness)} 7px, ${withAlpha(w.colour, 0.06 * lightness)} 14px)`,
     borderLeftColor: manual ? 'rgba(180, 203, 220, 0.5)' : w.colour,
   } as CSSProperties;
   return (
     <button
       type="button"
-      className={`board-window ${manual ? 'is-manual' : 'is-club'}`}
+      className={`board-window ${manual ? 'is-manual' : 'is-club'}${pending ? ` is-pending is-${pending}` : ''}`}
       style={style}
       data-board-item="window"
       data-col={w.col}
@@ -275,8 +279,8 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
       data-testid={`board-window-${w.block.id}-${w.day}`}
       aria-haspopup="dialog"
       data-hold={hold ?? undefined}
-      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `Blok klubu ${w.label}, ${w.timeLabel}${w.block.orderCode ? `, objednávka ${w.block.orderCode}` : ''}${hold ? `, ${holdLabel(hold)}` : ''}${w.frame.length > 0 ? `, ${w.frame.map(subTitle).join('; ')}` : ''}`}
-      title={manual ? undefined : [`Blok klubu · ${w.label}`, w.block.orderCode, w.timeLabel, hold ? holdLabel(hold) : null, seatsLabel(w.block), ...w.frame.map(subTitle)].filter(Boolean).join(' · ')}
+      aria-label={manual ? `Blokováno: ${w.label}, ${w.timeLabel}` : `${pending ? title0 : `Blok klubu ${w.label}`}, ${w.timeLabel}${w.block.orderCode ? `, objednávka ${w.block.orderCode}` : ''}${hold ? `, ${holdLabel(hold)}` : ''}${w.frame.length > 0 ? `, ${w.frame.map(subTitle).join('; ')}` : ''}`}
+      title={manual ? undefined : [pending ? title0 : `Blok klubu · ${w.label}`, w.block.orderCode, w.timeLabel, hold ? holdLabel(hold) : null, seatsLabel(w.block), ...w.frame.map(subTitle)].filter(Boolean).join(' · ')}
       onClick={(e) => {
         e.stopPropagation();
         onOpen(w, { x: e.clientX, y: e.clientY });
@@ -298,7 +302,7 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
       ) : null}
       <span className="board-sticky">
         {!manual ? <Icon name="lock" /> : null}
-        <span className="win-label">{w.label}</span>
+        <span className="win-label">{title0}</span>
         {!manual && w.block.orderCode ? <span className="win-code" data-testid="club-window-code">{w.block.orderCode}</span> : null}
         {!manual ? <span className="win-time" data-testid="club-window-time">{w.timeLabel}</span> : null}
         {hold ? <span className="win-hold" data-testid="club-window-hold" data-hold={hold}>{holdLabel(hold)}</span> : null}

@@ -102,7 +102,7 @@ import { CalendarStrip } from './CalendarStrip';
 import { Icon } from '../Icons';
 import { DayList, MonthMatrix } from './AlternateView';
 import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
-import { clubHolding, clubReservedText } from './clubHold';
+import { clubHolding, clubReservedText, offeredHolding, HOLD_TEXT } from './clubHold';
 import { LunchBandEl } from './BoardCards';
 import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
 import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../../colors/dayLock';
@@ -359,7 +359,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           ? {
               calendars: calendar.calendars,
               appointments: move.appointments,
-              blocksByCalendar: calendar.blocksByCalendar as Map<string, TimeBlock[]>,
+              blocksByCalendar: calendar.drawBlocksByCalendar as Map<string, TimeBlock[]>,
               catalogue: calendar.catalogue,
               mayBook: calendar.mayBook,
               excludeClubId: config.excludeClubId,
@@ -596,6 +596,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, columns],
   );
 
+  const [offeredAsk, setOfferedAsk] = useState<{ club: string; orderId: string | null; x: number; y: number; go: () => void } | null>(null);
   const selection = useBoardSelection({
     boardRef,
     geometry,
@@ -613,7 +614,14 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         showNotice({ text: clubReservedText(held), tone: 'error' });
         return;
       }
-      setPending({ ...sel, calendarId: cal?.id ?? null, calendarName: cal?.name ?? null });
+      const next = { ...sel, calendarId: cal?.id ?? null, calendarName: cal?.name ?? null };
+      /* R22: a day only OFFERED to a club does not refuse - the club may decline - but it asks first */
+      const offered = cal ? offeredHolding(calendar?.drawBlocksByCalendar.get(cal.id) ?? [], sel.day, sel.range) : null;
+      if (offered) {
+        setOfferedAsk({ club: offered.clubName?.trim() || 'klub', orderId: offered.clubOrderId ?? null, x: sel.x, y: sel.y, go: () => setPending(next) });
+        return;
+      }
+      setPending(next);
     },
   });
 
@@ -835,11 +843,11 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   );
   /* The windows of clubs, per day of the month: the club order is visible in the month, not only in the week. */
   const monthClubLines = useMemo(
-    () => (calendar && view === 'month' && !phone ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
+    () => (calendar && view === 'month' && !phone ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.drawBlocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthClubItems = useMemo(
-    () => (calendar && view === 'month' ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds, calendar.catalogue) : undefined),
+    () => (calendar && view === 'month' ? clubItemsByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.drawBlocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds, calendar.catalogue) : undefined),
     [calendar, view, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthTiles = useMemo(
@@ -869,7 +877,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const phoneMonth = useMemo(() => {
     if (!phone || view !== 'month') return null;
     const lines = calendar
-      ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds)
+      ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.drawBlocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds)
       : new Map<IsoDate, string[]>();
     return phoneMonthRows(monthTiles.tiles, lines, ctx.today);
   }, [phone, view, calendar, calendarMonth, dayMarks, config.excludeClubBlockIds, monthTiles, ctx.today]);
@@ -1420,6 +1428,49 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           onConfirm={move.confirmProposal}
         />
       ) : null}
+
+      <Popover
+        open={offeredAsk !== null}
+        onClose={() => setOfferedAsk(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={offeredAsk ? { top: offeredAsk.y, left: offeredAsk.x } : undefined}
+        slotProps={{ paper: { sx: { width: 300, maxWidth: 'calc(100vw - 24px)', p: 1.5, borderRadius: '10px', boxShadow: DESIGN.shadow.menu } } }}
+      >
+        {offeredAsk ? (
+          <div data-testid="offered-ask" role="group" aria-label={HOLD_TEXT.offeredWarn(offeredAsk.club)} className="offered-ask">
+            <strong>{HOLD_TEXT.offeredWarn(offeredAsk.club)}</strong>
+            <p>Tento čas jsme klubu jen nabídli, klub může nabídku odmítnout. Rezervovat sem přesto?</p>
+            <div className="offered-ask-actions">
+              <Button
+                variant="contained"
+                data-testid="offered-ask-go"
+                sx={{ minHeight: 44 }}
+                onClick={() => {
+                  const go = offeredAsk.go;
+                  setOfferedAsk(null);
+                  go();
+                }}
+              >
+                Přesto rezervovat
+              </Button>
+              {offeredAsk.orderId ? (
+                <Button
+                  data-testid="offered-ask-order"
+                  sx={{ minHeight: 44 }}
+                  onClick={() => {
+                    const id = offeredAsk.orderId!;
+                    setOfferedAsk(null);
+                    goOrder(id);
+                  }}
+                >
+                  Otevřít objednávku
+                </Button>
+              ) : null}
+              <Button data-testid="offered-ask-cancel" sx={{ minHeight: 44 }} onClick={() => setOfferedAsk(null)}>Zrušit</Button>
+            </div>
+          </div>
+        ) : null}
+      </Popover>
 
       <Popover
         open={inquiryPop !== null}
