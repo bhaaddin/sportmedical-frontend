@@ -396,7 +396,7 @@ export default function ServiceOverviewPage() {
                 : { text: t("booking.serviceOverview.empty"), action: { label: "Otevřít kalendář", to: "/planovani", state: { date: from } } }
           }
         >
-          <MetricCard label="Objednáno" value={totals.booked} hint={t("booking.serviceOverview.bookedCount", { count: totals.booked })} />
+          <MetricCard label="Objednáno" value={totals.booked} hint="ve zvoleném rozsahu" />
           <MetricCard label="Volné začátky" value={totals.freeStarts} tone="green" hint={freeText(totals.freeStarts, totals.freeDays)} />
         </Shelf>
       )}
@@ -484,18 +484,21 @@ function ActivityRow({
               <StatusChip tone="grey" size="sm">{t("booking.serviceOverview.retired")}</StatusChip>
             )}
           </Stack>
-          <Typography component="div" variant="body2" sx={{ mt: 0.25 }}>
-            {label("when")}
-            <Box component="span">{weekdayLine(row) || "—"}</Box>
-          </Typography>
-          <Typography component="div" variant="body2">
-            {label("who")}
-            <Box component="span">{whoLine(row) || "—"}</Box>
-          </Typography>
-          <Typography component="div" variant="body2">
-            {label("free")}
-            {freeCell(row)}
-          </Typography>
+          {/* When, who, free: one line each on a phone, one line together where there is room. */}
+          <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, flexWrap: "wrap", columnGap: 3, rowGap: 0.25, mt: 0.25 }}>
+            <Typography component="div" variant="body2">
+              {label("when")}
+              <Box component="span">{weekdayLine(row) || "—"}</Box>
+            </Typography>
+            <Typography component="div" variant="body2">
+              {label("who")}
+              <Box component="span">{whoLine(row) || "—"}</Box>
+            </Typography>
+            <Typography component="div" variant="body2">
+              {label("free")}
+              {freeCell(row)}
+            </Typography>
+          </Box>
         </Box>
         <Box sx={{ textAlign: "right", flexShrink: 0 }}>
           <Typography data-booked="" sx={{ fontSize: 22, fontWeight: 750, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{row.booked}</Typography>

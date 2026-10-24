@@ -21,8 +21,9 @@ import { errorText } from "../../components/booking/errorText";
 import { formatLongPragueDate } from "../../components/booking/appointmentEdit";
 import { dayTotalLine, shownPrice } from "../../components/booking/grid/appointmentPrice";
 import { usePermission } from "../../auth/usePermission";
+import { useIsPhone } from "../../layout/useDevice";
 import { EntityLink, MetricCard, PageFrame, Shelf, TARGET_SX, type ShelfAction } from "../../ui/shelf";
-import { DayRow } from "../../ui/shelf/DayRow";
+import { DayRow, isRealPatientId } from "../../ui/shelf/DayRow";
 import { APPOINTMENT_STATUS_WORD } from "../../ui/shelf/words";
 
 /**
@@ -66,6 +67,7 @@ export default function DayOverviewPage() {
   const maySeePatients = usePermission("patients.view");
   const maySetUp = usePermission("settings.clinic.manage");
   const queryClient = useQueryClient();
+  const phone = useIsPhone();
 
   const [date, setDate] = useState<string>(toDateOnly(new Date()));
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -118,7 +120,7 @@ export default function DayOverviewPage() {
    * every screen shares) - and only for a person who may read the register.
    */
   const lookups = useMemo(
-    () => (maySeePatients ? [...new Set(day.filter((a) => a.patientId !== "" && !a.patientName).map((a) => a.patientId))] : []),
+    () => (maySeePatients ? [...new Set(day.filter((a) => isRealPatientId(a.patientId) && !a.patientName).map((a) => a.patientId))] : []),
     [day, maySeePatients],
   );
   const patientQueries = useQueries({
@@ -165,10 +167,10 @@ export default function DayOverviewPage() {
   const nameOf = (row: DayAppointment): string =>
     patientNameById.get(row.patientId) ??
     row.patientName ??
-    (row.patientId === "" ? "Bez pacienta" : maySeePatients ? t("booking.day.loadingName") : "Pacient");
+    (!isRealPatientId(row.patientId) ? "Bez pacienta" : maySeePatients ? t("booking.day.loadingName") : "Pacient");
 
   const who = (row: DayAppointment): ReactNode =>
-    row.patientId === "" ? nameOf(row) : <EntityLink entity={{ kind: "patient", id: row.patientId, label: nameOf(row) }} />;
+    !isRealPatientId(row.patientId) ? nameOf(row) : <EntityLink entity={{ kind: "patient", id: row.patientId, label: nameOf(row) }} />;
 
   const what = (row: DayAppointment, withCalendar: boolean): ReactNode => {
     const calendar = withCalendar ? calendarById.get(row.calendarId ?? "")?.name : undefined;
@@ -239,6 +241,14 @@ export default function DayOverviewPage() {
       /* Noon in Prague on that date, so the weekday is that date's wherever the browser happens to be. */
       purpose={formatLongPragueDate(pragueWallClockToInstant(date, "12:00"))}
       actions={
+        <>
+        {/* The shell's action bar already has the filled "Nová objednávka" (it asks pacient / klub): from a tablet up this
+            screen's own booking - into the date on screen - is the quieter outlined one, not a second filled button. */}
+        {mayBook && !phone ? (
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setBooking({})} sx={{ ...TARGET_SX, minHeight: 44, whiteSpace: "nowrap" }}>
+            {t("booking.new.title")}
+          </Button>
+        ) : null}
         <Stack
           direction="row"
           data-day-stepper=""
@@ -257,8 +267,9 @@ export default function DayOverviewPage() {
             <ChevronRightIcon fontSize="small" />
           </IconButton>
         </Stack>
+        </>
       }
-      primaryAction={mayBook ? { label: t("booking.new.title"), icon: <AddIcon />, onClick: () => setBooking({}) } : undefined}
+      primaryAction={mayBook && phone ? { label: t("booking.new.title"), icon: <AddIcon />, onClick: () => setBooking({}) } : undefined}
     >
       {/* Which columns the day counts: every calendar on by default. */}
       {calendars.length > 0 && (
@@ -407,7 +418,7 @@ export default function DayOverviewPage() {
                         key={p.appointmentId}
                         kind="paperwork"
                         time={formatPragueTime(p.startUtc)}
-                        who={row ? who(row) : p.patientId !== "" ? <EntityLink entity={{ kind: "patient", id: p.patientId, label: "Pacient" }} /> : "Bez pacienta"}
+                        who={row ? who(row) : isRealPatientId(p.patientId) ? <EntityLink entity={{ kind: "patient", id: p.patientId, label: "Pacient" }} /> : "Bez pacienta"}
                         what={<EntityLink entity={{ kind: "appointment", id: p.appointmentId, calendarId: p.calendarId, label: p.activityName }} />}
                         trailing={
                           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, justifyContent: "flex-end" }}>

@@ -42,6 +42,8 @@ const VIEWPORTS = (process.env.VP ?? '390x844,820x1180,1440x900,1920x1080').spli
 });
 const PAGES = (process.env.PAGES ?? 'prehled,patients,patient').split(',');
 const POPULATED = (process.env.POPULATED ?? '1') !== '0';
+/* MODE=light photographs the light theme (screenshots get a "-light" suffix). */
+const MODE = process.env.MODE ?? 'dark';
 /* Which parts to run (default all): pages, palette, accent, motion, populated. */
 const SECTIONS = new Set((process.env.SECTIONS ?? 'pages,palette,accent,motion,populated').split(','));
 mkdirSync(OUT, { recursive: true });
@@ -156,9 +158,27 @@ async function patientPath(page) {
 }
 
 const PAGE_PATH = { prehled: '/prehled', patients: '/patients' };
+/* S-1 Den na recepci (route table 33-36 and `*`); `termin` opens a real appointment of the next weeks (read only, nothing is written). */
+Object.assign(PAGE_PATH, { dnes: '/dnes', sluzby: '/prehled-sluzeb', availability: '/availability', notfound: '/tahle-stranka-neexistuje' });
+
+/** An appointment to open (its own page, route 36): the first one the API lists from today on. */
+async function appointmentPath(page) {
+  await page.goto(`${BASE}/dnes`);
+  await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
+  return page.evaluate(async () => {
+    const token = localStorage.getItem('token');
+    const day = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(d);
+    const from = day(new Date());
+    const to = day(new Date(Date.now() + 40 * 864e5));
+    const res = await fetch(`/api/day?from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${token}` } });
+    const body = await res.json();
+    const rows = (body?.data ?? body ?? []).filter((r) => r.calendarId);
+    return rows.length === 0 ? null : `/kalendar/${rows[0].calendarId}/termin/${rows[0].id}`;
+  });
+}
 
 async function openPage(page, name, patientHref) {
-  const path = name === 'patient' ? patientHref : PAGE_PATH[name];
+  const path = name === 'patient' || name === 'termin' ? patientHref : PAGE_PATH[name];
   await page.goto(`${BASE}${path}`);
   await page.waitForSelector('section[data-shelf]', { timeout: 30000 });
   /* let the data arrive, the cascade finish and the count-ups settle */
@@ -183,15 +203,20 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   const page = await ctx.newPage();
   const problems = [];
   watch(page, problems);
-  const href = name === 'patient' ? await patientPath(page) : null;
-  if (name === 'patient' && href === null) {
-    fail(where, 'no patient to open');
+  const href = name === 'patient' ? await patientPath(page) : name === 'termin' ? await appointmentPath(page) : null;
+  if ((name === 'patient' || name === 'termin') && href === null) {
+    fail(where, `no ${name === 'patient' ? 'patient' : 'appointment'} to open`);
     await ctx.close();
     return;
   }
   await openPage(page, name, href);
+  /* The appointment's page opens with its detail dialog: close it to see (and measure) the page behind. */
+  if (name === 'termin') {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+  }
 
-  const shot = join(OUT, `${name}${label}-${vp.label}.jpg`);
+  const shot = join(OUT, `${name}${label}${MODE === 'light' ? '-light' : ''}-${vp.label}.jpg`);
   await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };
@@ -218,8 +243,12 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   return shot;
 }
 
-const contextFor = (extra = {}) => async (vp) =>
-  browser.newContext({ storageState: STATE, viewport: { width: vp.width, height: vp.height }, locale: 'cs-CZ', ...extra });
+const contextFor = (extra = {}) => async (vp) => {
+  const ctx = await browser.newContext({ storageState: STATE, viewport: { width: vp.width, height: vp.height }, locale: 'cs-CZ', ...extra });
+  /* MODE=light: the person picked "Světlý režim" (the staff app starts dark). */
+  if (MODE === 'light') await ctx.addInitScript(() => localStorage.setItem('sm-theme-mode-v2', 'light'));
+  return ctx;
+};
 
 if (SECTIONS.has('pages')) {
   for (const vp of VIEWPORTS) {

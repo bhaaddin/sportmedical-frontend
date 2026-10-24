@@ -378,10 +378,10 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 30 | `/intake-review` | Kontrola registrací (509) | FitPage + SoftCard queue | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | P1 |
 | 31 | `/hodnoceni-pacientu` | Hodnocení pacientů (145) | SettingsFrame + KpiCard | metrics (průměr, počet), Nová hodnocení (cards), K vyřízení | patient, appointment | A2 | P2 |
 | 32 | `/planovani` | Kalendář | planner stage | **Out** - fixed layout | - | - | out |
-| 33 | `/dnes` | Dnešní přehled (715) | FitPage + KpiCard + StackTable | metrics, Vyžaduje pozornost (today only), per-calendar columns as shelves, Čekárna | patient, booking, činnost, invoice per visit | A1 | P1 |
-| 34 | `/prehled-sluzeb` | Přehled podle služeb (625) | FitPage + filters + table | Filtr (board), per služba shelves (booked / free), Volná kapacita (metric) | služba, činnost, calendar, bookings | A1 | P2 |
-| 35 | `/availability` | Dostupnost (204) | FitPage + KpiCard | Kdo je dnes k dispozici (cards), Nepřítomnosti (list) | worker, calendar, absences | A1 | P2 |
-| 36 | `/kalendar/:calendarId/termin/:appointmentId` | Termín (notification landing, 64) | redirect/opener | PageFrame for one appointment: Související (patient, činnost, invoice, club, paperwork), Historie | appointment is an entity: this IS its page | A1 | P2 |
+| 33 | `/dnes` | Dnešní přehled | **Done (S-1)** PageFrame + shelves | Den v číslech, Čekárna, Mají zpoždění, Podklady, Kapacita dne, one shelf per calendar (`ui/shelf/DayRow`) | patient, appointment (činnost), price per visit | A1 | done |
+| 34 | `/prehled-sluzeb` | Přehled podle služeb | **Done (S-1)** | Filtr (board), Volná kapacita (metrics), one shelf per služba (činnosti: booked / when / who / free, terms on request) | služba, činnost, appointment | A1 | done |
+| 35 | `/availability` | Dostupnost sportovců | **Done (S-1)** | Sportovci (grow table, counts in the filter) - the screen is about athletes, not workers | patient | A1 | done |
+| 36 | `/kalendar/:calendarId/termin/:appointmentId` | Termín | **Done (S-1)** the appointment's page behind its detail dialog | Termín (board), Související (patient, činnost), Historie | appointment is an entity: this IS its page | A1 | done |
 | 37 | `/blokovany-cas` | Blokovaný čas (387) | FitPage + StackTable | Aktivní bloky (cards), Končí brzy | calendar, worker | A5 | P2 |
 | 38 | `/nastaveni/sluzby` | Služby (613) | SettingsFrame | Služby (cards: činností, kalendářů), Bez činnosti (attention) | činnosti, calendars, required documents | A5 | P2 |
 | 39 | `/nastaveni/sluzby/:serviceId` | Služba (same screen, open) | SettingsFrame | Služba (board), Činnosti (cards), Kalendáře, Potřebné dokumenty | činnost, calendar, document template | A5 | P2 |
@@ -413,7 +413,7 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 65 | `/system-health` | Zdraví systému (316) | SettingsFrame + KpiCard | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | P2 |
 | 66 | `/staff-management` | Tým (608) | SettingsFrame + table | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | P2 |
 | 67 | `/audit-log` | Audit (255) | SettingsFrame + table | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | P2 |
-| - | `*` | Nenalezeno (42) | SoftCard | Kam dál: recents + pages (palette) | recents, command palette | A1 | P3 |
+| - | `*` | Nenalezeno | **Done (S-1)** | Kam dál (action cards), Naposledy otevřené | recents, command palette | A1 | done |
 
 Not counted: the six retired paths (`/injuries`, `/rtp`, `/concussion`, `/training-load`, `/wellness`, `/statistiky`) redirect to `/prehled`.
 

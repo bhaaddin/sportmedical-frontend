@@ -14,6 +14,7 @@ import { usePermission } from "../../auth/usePermission";
 import { pragueDateKey, formatPragueTime } from "../../utils/time";
 import { EntityCard, PageFrame, PinButton, Shelf, rememberOpened, type EntityRef } from "../../ui/shelf";
 import { APPOINTMENT_STATUS_WORD } from "../../ui/shelf/words";
+import { isRealPatientId } from "../../ui/shelf/DayRow";
 
 /**
  * The page of one appointment (route 36) - where a booking notification's `actionUrl` points
@@ -53,7 +54,7 @@ export default function AppointmentLinkPage() {
     enabled: known,
   });
   const appointment = detailQuery.data;
-  const patientId = appointment?.patientId ?? "";
+  const patientId = isRealPatientId(appointment?.patientId) ? (appointment?.patientId as string) : "";
   const patientQuery = useQuery({
     queryKey: ["patient", patientId],
     queryFn: () => patientsApi.getById(patientId),
@@ -89,7 +90,7 @@ export default function AppointmentLinkPage() {
 
   const status = appointment ? APPOINTMENT_STATUS_WORD[statusName(appointment.status) ?? ""] : undefined;
   const related: EntityRef[] = [];
-  if (appointment && appointment.patientId !== "") related.push({ kind: "patient", id: appointment.patientId, label: patientName ?? "Pacient" });
+  if (appointment && patientId !== "") related.push({ kind: "patient", id: patientId, label: patientName ?? "Pacient" });
   if (appointment && appointment.activityName) related.push({ kind: "activity", id: appointment.activityId, label: appointment.activityName });
   const missing = appointment?.paperwork?.missing ?? [];
 
@@ -115,7 +116,7 @@ export default function AppointmentLinkPage() {
             <Fact label="Kdy" value={`${formatLongPragueDate(appointment.startUtc)}, ${when}`} />
             <Fact label="Kalendář" value={calendar?.name ?? "—"} />
             {/* A registered patient is a card under "Související"; a slot without one says the name it was taken under. */}
-            {appointment.patientId === "" ? <Fact label="Pacient" value={patientName ?? "Bez pacienta"} /> : null}
+            {patientId === "" ? <Fact label="Pacient" value={patientName ?? "Bez pacienta"} /> : null}
             {appointment.note ? <Fact label="Poznámka" value={appointment.note} /> : null}
             {/* Only when the register answered: `null` is "not looked", never "all in order". */}
             {appointment.paperwork ? (

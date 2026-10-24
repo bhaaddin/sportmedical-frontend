@@ -15,6 +15,10 @@ import type { ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import { MUTED_SX } from './shelfStyle';
 
+/** A booking's patient id names a register entry: not empty and not the empty GUID some answers carry for "nobody". */
+export const isRealPatientId = (id: string | null | undefined): id is string =>
+  typeof id === 'string' && id !== '' && id !== '00000000-0000-0000-0000-000000000000';
+
 export interface DayRowProps {
   /** "13:30" (or "13:30–14:00"). */
   time: string;

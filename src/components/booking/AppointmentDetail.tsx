@@ -272,7 +272,8 @@ function DetailBody({
    */
   const [conflict, setConflict] = useState<unknown>(null);
 
-  const hasPatient = appointment.patientId !== "";
+  /* Some answers carry the empty GUID for "nobody" (the grid and the planner check both): never ask the register for it. */
+  const hasPatient = appointment.patientId !== "" && appointment.patientId !== "00000000-0000-0000-0000-000000000000";
 
   const patientQuery = useQuery({
     queryKey: ["patient", appointment.patientId],
