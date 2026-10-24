@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useIsPhone } from '../layout/useDevice';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert, Box, Button, Collapse, Divider, Grid, IconButton, LinearProgress, Stack, Typography,
 } from '@mui/material';
@@ -32,7 +32,7 @@ import { NextAppointmentCard, nextInWindow } from '../components/patients/NextAp
 import { shownPrice } from '../components/booking/grid/appointmentPrice';
 import { AlertsCard } from '../components/patients/AlertsCard';
 import { VisitHistoryTable } from '../components/patients/VisitHistoryTable';
-import { ALL_APPOINTMENTS_KEY, fetchAllAppointments } from '../components/patients/appointmentsSource';
+import { ALL_APPOINTMENTS_KEY, fetchPatientAppointments } from '../components/patients/appointmentsSource';
 import { questionnaireMissing, summariseVisits } from '../components/patients/patientActivity';
 import { stillMissing, expiringSoon } from './patients/paperworkStanding';
 import { formatDateOnly } from '../utils/time';
@@ -71,6 +71,7 @@ export default function PatientDetails() {
     patient, profile, requirements, upcoming, displayPhone, displayEmail, documents, documentsKnown,
   } = useOutletContext<PatientContext>();
   /* `null` until the sessions are read: a count of zero is a claim, "not yet" is not. */
+  const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<DiagnosticSession[] | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export default function PatientDetails() {
   const appointmentsQuery = useQuery({
     /* One patient's visits: under the clinic-wide key, so whatever invalidates that one reaches this too. */
     queryKey: [...ALL_APPOINTMENTS_KEY, patient.id],
-    queryFn: () => fetchAllAppointments(patient.id),
+    queryFn: () => fetchPatientAppointments(queryClient, patient.id),
     staleTime: 60_000,
   });
   const activitiesQuery = useQuery({

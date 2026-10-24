@@ -26,7 +26,8 @@ import { clinicServiceListSchema } from '../../api/clinicServices';
 import { asList, toBlock } from '../../api/clubBlocks';
 import { CLUB_SETTINGS_QUERY_KEY, toClubSettings } from '../../api/clubs';
 import { CALENDAR_DISPLAY_QUERY_KEY, withHolidayRed, type CalendarDisplayResponse } from '../../api/displaySettings';
-import { parsePermissions, permissionsSnapshot } from '../../auth/localSession';
+import { parsePermissions, permissionsSnapshot, subscribePermissions } from '../../auth/localSession';
+import { onWriteSucceeded } from '../../api/requestPolicy';
 
 /** What the screen route asks of the account (the club-blocks route it replaces asks the same). */
 export const SCREEN_PERMISSION = 'patients.view';
@@ -41,6 +42,8 @@ const UNSUPPORTED_MS = 10 * 60_000;
 const BATCH_MS = 8;
 /** The most days the server answers. */
 const MAX_DAYS = 62;
+/** After an answer without a day section (no active calendar, a failed section) the same window is not asked for again this long. */
+const NO_DAY_MS = 30_000;
 const MEMO_KEY = 'sm.plannerScreen.unsupportedUntil';
 
 const readMemo = (): number => {
@@ -61,6 +64,15 @@ const writeMemo = (until: number): void => {
 
 /** When the screen may be asked for again. */
 let blockedUntil = readMemo();
+
+/* A different session (sign-out, another account) forgets what the last one learned about the server. */
+let lastSession = permissionsSnapshot();
+subscribePermissions(() => {
+  const now = permissionsSnapshot();
+  if (now === lastSession) return;
+  lastSession = now;
+  resetPlannerScreenForTests();
+});
 
 /** Test hook: forget what was learned about the server. */
 export function resetPlannerScreenForTests(): void {
@@ -140,18 +152,27 @@ export function makePlannerScreenSeeder(queryClient: QueryClient, permissions: (
   /** Requests on their way, by window and calendars: a read that arrives meanwhile waits for them instead of asking again. */
   const flying = new Map<string, { ek: string; union: WindowRange; promise: Promise<void> }>();
 
-  const put = (key: QueryKey, value: unknown) => queryClient.setQueryData(key, value);
-
-  /** A reference part is replaced only when what is held is old; a fresh copy stays (same object, no needless repaint). */
-  const putReference = (key: QueryKey, value: unknown) => {
-    if (!isFresh(queryClient, key, FRESH_MS)) put(key, value);
-  };
+  /** Bumped by every write (ours or announced from another person): an answer that started before it may hold rows from before. */
+  let writeEpoch = 0;
+  onWriteSucceeded(() => {
+    writeEpoch += 1;
+  });
+  /** Windows whose last answer had no day section, and until when they are left alone. */
+  const noDay = new Map<string, number>();
+  const noDayKey = (w: WindowRange, ek: string) => `${w.from}|${w.to}|${ek}`;
 
   /**
    * Puts the sections into the cache: the reference parts once, the window's parts under the keys of `union` and of every
    * smaller window a read asked for (cut out of the same rows with the rules the single clients use for their covers).
    */
-  async function seedFrom(body: unknown, union: WindowRange, wanted: readonly WindowRange[], explicit?: readonly string[]): Promise<Held['derive'] | null> {
+  async function seedFrom(body: unknown, union: WindowRange, wanted: readonly WindowRange[], explicit: readonly string[] | undefined, epoch: number): Promise<Held['derive'] | null> {
+    /* Nothing is written once a write has landed since the request started (its rows may predate the write). */
+    const put = (key: QueryKey, value: unknown) => {
+      if (writeEpoch === epoch) queryClient.setQueryData(key, value);
+    };
+    const putReference = (key: QueryKey, value: unknown) => {
+      if (!isFresh(queryClient, key, FRESH_MS)) put(key, value);
+    };
     const sections = (body as { sections?: Record<string, Section> } | null)?.sections;
     if (sections === undefined || sections === null || typeof sections !== 'object') return null;
     const guard = async (run: () => void | Promise<void>) => {
@@ -270,6 +291,12 @@ export function makePlannerScreenSeeder(queryClient: QueryClient, permissions: (
 
   /** The windows whose day is not fresh in the cache: what a request would have to bring. */
   function needed(windows: readonly WindowRange[], explicit?: readonly string[]): WindowRange[] {
+    const ek = explicit?.join(',') ?? '';
+    const now = Date.now();
+    return neededRaw(windows, explicit).filter((w) => (noDay.get(noDayKey(w, ek)) ?? 0) <= now);
+  }
+
+  function neededRaw(windows: readonly WindowRange[], explicit?: readonly string[]): WindowRange[] {
     const cached = queryClient.getQueryData<Calendar[]>(['calendars']);
     if (cached === undefined) return [...windows];
     const ids = shownIds(cached, explicit);
@@ -303,6 +330,7 @@ export function makePlannerScreenSeeder(queryClient: QueryClient, permissions: (
     const key = `${union.from}|${union.to}|${ek}`;
     const going = flying.get(key);
     if (going) return going.promise;
+    const epoch = writeEpoch;
     const run = (async () => {
       try {
         const res = await client.get('/api/v1/screens/planner', {
@@ -312,11 +340,15 @@ export function makePlannerScreenSeeder(queryClient: QueryClient, permissions: (
             calendarIds: explicit && explicit.length > 0 ? explicit.join(',') : undefined,
           },
         });
-        const derive = await seedFrom(res.data, union, missing, explicit);
+        /* A write landed while the answer was on its way: its rows may predate it. Drop it; the reads ask for themselves. */
+        if (writeEpoch !== epoch) return;
+        const derive = await seedFrom(res.data, union, missing, explicit, epoch);
+        if (writeEpoch !== epoch) return; /* the parsers are async: a write may have landed meanwhile */
         if (derive !== null) {
           held.unshift({ ek, explicit, union, derive });
           held.length = Math.min(held.length, 4);
         }
+        for (const w of neededRaw(missing, explicit)) noDay.set(noDayKey(w, ek), Date.now() + NO_DAY_MS);
       } catch (error) {
         const status = (error as { response?: { status?: number } } | undefined)?.response?.status;
         /* 404/405: an older server, which has no such route. Any other failure may pass; ask again later. */

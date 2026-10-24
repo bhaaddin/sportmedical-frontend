@@ -52,19 +52,24 @@ const announceChange = (except: () => void) => {
 
 const POLL_MS = 60_000;
 
-/** The newest row's instant as an ISO string with an offset (what `?since=` takes), or null when there is none to go by. */
+/** The instant 1 ms before the newest row, as an ISO string with an offset (what `?since=` takes), or null when there is none to go by. */
 export function newestInstant(list: readonly FeedNotification[]): string | null {
   const times = list.map((n) => Date.parse(n.timestamp)).filter(Number.isFinite);
-  return times.length > 0 ? new Date(Math.max(...times)).toISOString() : null;
+  return times.length > 0 ? new Date(Math.max(...times) - 1).toISOString() : null;
 }
 
 /**
- * The answer to `?since=`: a server that has the parameter sends only rows after it, which are put in front of what is
- * held; an older one ignores it and sends the whole list (it includes rows at or before `since`), which replaces it.
+ * The answer to `?since=` (sent 1 ms before the newest row, so a millisecond lost to truncation cannot hide a row). A server
+ * that has the parameter sends only rows from `since` on: they are put in front of what is held, and on an id both have the
+ * server's row wins (its read flag is newer). An older one ignores it and sends the whole list (it includes rows before
+ * `since`), which replaces what is held.
  */
 export function mergeSince(held: readonly FeedNotification[], answer: readonly FeedNotification[], since: string): FeedNotification[] {
-  if (answer.some((n) => Date.parse(n.timestamp) <= Date.parse(since))) return [...answer];
-  return [...answer, ...held.filter((n) => !answer.some((a) => a.id === n.id))];
+  const limit = Date.parse(since);
+  if (answer.some((n) => Date.parse(n.timestamp) < limit)) return [...answer];
+  const seen = new Set<string>();
+  const fresh = answer.filter((n) => (seen.has(n.id) ? false : (seen.add(n.id), true)));
+  return [...fresh, ...held.filter((n) => !seen.has(n.id))];
 }
 
 /*
@@ -119,12 +124,17 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
   notificationsRef.current = notifications;
   const selfRef = useRef<() => void>(() => undefined);
 
-  const fetchNotifications = useCallback(async (options: { incremental?: boolean } = {}) => {
+  const fetchNotifications = useCallback(async function load(options: { incremental?: boolean } = {}): Promise<void> {
     try {
       const since = options.incremental ? newestInstant(notificationsRef.current) : null;
       const res = since === null ? await client.get('/api/notifications') : await client.get('/api/notifications', { params: { since } });
       const data = res.data?.value ?? res.data;
       const list: FeedNotification[] = Array.isArray(data) ? data : data?.items ?? [];
+      /* A nudge that brought no new row was a read or a removal somewhere else, which `since` cannot show: ask for the whole list. */
+      if (since !== null && list.every((n) => notificationsRef.current.some((h) => h.id === n.id))) {
+        await load();
+        return;
+      }
       const next = since === null ? list : mergeSince(notificationsRef.current, list, since);
       setNotifications(next);
       seedList = { at: Date.now(), list: next };

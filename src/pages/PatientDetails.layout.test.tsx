@@ -27,6 +27,7 @@ vi.mock('../components/patients/appointmentsSource', () => ({
   ALL_APPOINTMENTS_KEY: ['scheduling', 'appointments', 'all'],
   UPCOMING_WINDOW_KEY: ['day', 'upcoming-window'],
   fetchAllAppointments,
+  fetchPatientAppointments: (_qc: unknown, id: string) => fetchAllAppointments(id),
   fetchUpcomingWindow: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../components/booking/patient/CompletionLinkButton', () => ({ CompletionLinkButton: () => null }));
