@@ -13,7 +13,10 @@ import { ClubOrderError, toOrder } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import type { PickedRange } from './multiSelect';
 
-const { getAllClubs, list, update, toastSuccess, toastError, invalidateClubWorld } = vi.hoisted(() => ({
+const { getAllClubs, list, update, toastSuccess, toastError, invalidateClubWorld, apptRange, apptAvail, apptResched } = vi.hoisted(() => ({
+  apptRange: vi.fn(),
+  apptAvail: vi.fn(),
+  apptResched: vi.fn(),
   getAllClubs: vi.fn(),
   list: vi.fn(),
   update: vi.fn(),
@@ -28,6 +31,7 @@ vi.mock('../../../api/clubOrders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/clubOrders')>();
   return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, list, update } };
 });
+vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: apptRange, getAvailability: apptAvail, reschedule: apptResched } }));
 vi.mock('../../clubs/clubWorld', () => ({ invalidateClubWorld }));
 
 const { AddToClubOrderDialog } = await import('./AddToClubOrderDialog');
@@ -92,6 +96,9 @@ beforeEach(() => {
   toastSuccess.mockClear();
   toastError.mockClear();
   invalidateClubWorld.mockClear();
+  apptRange.mockReset().mockResolvedValue([]);
+  apptAvail.mockReset().mockResolvedValue([]);
+  apptResched.mockReset().mockResolvedValue(null);
 });
 
 describe('club and order pick', () => {
@@ -317,5 +324,97 @@ describe('R4: the worker is busy (worker.busy) - the owner may go over it with a
     await screen.findByTestId('worker-busy');
     expect(screen.queryByTestId('worker-busy-override')).toBeNull();
     window.localStorage.removeItem('permissions');
+  });
+});
+
+describe('R24: bookings stand in the club way - one flow instead of "move them first"', () => {
+  /* the marked range: 2026-11-05 09:00-10:00 Prague (CET = 08:00-09:00Z) on cal-2 */
+  const booking = (id: string, from: string, to: string, name: string) => ({
+    id, calendarId: 'cal-2', patientId: 'p', activityId: 'a-1', activityName: 'Základní prohlídka', startUtc: `2026-11-05T${from}:00Z`, endUtc: `2026-11-05T${to}:00Z`, status: 0, patientName: name,
+  });
+  const slot = (from: string) => ({ startUtc: `2026-11-05T${from}:00Z`, endUtc: `2026-11-05T${from}:00Z` });
+  const refuse = () => update.mockRejectedValueOnce(new ClubOrderError('Čas je už obsazený.', 409, 'scheduling.booking.time_taken'));
+
+  async function openConflict() {
+    refuse();
+    mount();
+    const user = await chooseClub();
+    await user.click(await screen.findByTestId('add-to-club-order-row'));
+    await user.click(screen.getByTestId('add-to-club-confirm'));
+    await screen.findByTestId('club-conflict');
+    return user;
+  }
+
+  it('lists the colliding bookings (name, činnost) with a proposed slot each, and moves nothing before the button', async () => {
+    apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková'), booking('b2', '08:30', '09:00', 'Petr Svoboda'), booking('far', '12:00', '12:30', 'Mimo Čas')]);
+    apptAvail.mockResolvedValue([slot('09:00'), slot('10:00'), slot('11:00'), slot('07:00')]);
+    await openConflict();
+    const list = await screen.findByTestId('club-conflict-list');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(list).toHaveTextContent('Jana Nováková');
+    expect(list).toHaveTextContent('Petr Svoboda');
+    expect(list).toHaveTextContent('Základní prohlídka');
+    expect(list).not.toHaveTextContent('Mimo Čas');
+    await screen.findByTestId('club-conflict-to-b1');
+    expect(screen.getByTestId('club-conflict-to-b2')).toBeInTheDocument();
+    expect(apptResched).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Přesunout a pokračovat" reschedules each with its own notify choice, then places the club again', async () => {
+    apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková'), booking('b2', '08:30', '09:00', 'Petr Svoboda')]);
+    apptAvail.mockResolvedValue([slot('07:00'), slot('07:30'), slot('10:00')]);
+    const user = await openConflict();
+    await screen.findByTestId('club-conflict-to-b2');
+    const row1 = screen.getByTestId('club-conflict-b1');
+    const box1 = within(row1).getByRole('checkbox');
+    if (!(box1 as HTMLInputElement).checked) await user.click(box1);
+    const box2 = within(screen.getByTestId('club-conflict-b2')).getByRole('checkbox') as HTMLInputElement;
+    if (box2.checked) await user.click(box2);
+    await user.click(screen.getByTestId('club-conflict-go'));
+    await waitFor(() => expect(apptResched).toHaveBeenCalledTimes(2));
+    expect(apptResched.mock.calls[0]).toEqual(['cal-2', 'b1', '2026-11-05T07:30:00Z', undefined, { notifyPatient: true }]);
+    expect(apptResched.mock.calls[1]).toEqual(['cal-2', 'b2', '2026-11-05T07:00:00Z', undefined, { notifyPatient: false }]);
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  });
+
+  it('a booking with no free slot says so and blocks the step', async () => {
+    apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková')]);
+    apptAvail.mockResolvedValue([]);
+    await openConflict();
+    expect(await screen.findByTestId('club-conflict-none-b1')).toBeInTheDocument();
+    expect(screen.getByTestId('club-conflict-blocked')).toBeInTheDocument();
+    expect(screen.getByTestId('club-conflict-go')).toBeDisabled();
+  });
+
+  it('when a move fails it stops, names what already moved, and "Vrátit přesuny" moves it back', async () => {
+    apptRange.mockResolvedValue([booking('b1', '08:00', '08:30', 'Jana Nováková'), booking('b2', '08:30', '09:00', 'Petr Svoboda')]);
+    apptAvail.mockResolvedValue([slot('07:00'), slot('07:30'), slot('10:00')]);
+    apptResched.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('Čas je obsazený'));
+    const user = await openConflict();
+    await screen.findByTestId('club-conflict-to-b2');
+    await user.click(screen.getByTestId('club-conflict-go'));
+    const failure = await screen.findByTestId('club-conflict-failure');
+    expect(failure).toHaveTextContent('Přesun se nepodařil: Čas je obsazený');
+    expect(screen.getByTestId('club-conflict-moved')).toHaveTextContent('Jana Nováková');
+    expect(update).toHaveBeenCalledTimes(1); /* the club was never placed */
+    apptResched.mockClear();
+    await user.click(screen.getByTestId('club-conflict-revert'));
+    await waitFor(() => expect(apptResched).toHaveBeenCalledTimes(1));
+    expect(apptResched.mock.calls[0]![0]).toBe('cal-2');
+    expect(apptResched.mock.calls[0]![1]).toBe('b1');
+    expect(apptResched.mock.calls[0]![2]).toBe('2026-11-05T08:00:00Z');
+    expect(await screen.findByTestId('club-conflict-reverted')).toBeInTheDocument();
+  });
+
+  it('a refusal with no booking in the way stays the plain refusal', async () => {
+    apptRange.mockResolvedValue([]);
+    refuse();
+    mount();
+    const user = await chooseClub();
+    await user.click(await screen.findByTestId('add-to-club-order-row'));
+    await user.click(screen.getByTestId('add-to-club-confirm'));
+    expect(await screen.findByTestId('add-to-club-failure')).toBeInTheDocument();
+    expect(screen.queryByTestId('club-conflict')).toBeNull();
   });
 });
