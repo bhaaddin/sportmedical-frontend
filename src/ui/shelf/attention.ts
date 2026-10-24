@@ -12,11 +12,12 @@
  *   clubInquiries       club orders a club has submitted (`Requested`) and nobody has answered     (club orders)
  *   intakeReviews       registrations waiting for a person to match or register them              (patients.register)
  *   failedMessages      the outgoing queue's failed count                                         (settings.clinic.manage)
+ *   invoiceApprovals    invoices above a discount limit waiting for an approver (Fakturace only)  (billing.approve)
  */
 import type { DayAppointment } from '../../api/bookingContracts';
 import { statusTally } from '../../api/bookingContracts';
 import type { Invoice } from '../../api/billing';
-import { isOverdue } from '../../pages/billing/invoiceView';
+import { isOverdue, isPendingApproval } from '../../pages/billing/invoiceView';
 import { formatCzk } from '../../components/booking/grid/appointmentPrice';
 import { addDaysToDateOnly, formatDateOnly, formatPragueTime, pragueDateKey } from '../../utils/time';
 import { entityTarget, type EntityRef } from './entities';
@@ -78,7 +79,8 @@ export type AttentionId =
   /* Settings screens' own attention cards (Phase 2, S-5): built by the screen's model from what that screen reads. */
   | 'systemProblems'
   | 'scheduleProblems'
-  | 'offerProblems';
+  | 'offerProblems'
+  | 'invoiceApprovals';
 
 export type Severity = 'high' | 'medium' | 'low';
 
@@ -308,6 +310,39 @@ export function failedMessages(input: AttentionInput): AttentionGroup | null {
     ],
     summary: 'Připomínky a potvrzení, které odchozí fronta nedoručila.',
     action: { label: 'Zdraví systému', to: '/system-health' },
+  };
+}
+
+/**
+ * Invoices above somebody's manual-discount limit, waiting for an approver (`PendingApproval`), the oldest first. Fakturace
+ * draws it for a person with `billing.approve`; it is not part of `attentionGroups` (the home's shelf does not ask for it).
+ */
+export function invoiceApprovals(input: AttentionInput): AttentionGroup | null {
+  if (input.invoices == null) return null;
+  const waiting = input.invoices
+    .filter(isPendingApproval)
+    .sort((a, b) => Date.parse(a.issueDateUtc) - Date.parse(b.issueDateUtc));
+  if (waiting.length === 0) return null;
+  const total = waiting.reduce((sum, i) => sum + i.totalCzk, 0);
+  return {
+    id: 'invoiceApprovals',
+    severity: 'medium',
+    title: 'Doklady ke schválení',
+    count: waiting.length,
+    items: waiting.slice(0, ITEMS_PER_GROUP).map((invoice) => {
+      const who = invoice.clubName ?? invoice.recipientName ?? invoice.patientName ?? '';
+      const target = entityTarget({ kind: 'invoice', id: invoice.id });
+      return {
+        id: `approval-${invoice.id}`,
+        title: `Doklad ${invoice.invoiceNumber}`,
+        detail: `${who === '' ? '' : `${who} · `}${formatMoney(invoice.totalCzk)} · ruční sleva nad limitem`,
+        to: target.to,
+        state: target.state,
+        entity: { kind: 'invoice', id: invoice.id, label: invoice.invoiceNumber },
+      };
+    }),
+    summary: `Celkem ${formatMoney(total)}; dokud je nikdo neschválí, nedají se zaplatit.`,
+    action: { label: 'Zobrazit ke schválení', to: '/billing', state: { filter: 'approval' } },
   };
 }
 

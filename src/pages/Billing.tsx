@@ -10,12 +10,20 @@
  * "Hotově na místě" is the money taken at the desk this month, read off the
  * payments each invoice lists. A row opens into its discounts and payments.
  * The page can be entered with a `state` (see `billing/invoicePrefill`): from a
- * visit, from a club, from a club block, or from a link to one document.
+ * visit, from a club, from a club block, or from a link to one document; and
+ * with `{ filter }` (an attention card's "show them all").
+ *
+ * Built as shelves (docs/ui-shelf-system.md): the frame with "Nový doklad", the
+ * month's figures, "Vyžaduje pozornost" (overdue invoices - the same `isOverdue`
+ * as the filter - and, for an approver, the ones waiting for approval; drawn only
+ * when there is something), and the invoices themselves, a shelf that takes the
+ * height that is left and scrolls inside. An opened invoice shows what it is
+ * connected to (`invoiceRelatedGroups`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper, Skeleton,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper,
   Stack, TextField, Typography, useMediaQuery,
 } from '@mui/material';
 import { Add, Search } from '@mui/icons-material';
@@ -25,7 +33,7 @@ import type { Invoice, InvoicePaymentMethod } from '../api/billing';
 import { toBookingError } from '../api/apiError';
 import { usePermissions } from '../auth/usePermission';
 import { useDevice } from '../layout/useDevice';
-import { PageHeader, KpiCard, FilterChips } from '../components/ui';
+import { FilterChips } from '../components/ui';
 import type { FilterOption } from '../components/ui';
 import InvoiceCards from '../components/billing/InvoiceCards';
 import InvoiceTable from '../components/billing/InvoiceTable';
@@ -35,7 +43,7 @@ import NewInvoiceFlow from '../components/billing/NewInvoiceFlow';
 import RejectInvoiceDialog from '../components/billing/RejectInvoiceDialog';
 import { czk } from './billing/money';
 import {
-  doklady, isClub, matchesFilter, matchesSearch, monthIn, monthYear, statusOf, summarize, customerOf,
+  doklady, filterFromState, isClub, matchesFilter, matchesSearch, monthIn, monthYear, statusOf, summarize, customerOf,
   PAYMENT_METHOD_LABEL,
 } from './billing/invoiceView';
 import type { InvoiceFilter } from './billing/invoiceView';
@@ -43,7 +51,10 @@ import { hasPrefill, readNavState, wantsNewInvoice } from './billing/invoicePref
 import type { BillingNavState } from './billing/invoicePrefill';
 import { pdfFileName } from './billing/openPdf';
 import { download } from '../utils/download';
-import { FitPage, FIT_FILL_SX, STICKY_HEAD_SX } from '../components/ui/fit';
+import { FIT_FILL_SX, STICKY_HEAD_SX } from '../components/ui/fit';
+import { AttentionCard, MetricCard, PageFrame, Shelf } from '../ui/shelf';
+import type { AttentionGroup } from '../ui/shelf';
+import { invoiceApprovals, overdueInvoices } from '../ui/shelf/attention';
 
 /** The permission that lets somebody approve or reject an invoice above a discount limit. */
 const APPROVE_PERMISSION = 'billing.approve';
@@ -53,6 +64,11 @@ const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = (
 ).map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }));
 
 const messageOf = (error: unknown, fallback: string): string => toBookingError(error).serverMessage ?? fallback;
+
+/*
+ * An attention card on this page is its count, its sentence and one button that applies the filter: the cases themselves
+ * are the table right under it, so listing them twice would only push the table off the screen (R18: few, strong blocks).
+ */
 
 export default function Billing() {
   const device = useDevice();
@@ -138,21 +154,28 @@ export default function Billing() {
     }
   };
 
-  /* ── Entered from another screen ── */
+  /* ── Entered from another screen (or from an attention card on this one) ── */
   const location = useLocation();
   const navigate = useNavigate();
-  const entered = useRef(false);
+  /* The navigation already acted on: a card on this page links here again, so this runs per navigation, not once. */
+  const handled = useRef<string | null>(null);
 
   useEffect(() => {
-    if (loading || entered.current) return;
+    if (loading || handled.current === location.key) return;
     const state = readNavState(location.state);
-    if (!hasPrefill(state)) return;
-    entered.current = true;
+    const askedFilter = filterFromState(location.state);
+    if (!hasPrefill(state) && askedFilter === null) return;
+    handled.current = location.key;
     /* Spent: a reload must not open the dialog again. */
     navigate(location.pathname, { replace: true, state: null });
-    if (state.invoiceId !== undefined) setOpenId(state.invoiceId);
+    if (askedFilter !== null) setFilter(askedFilter);
+    if (state.invoiceId !== undefined) {
+      setOpenId(state.invoiceId);
+      /* The document must be in the list it is opened in. */
+      if (askedFilter === null) { setFilter('all'); setSearch(''); }
+    }
     if (wantsNewInvoice(state)) setFlow({ nav: state });
-  }, [loading, location.state, location.pathname, navigate]);
+  }, [loading, location.key, location.state, location.pathname, navigate]);
 
   /* A link to one document brings it into view. */
   useEffect(() => {
@@ -253,173 +276,178 @@ export default function Billing() {
   /* A club filter on a clinic that never billed a club is just noise on a phone. */
   const visibleFilters = phone && !hasClubs ? filterOptions.filter((o) => o.key !== 'clubs') : filterOptions;
 
-  const header = (
-    <PageHeader
-      title="Fakturace"
-      subtitle="Doklady, platby a přehled tržeb"
-      actions={
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setFlow({ nav: null })}
-          sx={phone ? { minHeight: 44 } : undefined}
-        >
-          Nový doklad
-        </Button>
+  /* "Vyžaduje pozornost": the same pure rules as the home's shelf. "Show them all" opens the filter here, not this page again. */
+  const attention = useMemo(() => {
+    const groups: AttentionGroup[] = [];
+    const overdue = overdueInvoices({ now, invoices });
+    if (overdue !== null) groups.push({ ...overdue, action: { label: 'Zobrazit po splatnosti', to: '/billing', state: { filter: 'overdue' } } });
+    const approvals = canApprove ? invoiceApprovals({ now, invoices }) : null;
+    if (approvals !== null) groups.push(approvals);
+    return groups.map((g) => ({ ...g, items: [] }));
+  }, [invoices, now, canApprove]);
+
+  const primaryAction = { label: 'Nový doklad', icon: <Add />, onClick: () => setFlow({ nav: null }) };
+  const emptyText = invoices.length === 0 ? 'Zatím žádné doklady.' : 'Žádný doklad neodpovídá hledání.';
+  const ready = !loading && !loadFailed;
+  const shown = `Zobrazeno ${filteredInvoices.length} z ${doklady(invoices.length)}`;
+
+  /* On a phone the chips run in one row that scrolls sideways, so they never push the list off the screen. */
+  const filters = (
+    <Box
+      data-filters={phone ? 'scroll' : 'wrap'}
+      sx={
+        phone
+          ? {
+              order: 3, flexBasis: '100%', overflowX: 'auto', mx: -2, px: 2, pb: 0.5,
+              '& [role="group"]': { flexWrap: 'nowrap', width: 'max-content' },
+              '& .MuiButtonBase-root': { minHeight: 44, flexShrink: 0 },
+            }
+          : undefined
       }
-    />
+    >
+      <FilterChips options={visibleFilters} value={filter} onChange={setFilter} ariaLabel="Filtr dokladů" />
+    </Box>
   );
 
-  if (loading) {
-    return (
-      <Box>
-        {header}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 2, mb: 2.5 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} variant="rounded" height={96} />
-          ))}
-        </Box>
-        <Skeleton variant="rounded" height={48} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={320} />
-      </Box>
-    );
-  }
-
-  if (loadFailed) {
-    return (
-      <Box>
-        {header}
-        <Paper variant="outlined" role="alert" sx={{ p: 3, display: 'grid', gap: 1.5, justifyItems: 'start' }}>
-          <Typography sx={{ fontWeight: 700 }}>Doklady se nepodařilo načíst.</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Server neodpověděl. Zkontrolujte připojení a zkuste to znovu.
-          </Typography>
-          <Button variant="contained" onClick={load} sx={phone ? { minHeight: 44 } : undefined}>Zkusit znovu</Button>
-        </Paper>
-        <NewInvoiceFlow open={flow !== null} nav={flow?.nav ?? null} onClose={() => setFlow(null)} onCreated={() => load()} />
-      </Box>
-    );
-  }
-
-  const emptyText = invoices.length === 0 ? 'Zatím žádné doklady.' : 'Žádný doklad neodpovídá hledání.';
+  const showAttention = ready && attention.length > 0;
+  /* From 1280 the figures and the attention cards stand side by side. */
+  const besideAttention = device === 'desktop' && showAttention;
+  const metricsShelf = (
+    <Shelf
+      id="metrics"
+      title="Přehled tržeb"
+      hint={monthYear(now)}
+      layout={phone ? 'row' : 'grid'}
+      minCardWidth={besideAttention ? 160 : 180}
+      phoneWidth="min(56vw, 210px)"
+      cardHeight={104}
+      skeletons={canApprove ? 5 : 4}
+      loading={loading}
+      stagger={false}
+    >
+      <MetricCard
+        label={`Vyfakturováno ${monthIn(now)}`}
+        value={stats.invoicedThisMonth}
+        format={czk}
+        hint={doklady(stats.invoicedThisMonthCount)}
+      />
+      <MetricCard
+        label="Nezaplaceno"
+        value={stats.unpaid}
+        format={czk}
+        tone={stats.unpaid > 0 ? 'red' : 'grey'}
+        hint={`${doklady(stats.overdueCount)} po splatnosti`}
+      />
+      <MetricCard label="Hotově na místě" value={stats.cashThisMonth} format={czk} hint={`kartou ${czk(stats.cardThisMonth)}`} />
+      <MetricCard
+        label="Průměr na pacienta"
+        value={stats.averagePerPatient === null ? '—' : stats.averagePerPatient}
+        format={czk}
+        hint={monthYear(now)}
+      />
+      {canApprove && (
+        <MetricCard
+          label="Ke schválení"
+          value={stats.pendingApprovalCount}
+          tone={stats.pendingApprovalCount > 0 ? 'primary' : 'grey'}
+          hint="nad limitem ruční slevy"
+        />
+      )}
+    </Shelf>
+  );
+  const attentionShelf = (
+    <Shelf
+      id="attention"
+      title="Vyžaduje pozornost"
+      count={attention.reduce((sum, g) => sum + g.count, 0)}
+      countTone="red"
+      layout={besideAttention ? 'grid' : 'row'}
+      minCardWidth={besideAttention ? 280 : 340}
+      fill
+      stagger={false}
+    >
+      {attention.map((g) => <AttentionCard key={g.id} group={g} />)}
+    </Shelf>
+  );
 
   return (
-    <FitPage>
-      {header}
+    <PageFrame fit title="Fakturace" purpose="Doklady, platby a přehled tržeb" primaryAction={primaryAction}>
+      {/*
+        * ── The month's figures (a row that swipes on a phone, a grid from a tablet up) and what needs a person (only when
+        * there is something). On a desktop they share one band, so the invoice table keeps the height of the window.
+        */}
+      {besideAttention ? (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 380px)', gap: 3, alignItems: 'start' }}>
+          {metricsShelf}
+          {attentionShelf}
+        </Box>
+      ) : (
+        <>
+          {!loadFailed && metricsShelf}
+          {showAttention && attentionShelf}
+        </>
+      )}
 
-      {/* ── KPI cards: 2×2 on a phone ── */}
-      <Box
-        sx={{
-          flexShrink: 0,
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: canApprove ? 'repeat(auto-fit, minmax(190px, 1fr))' : 'repeat(4, minmax(0, 1fr))',
-          },
-          gap: { xs: 1.5, md: 2 },
-          mb: 2.5,
-        }}
+      {/* ── The invoices: search, filters, the table (cards on a phone) ── */}
+      <Shelf
+        id="invoices"
+        title="Doklady"
+        count={ready ? filteredInvoices.length : undefined}
+        layout="free"
+        grow
+        loading={loading}
+        error={loadFailed ? 'Doklady se nepodařilo načíst.' : false}
+        onRetry={load}
+        controls={ready ? filters : undefined}
       >
-        <KpiCard
-          label={`Vyfakturováno ${monthIn(now)}`}
-          value={czk(stats.invoicedThisMonth)}
-          hint={doklady(stats.invoicedThisMonthCount)}
-        />
-        <KpiCard
-          label="Nezaplaceno"
-          value={czk(stats.unpaid)}
-          tone={stats.unpaid > 0 ? 'red' : 'ink'}
-          hint={`${doklady(stats.overdueCount)} po splatnosti`}
-        />
-        <KpiCard
-          label="Hotově na místě"
-          value={czk(stats.cashThisMonth)}
-          hint={`kartou ${czk(stats.cardThisMonth)}`}
-        />
-        <KpiCard
-          label="Průměr na pacienta"
-          value={stats.averagePerPatient === null ? '—' : czk(stats.averagePerPatient)}
-          hint={monthYear(now)}
-        />
-        {canApprove && (
-          <KpiCard
-            label="Ke schválení"
-            value={String(stats.pendingApprovalCount)}
-            tone={stats.pendingApprovalCount > 0 ? 'primary' : 'ink'}
-            hint="nad limitem ruční slevy"
-          />
-        )}
-      </Box>
-
-      {/* ── Search + filters (the chips scroll sideways on a phone) ── */}
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2, alignItems: { md: 'center' }, flexShrink: 0 }}>
         <TextField
           fullWidth
           placeholder="Číslo dokladu, pacient nebo klub"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           slotProps={{
-            input: { startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> },
+            input: {
+              sx: { minHeight: 44 },
+              startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+            },
             htmlInput: { 'aria-label': 'Hledat doklad' },
           }}
-          sx={{ flex: 1, ...(phone ? { '& .MuiInputBase-root': { minHeight: 44 } } : {}) }}
+          sx={{ mb: 1.5, flexShrink: 0 }}
         />
-        <Box
-          sx={
-            phone
-              ? {
-                  overflowX: 'auto',
-                  mx: -2,
-                  px: 2,
-                  pb: 0.5,
-                  '& [role="group"]': { flexWrap: 'nowrap', width: 'max-content' },
-                  '& .MuiButtonBase-root': { minHeight: 44, flexShrink: 0 },
-                }
-              : undefined
-          }
-        >
-          <FilterChips options={visibleFilters} value={filter} onChange={setFilter} ariaLabel="Filtr dokladů" />
-        </Box>
-      </Stack>
-
-      {/* ── Invoices ── */}
-      {phone ? (
-        <InvoiceCards
-          invoices={filteredInvoices}
-          now={now}
-          openId={openId}
-          onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
-          handlers={handlers}
-          empty={emptyText}
-        />
-      ) : (
-        <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
-          <Box sx={[{ overflow: 'auto', overscrollBehavior: 'contain', ...FIT_FILL_SX }, STICKY_HEAD_SX]}>
-            <InvoiceTable
+        {phone ? (
+          <>
+            <InvoiceCards
               invoices={filteredInvoices}
               now={now}
-              compact={tablet}
-              sortBy={sortBy}
-              sortDir={sortDir}
-              onSort={handleSort}
               openId={openId}
               onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
               handlers={handlers}
               empty={emptyText}
             />
-          </Box>
-          <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Zobrazeno {filteredInvoices.length} z {doklady(invoices.length)}
-            </Typography>
-          </Box>
-        </Paper>
-      )}
-      {phone && (
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, textAlign: 'center' }}>
-          Zobrazeno {filteredInvoices.length} z {doklady(invoices.length)}
-        </Typography>
-      )}
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, textAlign: 'center' }}>{shown}</Typography>
+          </>
+        ) : (
+          <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={[{ overflow: 'auto', overscrollBehavior: 'contain', ...FIT_FILL_SX }, STICKY_HEAD_SX]}>
+              <InvoiceTable
+                invoices={filteredInvoices}
+                now={now}
+                compact={tablet}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={handleSort}
+                openId={openId}
+                onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
+                handlers={handlers}
+                empty={emptyText}
+              />
+            </Box>
+            <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{shown}</Typography>
+            </Box>
+          </Paper>
+        )}
+      </Shelf>
 
       {/* ── New document ── */}
       <NewInvoiceFlow
@@ -490,6 +518,6 @@ export default function Billing() {
           </Button>
         </DialogActions>
       </Dialog>
-    </FitPage>
+    </PageFrame>
   );
 }

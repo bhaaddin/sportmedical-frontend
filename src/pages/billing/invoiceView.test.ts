@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Invoice } from '../../api/billing';
 import {
+  filterFromState, issuedBetween,
   customerOf, discountSuffix, doklady, isOverdue, isPendingApproval, itemsLabel, itemsWithDiscount, matchesFilter,
   matchesSearch, monthIn, recipientTypeOf, statusOf, summarize,
 } from './invoiceView';
@@ -179,5 +180,38 @@ describe('recipient types, approval and discounts (contract C3)', () => {
     expect(discountSuffix(inv)).toBe('−10 %');
     expect(itemsWithDiscount(inv)).toBe('12× Komplexní prohlídka · −10 %');
     expect(itemsWithDiscount(invoice({}))).toBe(itemsLabel(invoice({})));
+  });
+});
+
+describe('filterFromState', () => {
+  it('reads a known filter and ignores anything else', () => {
+    expect(filterFromState({ filter: 'approval' })).toBe('approval');
+    expect(filterFromState({ filter: 'overdue', invoiceId: 'x' })).toBe('overdue');
+    expect(filterFromState({ filter: 'nonsense' })).toBeNull();
+    expect(filterFromState({ filter: 3 })).toBeNull();
+    expect(filterFromState(null)).toBeNull();
+    expect(filterFromState('approval')).toBeNull();
+  });
+});
+
+describe('issuedBetween', () => {
+  const at = (id: string, issueDateUtc: string, status: Invoice['status'] = 'Issued', totalCzk = 1000) =>
+    ({ id, issueDateUtc, status, totalCzk } as Invoice);
+
+  it('counts the turnover invoices issued on the days of the range, by the Prague day', () => {
+    const rows = [
+      at('a', '2026-09-30T22:30:00Z'),            // 1. 10. in Prague
+      at('b', '2026-10-15T10:00:00Z', 'Paid', 500),
+      at('c', '2026-10-31T23:30:00Z'),            // 1. 11. in Prague (CET)
+      at('d', '2026-10-10T10:00:00Z', 'Cancelled'),
+      at('e', '2026-10-10T10:00:00Z', 'PendingApproval'),
+      at('f', 'nonsense'),
+    ];
+    expect(issuedBetween(rows, '2026-10-01', '2026-10-31')).toEqual({ count: 2, total: 1500 });
+  });
+
+  it('is nothing for a range that is not two dates or runs backwards', () => {
+    expect(issuedBetween([], '2026-10-31', '2026-10-01')).toBeNull();
+    expect(issuedBetween([], '', '2026-10-01')).toBeNull();
   });
 });

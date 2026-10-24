@@ -52,7 +52,8 @@ export default function InvoiceTable({
   const span = compact ? 5 : 7;
 
   return (
-    <Table aria-label="Doklady">
+    /* An iPad's five columns sit closer together, so the actions column is never pushed past the edge. */
+    <Table aria-label="Doklady" sx={compact ? { '& .MuiTableCell-root': { px: 1 } } : undefined}>
       <TableHead>
         <TableRow>
           <TableCell sortDirection={dir('invoiceNumber')}>{sortable('invoiceNumber', 'Číslo')}</TableCell>
@@ -78,7 +79,8 @@ export default function InvoiceTable({
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>{czDate(inv.issueDateUtc)}</Typography>
                   )}
                 </TableCell>
-                <TableCell sx={{ maxWidth: compact ? 260 : undefined }}>
+                {/* On an iPad the customer column gives way (its lines end in an ellipsis) so the actions stay on screen. */}
+                <TableCell sx={compact ? { width: '34%', maxWidth: 0, minWidth: 96 } : undefined}>
                   <InvoiceCustomer invoice={inv} wrap={compact} />
                   {compact && (
                     <Typography variant="caption" noWrap title={items} sx={{ color: 'text.secondary', display: 'block' }}>

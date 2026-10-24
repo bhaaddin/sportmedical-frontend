@@ -6,6 +6,7 @@
  */
 import { defaultActivityColor } from '../../colors/defaultActivityColors';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -66,7 +67,7 @@ const PALETTE = ['#0D5C52', '#2B3440', '#8A5A2F', '#27603A', '#9B3B1B', '#4A5564
 const renderCenik = () =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <Cenik />
+      <MemoryRouter initialEntries={['/nastaveni/cenik']}><Cenik /></MemoryRouter>
     </QueryClientProvider>,
   );
 
@@ -239,5 +240,28 @@ describe('Ceník - činnosti', () => {
     m.listActivities.mockResolvedValue({ activities: [], warnings: [] });
     renderCenik();
     expect((await screen.findAllByText('Zatím žádná činnost se podle této položky neúčtuje.')).length).toBe(2);
+  });
+});
+
+describe('Bez ceny', () => {
+  it('lists the active činnosti no row bills, each a chip to Činnosti, and the rows that cost nothing', async () => {
+    m.getAll.mockResolvedValue([...ITEMS, { id: 'p-3', code: 'NULA', name: 'Konzultace zdarma', description: '', durationMinutes: 15, priceCzk: 0, isActive: true }]);
+    m.listActivities.mockResolvedValue({
+      ...ACTIVITIES,
+      activities: [...ACTIVITIES.activities, activity({ id: 'a-5', name: 'Nová činnost', serviceItemId: null }), activity({ id: 'a-6', name: 'Stará', serviceItemId: 'gone' })],
+    });
+    renderCenik();
+    const shelf = within(await screen.findByRole('region', { name: 'Bez ceny' }));
+    expect(shelf.getByLabelText('Počet: 3')).toBeInTheDocument();
+    expect(shelf.getByRole('link', { name: 'Činnost: Nová činnost' })).toHaveAttribute('href', '/activities');
+    expect(shelf.getByRole('link', { name: 'Činnost: Stará' })).toBeInTheDocument();
+    expect(shelf.getByText(/Konzultace zdarma/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Položky ceníku' })).toBeInTheDocument();
+  });
+
+  it('is not drawn when everything is priced', async () => {
+    renderCenik();
+    await screen.findByRole('button', { name: 'Upravit činnost Základní' });
+    expect(screen.queryByRole('region', { name: 'Bez ceny' })).not.toBeInTheDocument();
   });
 });

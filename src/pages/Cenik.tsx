@@ -26,8 +26,15 @@
  * is checked in front, because the server checks almost none of them - see
  * `pricing/serviceForm.ts`. A failed load names what failed and offers
  * "Zkusit znovu".
+ *
+ * Built as shelves (docs/ui-shelf-system.md): "Bez ceny" - the active činnosti
+ * no row bills (they are booked but never priced) and rows that cost nothing,
+ * each činnost a connected chip; shown only to whoever may fix it and only when
+ * there is something - and "Položky ceníku", the list itself, a shelf that takes
+ * the height that is left. The ceník has no categories (a row has no such
+ * field), so it is one list, not a shelf per category.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box, Typography, Button, TextField, InputAdornment, Stack, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Alert,
@@ -47,8 +54,8 @@ import type { Activity } from '../api/bookingContracts';
 import ServiceDialog from './pricing/ServiceDialog';
 import ActivityLine from './cenik/ActivityLine';
 import ActivityExtrasDialog from './cenik/ActivityExtrasDialog';
-import { StatusChip, SoftCard, DESIGN } from '../components/ui';
-import { FitPage } from '../components/ui/fit';
+import { StatusChip, SoftCard } from '../components/ui';
+import { EntityChip, PageFrame, Shelf } from '../ui/shelf';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { TYPE } from '../components/settings/settingsStyle';
 import { activityColorOrNull } from '../colors/activityColor';
@@ -106,6 +113,16 @@ export default function Cenik() {
     const first = activitiesOf(item)[0];
     return first === undefined ? null : serviceColorOf(first) ?? drawnColor(first);
   };
+
+  /* What the ceník leaves unpriced: active činnosti no row bills, and rows that cost nothing. Only for whoever may fix it. */
+  const unpriced = useMemo(() => {
+    if (!mayEdit || loading || activitiesQuery.data === undefined) return null;
+    const known = new Set(services.map((sv) => sv.id));
+    const activitiesWithout = activitiesQuery.data.filter((a) => a.isActive && (a.serviceItemId === null || !known.has(a.serviceItemId)));
+    const free = services.filter((sv) => sv.isActive && !(sv.priceCzk > 0));
+    return { activities: activitiesWithout, free };
+  }, [mayEdit, loading, activitiesQuery.data, services]);
+  const unpricedCount = unpriced === null ? 0 : unpriced.activities.length + unpriced.free.length;
 
   const confirmArchive = async () => {
     if (archiving === null) return;
@@ -193,26 +210,51 @@ export default function Cenik() {
   ];
 
   return (
-    <FitPage>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: 3, flexShrink: 0 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography component="h1" sx={TYPE.pageTitle}>Ceník</Typography>
-          <Typography sx={[TYPE.caption, { mt: 0.75, maxWidth: 760 }]}>
-            Položky a ceny, které vidí pacient i kalendář. Cenu určuje jen ceník — kalendář, faktury i web ji berou odtud.
-          </Typography>
+    <PageFrame
+      fit
+      title="Ceník"
+      /* The shell already draws the way back (Nastavení / Služby a ceny) on this route: no breadcrumb of its own. */
+      purpose="Cenu určuje jen ceník — kalendář, faktury i web ji berou odtud."
+      /* In the header on every device (a setup screen, not a desk one), 44 px everywhere. */
+      actions={mayEdit && services.length > 0 ? newButton : undefined}
+    >
+      {(failed !== null || activitiesQuery.isError || clinicServicesQuery.isError) && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+          {failed !== null && (
+            <Alert severity="error" action={<Button color="inherit" size="small" sx={{ minHeight: 44 }} onClick={() => { setLoading(true); load(); }}>Zkusit znovu</Button>}>
+              {failed}
+            </Alert>
+          )}
+          {(activitiesQuery.isError || clinicServicesQuery.isError) && (
+            <Alert severity="warning" action={<Button color="inherit" size="small" sx={{ minHeight: 44 }} onClick={() => { void activitiesQuery.refetch(); void clinicServicesQuery.refetch(); }}>Zkusit znovu</Button>}>
+              Činnosti se nepodařilo načíst, pod položkami zatím chybí.
+            </Alert>
+          )}
         </Box>
-        {mayEdit && services.length > 0 && <Box sx={{ flexShrink: 0 }}>{newButton}</Box>}
-      </Stack>
-
-      {failed !== null && (
-        <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" sx={{ minHeight: 44 }} onClick={() => { setLoading(true); load(); }}>Zkusit znovu</Button>}>
-          {failed}
-        </Alert>
       )}
-      {(activitiesQuery.isError || clinicServicesQuery.isError) && (
-        <Alert severity="warning" sx={{ mb: 2 }} action={<Button color="inherit" size="small" sx={{ minHeight: 44 }} onClick={() => { void activitiesQuery.refetch(); void clinicServicesQuery.refetch(); }}>Zkusit znovu</Button>}>
-          Činnosti se nepodařilo načíst, pod položkami zatím chybí.
-        </Alert>
+
+      {unpriced !== null && unpricedCount > 0 && (
+        <Shelf id="unpriced" title="Bez ceny" count={unpricedCount} countTone="beige" layout="board" hint="Co se objednává, ale nemá cenu">
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            {unpriced.activities.length > 0 && (
+              <Box>
+                <Typography sx={TYPE.caption}>Činnosti, které žádná položka ceníku neúčtuje:</Typography>
+                <Box role="list" aria-label="Činnosti bez položky ceníku" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.75 }}>
+                  {unpriced.activities.map((a) => (
+                    <Box component="span" role="listitem" key={a.id} sx={{ display: 'inline-flex', maxWidth: '100%' }}>
+                      <EntityChip entity={{ kind: 'activity', id: a.id, label: a.name }} size="sm" />
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+            {unpriced.free.length > 0 && (
+              <Typography sx={TYPE.caption}>
+                {`Položky s nulovou cenou: ${unpriced.free.map((sv) => sv.name).join(', ')}.`}
+              </Typography>
+            )}
+          </Box>
+        </Shelf>
       )}
 
       {/*
@@ -221,63 +263,66 @@ export default function Cenik() {
         * as well as the database, so nothing reappears. Three zeroes and a
         * search box over nothing are furniture; this says what to do instead.
         */}
-      {!loading && services.length === 0 && failed === null && (
-        <SoftCard sx={{ textAlign: 'center', py: 6 }}>
-          <Typography component="h2" sx={TYPE.sectionTitle}>Ceník je prázdný</Typography>
-          <Typography sx={[TYPE.caption, { mt: 0.5, mb: 3 }]}>
-            {mayEdit
-              ? 'Přidejte první položku — co ordinace nabízí a kolik to stojí.'
-              : 'Ceník vyplní ten, kdo smí měnit nastavení ordinace.'}
-          </Typography>
-          {mayEdit && newButton}
-        </SoftCard>
-      )}
-
-      {services.length > 0 && (
-        <TextField
-          fullWidth
-          placeholder="Hledat v ceníku"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          size={phone ? 'medium' : 'small'}
-          slotProps={{ input: {
-            startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
-          }, htmlInput: { 'aria-label': 'Hledat v ceníku' } }}
-          sx={{ mb: 2 }}
-        />
-      )}
-
-      {loading ? (
-        <Stack spacing={1.5} aria-busy="true" aria-label="Načítám ceník">
-          <Skeleton variant="rounded" height={48} />
-          <Skeleton variant="rounded" height={280} />
-        </Stack>
-      ) : services.length > 0 && (
-        <ResponsiveDataList
-          rows={filtered}
-          rowKey={(s) => s.id}
-          columns={columns}
-          ariaLabel="Ceník"
-          fill
-          /* Only about the search. An empty price list has its own words above -
-             "nic takového není" answers a question nobody asked when there is
-             nothing to search through. */
-          empty="V ceníku nic takového není"
-          renderCard={(s) => (
-            <Stack spacing={1.25}>
-              <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                {nameBlock(s, false)}
-                {price(s)}
-              </Stack>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <StatusChip tone={s.isActive ? 'green' : 'grey'}>{s.isActive ? 'Aktivní' : 'Vyřazeno'}</StatusChip>
-                <Typography sx={TYPE.caption}>{s.code}</Typography>
-              </Stack>
-              {mayEdit && actions(s)}
-            </Stack>
-          )}
-        />
-      )}
+      <Shelf
+        id="items"
+        title="Položky ceníku"
+        count={loading || failed !== null ? undefined : services.length}
+        layout="free"
+        grow
+        loading={loading}
+      >
+        {services.length === 0 ? (
+          failed === null && (
+            <SoftCard sx={{ textAlign: 'center', py: 6 }}>
+              <Typography component="h3" sx={TYPE.sectionTitle}>Ceník je prázdný</Typography>
+              <Typography sx={[TYPE.caption, { mt: 0.5, mb: 3 }]}>
+                {mayEdit
+                  ? 'Přidejte první položku — co ordinace nabízí a kolik to stojí.'
+                  : 'Ceník vyplní ten, kdo smí měnit nastavení ordinace.'}
+              </Typography>
+              {mayEdit && newButton}
+            </SoftCard>
+          )
+        ) : (
+          <>
+            <TextField
+              fullWidth
+              placeholder="Hledat v ceníku"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              size={phone ? 'medium' : 'small'}
+              slotProps={{ input: {
+                startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+              }, htmlInput: { 'aria-label': 'Hledat v ceníku' } }}
+              sx={{ mb: 1.5, flexShrink: 0 }}
+            />
+            <ResponsiveDataList
+              rows={filtered}
+              rowKey={(s) => s.id}
+              columns={columns}
+              ariaLabel="Ceník"
+              fill
+              /* Only about the search. An empty price list has its own words above -
+                 "nic takového není" answers a question nobody asked when there is
+                 nothing to search through. */
+              empty="V ceníku nic takového není"
+              renderCard={(s) => (
+                <Stack spacing={1.25}>
+                  <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    {nameBlock(s, false)}
+                    {price(s)}
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <StatusChip tone={s.isActive ? 'green' : 'grey'}>{s.isActive ? 'Aktivní' : 'Vyřazeno'}</StatusChip>
+                    <Typography sx={TYPE.caption}>{s.code}</Typography>
+                  </Stack>
+                  {mayEdit && actions(s)}
+                </Stack>
+              )}
+            />
+          </>
+        )}
+      </Shelf>
 
       {editing !== undefined && (
         <ServiceDialog
@@ -322,6 +367,6 @@ export default function Cenik() {
           </Button>
         </DialogActions>
       </Dialog>
-    </FitPage>
+    </PageFrame>
   );
 }

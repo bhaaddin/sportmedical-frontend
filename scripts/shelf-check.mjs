@@ -4,7 +4,7 @@
  *     node scripts/shelf-check.mjs
  *     env: BASE=http://localhost:3000   DEV_LOGIN=<file with "E-mail:" / "Password:" lines>   OUT_DIR=design/shelf
  *          PLAYWRIGHT_CORE=<folder of playwright-core>   CHROME_PATH=<chrome.exe>
- *          VP=390x844,820x1180,1440x900,1920x1080   PAGES=prehled,patients,patient   POPULATED=0 (skip the mocked pass)
+ *          VP=390x844,820x1180,1440x900,1920x1080   PAGES=prehled,patients,patient (+ billing, cashier, export, cenik, patient-faktury)   THEME=dark|light   POPULATED=0 (skip the mocked pass)
  *
  * It uses its OWN headless Chromium (never the shared browser pane), signs in once, then for each viewport x page
  * (Přehled /prehled, Pacienti /patients, a patient's card /patients/:id):
@@ -43,6 +43,8 @@ const VIEWPORTS = (process.env.VP ?? '390x844,820x1180,1440x900,1920x1080').spli
 const PAGES = (process.env.PAGES ?? 'prehled,patients,patient').split(',');
 const POPULATED = (process.env.POPULATED ?? '1') !== '0';
 const MODE = process.env.MODE;
+/* S-3: THEME=dark|light seeds the stored theme mode before the page loads. */
+const THEME = process.env.THEME ?? '';
 /* Which parts to run (default all): pages, palette, accent, motion, populated. */
 const SECTIONS = new Set((process.env.SECTIONS ?? 'pages,palette,accent,motion,populated').split(','));
 mkdirSync(OUT, { recursive: true });
@@ -188,11 +190,13 @@ const PAGE_PATH = {
   'set-hours': '/working-hours',
   'set-2fa': '/nastaveni/zabezpeceni',
   /* Phase 2, S-2 */
+  /* Phase 2, S-3 */
+  billing: '/billing', cashier: '/cashier', export: '/accounting-export', cenik: '/nastaveni/cenik',
   'intake-review': '/intake-review', register: '/patients/register', 'diagnostics-new': '/diagnostics/new', feedback: '/hodnoceni-pacientu',
 };
 /* The patient's own pages: `patient` + the suffix after `/patients/{id}`. */
 const PATIENT_PAGE = {
-  patient: '', 'p-dokumenty': '/dokumenty', 'p-terminy': '/terminy', 'p-vysledky': '/vysledky', 'p-historie': '/historie', 'p-edit': '/edit',
+  patient: '', 'p-dokumenty': '/dokumenty', 'p-terminy': '/terminy', 'p-vysledky': '/vysledky', 'p-historie': '/historie', 'p-edit': '/edit', 'patient-faktury': '/faktury',
 };
 const isPatientPage = (name) => Object.hasOwn(PATIENT_PAGE, name);
 
@@ -222,6 +226,7 @@ function watch(page, bucket) {
 async function checkPage(ctxFactory, vp, name, label = '') {
   const where = `${vp.label} ${name}${label}`;
   const ctx = await ctxFactory(vp);
+  if (THEME !== '') await ctx.addInitScript((mode) => localStorage.setItem('sm-theme-mode-v2', mode), THEME);
   const page = await ctx.newPage();
   const problems = [];
   watch(page, problems);

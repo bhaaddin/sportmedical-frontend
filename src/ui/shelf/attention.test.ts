@@ -3,7 +3,7 @@ import type { Invoice } from '../../api/billing';
 import type { DayAppointment } from '../../api/bookingContracts';
 import {
   ITEMS_PER_GROUP, attentionGroups, attentionTotal, clubInquiries, daysBetween, expiringDocuments, failedMessages, intakeReviews,
-  overdueInvoices, paperworkToday, paperworkWords,
+  overdueInvoices, paperworkToday, paperworkWords, invoiceApprovals,
 } from './attention';
 
 /* 21. 10. 2026, 10:00 Prague */
@@ -243,5 +243,35 @@ describe('daysBetween', () => {
     expect(daysBetween('2026-10-01', '2026-10-21')).toBe(20);
     expect(daysBetween('2026-10-24', '2026-10-26')).toBe(2);
     expect(daysBetween('nonsense', '2026-10-26')).toBe(0);
+  });
+});
+
+describe('invoiceApprovals', () => {
+  it('is nothing when the invoices are not known, or none waits', () => {
+    expect(invoiceApprovals({ now: NOW })).toBeNull();
+    expect(invoiceApprovals({ now: NOW, invoices: null })).toBeNull();
+    expect(invoiceApprovals({ now: NOW, invoices: [invoice({})] })).toBeNull();
+  });
+
+  it('lists the waiting ones oldest first, each a link that opens the invoice on Fakturace', () => {
+    const group = invoiceApprovals({
+      now: NOW,
+      invoices: [
+        invoice({ id: 'new', invoiceNumber: 'FA-NEW', status: 'PendingApproval', issueDateUtc: '2026-10-20T10:00:00Z', recipientName: 'ČEZ Sport' }),
+        invoice({ id: 'old', invoiceNumber: 'FA-OLD', status: 'PendingApproval', issueDateUtc: '2026-10-01T10:00:00Z', totalCzk: 500 }),
+        invoice({ id: 'issued' }),
+      ],
+    });
+    expect(group?.count).toBe(2);
+    expect(group?.severity).toBe('medium');
+    expect(group?.items.map((i) => i.id)).toEqual(['approval-old', 'approval-new']);
+    expect(group?.items[0]).toMatchObject({ to: '/billing', state: { invoiceId: 'old' }, entity: { kind: 'invoice', id: 'old', label: 'FA-OLD' } });
+    expect(group?.items[1].detail).toMatch(/^ČEZ Sport · /);
+    expect(group?.action).toEqual({ label: 'Zobrazit ke schválení', to: '/billing', state: { filter: 'approval' } });
+  });
+
+  it('is not part of the home shelf', () => {
+    const groups = attentionGroups({ now: NOW, invoices: [invoice({ status: 'PendingApproval' })] });
+    expect(groups.map((g) => g.id)).not.toContain('invoiceApprovals');
   });
 });

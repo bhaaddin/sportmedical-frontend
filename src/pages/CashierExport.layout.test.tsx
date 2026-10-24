@@ -25,6 +25,8 @@ vi.mock('../services/cashierApi', async (importOriginal) => ({
 vi.mock('../api/services', () => ({ servicesApi: { getAll: getServices } }));
 vi.mock('../api/client', () => ({ default: { get: clientGet, post: vi.fn(), delete: vi.fn() } }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+const getPatient = vi.fn();
+vi.mock('../api/patients', () => ({ patientsApi: { getById: getPatient } }));
 vi.mock('../components/patients/PatientPicker', () => ({ default: () => <div>Výběr pacienta</div> }));
 
 const { default: CashierPage } = await import('./CashierPage');
@@ -76,15 +78,41 @@ describe('Pokladna', () => {
         expect(screen.getByRole('button', { name: 'Refundovat' })).toHaveStyle({ minHeight: '44px' });
       } else if (width === 'tablet') {
         expect(container.querySelector('[data-layout="table-3"]')).not.toBeNull();
-        expect(headers()).toEqual(['Čas', 'Částka', 'Stav']);
+        expect(headers()).toEqual(['Položka', 'Částka', 'Stav']);
         /* The refund stays reachable on the three-column table. */
         expect(screen.getByRole('button', { name: 'Refundovat' })).toBeInTheDocument();
       } else {
-        expect(headers()).toEqual(['Čas', 'Částka', 'Platba', 'Stav', 'Akce']);
+        expect(headers()).toEqual(['Čas', 'Položka', 'Částka', 'Platba', 'Stav', 'Akce']);
       }
       expect(container.querySelector('[data-pinned="true"]') !== null).toBe(width === 'phone');
       expect(screen.getAllByRole('button', { name: /Nová platba/ })).toHaveLength(1);
     });
+  });
+
+  it('names what was paid for and links who paid, read from the patient record', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['billing.manage', 'patients.view']));
+    getServices.mockResolvedValue([{ id: 's1', name: 'Komplexní prohlídka', code: 'KP', priceCzk: 1600, isActive: true }]);
+    getPatient.mockReset().mockResolvedValue({ id: 'p1', firstName: 'Jana', lastName: 'Marková' });
+    getTransactions.mockResolvedValue([tx('t1', 'Completed', 1600), tx('t2', 'Completed', 1600)]);
+    renderAt('desktop', <CashierPage />);
+    expect((await screen.findAllByText('Komplexní prohlídka')).length).toBe(2);
+    const links = await screen.findAllByRole('link', { name: 'Jana Marková' });
+    expect(links[0]).toHaveAttribute('href', '/patients/p1');
+    /* One request per patient, not per row. */
+    expect(getPatient).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('region', { name: 'Dnes' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Dnešní transakce' })).toBeInTheDocument();
+    localStorage.clear();
+  });
+
+  it('asks for no patient without the permission to open one', async () => {
+    localStorage.clear();
+    getPatient.mockReset();
+    getTransactions.mockResolvedValue([tx('t1', 'Completed', 1600)]);
+    renderAt('desktop', <CashierPage />);
+    await screen.findAllByText(/1\s600\sKč/);
+    expect(getPatient).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: /Karta pacienta|Jana/ })).toBeNull();
   });
 
   it('writes money with a non-breaking space before Kč', async () => {
@@ -182,6 +210,26 @@ describe('Účetní export', () => {
     serve([exported('e1', 'faktury-2026-09.csv')]);
     await userEvent.click(screen.getByRole('button', { name: 'Zkusit znovu' }));
     expect(await screen.findByText('faktury-2026-09.csv')).toBeInTheDocument();
+  });
+
+  it('says what the chosen period holds before anything is exported', async () => {
+    const today = new Date().toISOString();
+    clientGet.mockImplementation((url: string) => {
+      if (url.endsWith('/history')) return Promise.resolve({ data: [] });
+      if (url === '/api/billing/invoices') {
+        return Promise.resolve({ data: [
+          { id: 'i1', invoiceNumber: '1', status: 'Issued', totalCzk: 1600, issueDateUtc: today },
+          { id: 'i2', invoiceNumber: '2', status: 'Paid', totalCzk: 2200, issueDateUtc: today },
+          { id: 'i3', invoiceNumber: '3', status: 'Cancelled', totalCzk: 900, issueDateUtc: today },
+        ] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    renderAt('desktop', <AccountingExportPage />);
+    expect(await screen.findByText(/^V období vystaveno 2 doklady za 3\s800\sKč\.$/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Faktury' })).toHaveAttribute('href', '/billing');
+    expect(screen.getByRole('region', { name: 'Nový export' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Poslední exporty' })).toBeInTheDocument();
   });
 
   it('stacks the form fields one per row on a phone', async () => {

@@ -1,7 +1,8 @@
 /*
- * What an opened invoice shows: who it is for in full, the discount
- * breakdown (the same rows as the quote had), the approval trail and the
- * payments received.
+ * What an opened invoice shows: what it is connected to ("Související": the
+ * patient, the visit, the club, the payments - `invoiceRelatedGroups`), the
+ * discount breakdown (the same rows as the quote had), the approval trail and
+ * the payments received.
  */
 import { Box, Typography } from '@mui/material';
 import type { Invoice } from '../../api/billing';
@@ -11,6 +12,7 @@ import { PENDING_PAY_REASON } from './InvoiceActions';
 import { czDate, czk } from '../../pages/billing/money';
 import { isPendingApproval } from '../../pages/billing/invoiceView';
 import DiscountRows from './DiscountRows';
+import { RelatedShelf, invoiceRelatedGroups } from '../../ui/shelf';
 
 export default function InvoiceDetails({ invoice }: { invoice: Invoice }) {
   const discounts = invoice.discounts ?? [];
@@ -51,6 +53,8 @@ export default function InvoiceDetails({ invoice }: { invoice: Invoice }) {
           </Typography>
         </Box>
       )}
+
+      <RelatedShelf groups={invoiceRelatedGroups({ invoice })} hint={`Doklad ${invoice.invoiceNumber}`} />
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: discounts.length > 0 ? '1fr 1fr' : '1fr' } }}>
         <Box>

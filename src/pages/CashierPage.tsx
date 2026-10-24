@@ -1,23 +1,33 @@
-import { useEffect, useState } from 'react';
+/*
+ * Pokladna - the payments taken at the desk today.
+ *
+ * Built as shelves (docs/ui-shelf-system.md): the frame with "Nová platba" (pinned on a phone) and "Obnovit", the day's
+ * figures from the cashier dashboard, and the day's transactions - a shelf that takes the height that is left and scrolls
+ * inside. Each transaction names what was paid for (the price-list item) and who paid (a connected link to the patient's
+ * card with a peek; the name is read from the patient's record, at most `NAMES_AT_MOST` of them, and only for somebody who
+ * may open a patient). A failed read of the transactions says so; it never claims "no payments yet".
+ */
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Box, Typography, Grid, Button, TextField, Stack,
+  Box, Typography, Button, TextField, Stack,
   MenuItem, InputAdornment,
 } from '@mui/material';
+import { useQueries } from '@tanstack/react-query';
 import { Add, Refresh } from '@mui/icons-material';
 import { cashierApi, PaymentMethod, type CashierTransaction, type DashboardStats } from '../services/cashierApi';
 import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
+import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
+import { usePermissions } from '../auth/usePermission';
 import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
-import { PageHeader, KpiCard, StatusChip, SectionLabel, DESIGN } from '../components/ui';
+import { StatusChip } from '../components/ui';
 import type { ChipTone } from '../components/ui';
-import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
-import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
+import { EntityLink, MetricCard, PageFrame, Shelf, mayOpen } from '../ui/shelf';
 import { FormDialog } from './sports/FormDialog';
-import { LoadError, PageSkeleton } from './sports/LoadStates';
 import { kc } from './sports/format';
 import { useTouchSx } from './sports/touch';
 
@@ -51,6 +61,9 @@ const timeOf = (t: CashierTransaction) =>
 const cancellable = (t: CashierTransaction) => t.status === 'Pending' || t.status === 'Completed';
 const cancelLabel = (t: CashierTransaction) => (t.status === 'Pending' ? 'Zrušit' : 'Refundovat');
 
+/** How many patients' names the day's list reads (one request each, shared with the peek's cache). */
+const NAMES_AT_MOST = 20;
+
 export default function CashierPage() {
   const today = new Date().toISOString().split('T')[0];
   const device = useDevice();
@@ -69,6 +82,26 @@ export default function CashierPage() {
     discount: 0,
   });
   const [saving, setSaving] = useState(false);
+  const mayOpenPatients = mayOpen('patient', usePermissions());
+
+  /* Who paid: the names of today's patients, read from their records (the peek reads the same key). */
+  const patientIds = useMemo(
+    () => (mayOpenPatients ? [...new Set(transactions.map((t) => t.patientId).filter((id) => id !== ''))].slice(0, NAMES_AT_MOST) : []),
+    [transactions, mayOpenPatients],
+  );
+  const patientQueries = useQueries({
+    queries: patientIds.map((id) => ({
+      queryKey: ['patient', id],
+      queryFn: () => patientsApi.getById(id),
+      staleTime: 5 * 60_000,
+      retry: false,
+    })),
+  });
+  const nameOf = new Map<string, string>();
+  patientQueries.forEach((q, i) => {
+    if (q.data) nameOf.set(patientIds[i], `${q.data.firstName} ${q.data.lastName}`.trim());
+  });
+  const serviceName = (t: CashierTransaction) => services.find((s) => s.id === t.serviceId)?.name ?? 'Položka ceníku';
 
   const load = async () => {
     setLoading(true);
@@ -156,10 +189,31 @@ export default function CashierPage() {
     </Stack>
   );
 
+  /* What was paid for, and who paid: a link to the patient's card (plain text for somebody who may not open it). */
+  const whatCell = (t: CashierTransaction) => (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{serviceName(t)}</Typography>
+      {t.patientId !== '' && mayOpenPatients && (
+        <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+          <EntityLink entity={{ kind: 'patient', id: t.patientId, label: nameOf.get(t.patientId) || 'Karta pacienta' }} />
+        </Typography>
+      )}
+    </Box>
+  );
+
   const columns: DataColumn<CashierTransaction>[] =
     device === 'tablet'
       ? [
-          { key: 'time', header: 'Čas', tablet: true, cell: (t) => <Box sx={{ whiteSpace: 'nowrap' }}>{timeOf(t)}</Box> },
+          /* The iPad keeps three columns: the time goes under what was paid for. */
+          {
+            key: 'what', header: 'Položka', tablet: true,
+            cell: (t) => (
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{timeOf(t)}</Typography>
+                {whatCell(t)}
+              </Stack>
+            ),
+          },
           {
             key: 'amount', header: 'Částka', align: 'right', tablet: true,
             cell: (t) => <Box sx={{ fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{kc(t.finalPrice)}</Box>,
@@ -168,6 +222,7 @@ export default function CashierPage() {
         ]
       : [
           { key: 'time', header: 'Čas', tablet: true, cell: (t) => <Box sx={{ whiteSpace: 'nowrap' }}>{timeOf(t)}</Box> },
+          { key: 'what', header: 'Položka', tablet: true, cell: whatCell },
           {
             key: 'amount', header: 'Částka', align: 'right', tablet: true,
             cell: (t) => <Box sx={{ fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{kc(t.finalPrice)}</Box>,
@@ -180,59 +235,44 @@ export default function CashierPage() {
           },
         ];
 
-  const newButton = (
-    <Button variant="contained" startIcon={<Add />} onClick={() => setDialogOpen(true)} sx={touch}>
-      Nová platba
-    </Button>
-  );
-
-  const header = (
-    <PageHeader
-      title="Pokladna"
-      subtitle="Platby přijaté dnes na místě"
-      actions={
-        <>
-          <Button variant="outlined" startIcon={<Refresh />} onClick={load} sx={touch}>Obnovit</Button>
-          {device !== 'phone' && newButton}
-        </>
-      }
-    />
-  );
-
-  if (loading) {
-    return (
-      <Box>
-        {header}
-        <PageSkeleton kpis={4} rows={4} />
-      </Box>
-    );
-  }
+  const shownStats = loading ? null : stats;
 
   return (
-    <FitPage>
-      {header}
+    <PageFrame
+      fit
+      title="Pokladna"
+      purpose="Platby přijaté dnes na místě"
+      primaryAction={{ label: 'Nová platba', icon: <Add />, onClick: () => setDialogOpen(true) }}
+      actions={<Button variant="outlined" startIcon={<Refresh />} onClick={load} sx={touch}>Obnovit</Button>}
+    >
+      {/* The day's figures: a row that swipes on a phone, a grid from a tablet up. */}
+      <Shelf
+        id="today"
+        title="Dnes"
+        layout={device === 'phone' ? 'row' : 'grid'}
+        minCardWidth={160}
+        phoneWidth="min(56vw, 210px)"
+        cardHeight={104}
+        skeletons={4}
+        loading={loading}
+        stagger={false}
+      >
+        <MetricCard label="Dnešní tržba" value={shownStats ? shownStats.todayRevenue : '—'} format={kc} hint="všechny způsoby platby" />
+        <MetricCard label="Transakcí" value={shownStats ? shownStats.transactionsCount : '—'} hint="dnes" />
+        <MetricCard label="Hotově" value={shownStats ? shownStats.cashTransactions : '—'} hint="plateb v hotovosti" />
+        <MetricCard label="Kartou" value={shownStats ? shownStats.cardTransactions : '—'} hint="plateb kartou" />
+      </Shelf>
 
-      {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 2.5, flexShrink: 0 }}>
-        <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Dnešní tržba" value={stats ? kc(stats.todayRevenue) : '—'} hint="všechny způsoby platby" />
-        </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Transakcí" value={stats?.transactionsCount ?? '—'} hint="dnes" />
-        </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Hotově" value={stats?.cashTransactions ?? '—'} hint="plateb v hotovosti" />
-        </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
-          <KpiCard label="Kartou" value={stats?.cardTransactions ?? '—'} hint="plateb kartou" />
-        </Grid>
-      </Grid>
-
-      {/* Transactions */}
-      <Box sx={{ flexShrink: 0 }}><SectionLabel>Dnešní transakce</SectionLabel></Box>
-      {loadFailed ? (
-        <LoadError what="Dnešní transakce" onRetry={load} />
-      ) : (
+      <Shelf
+        id="transactions"
+        title="Dnešní transakce"
+        count={loading || loadFailed ? undefined : transactions.length}
+        layout="free"
+        grow
+        loading={loading}
+        error={loadFailed ? 'Dnešní transakce se nepodařilo načíst.' : false}
+        onRetry={load}
+      >
         <ResponsiveDataList
           ariaLabel="Dnešní transakce"
           rows={transactions}
@@ -246,6 +286,7 @@ export default function CashierPage() {
                 <Typography sx={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{kc(t.finalPrice)}</Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{timeOf(t)}</Typography>
               </Stack>
+              {whatCell(t)}
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <StatusChip tone={statusOf(t).tone}>{statusOf(t).label}</StatusChip>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -256,9 +297,7 @@ export default function CashierPage() {
             </Stack>
           )}
         />
-      )}
-
-      {device === 'phone' && <PinnedActionBar label="Nová platba">{newButton}</PinnedActionBar>}
+      </Shelf>
 
       {/* New payment dialog */}
       <FormDialog
@@ -306,6 +345,6 @@ export default function CashierPage() {
             slotProps={{ input: { endAdornment: <InputAdornment position="end">Kč</InputAdornment> } }} />
         </Stack>
       </FormDialog>
-    </FitPage>
+    </PageFrame>
   );
 }

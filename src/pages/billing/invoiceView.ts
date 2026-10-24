@@ -10,8 +10,18 @@
  */
 import type { Invoice, InvoicePaymentMethod, RecipientType } from '../../api/billing';
 import type { ChipTone } from '../../components/ui';
+import { pragueDateKey } from '../../utils/time';
 
 export type InvoiceFilter = 'all' | 'unpaid' | 'overdue' | 'clubs' | 'approval';
+
+const INVOICE_FILTERS: readonly InvoiceFilter[] = ['all', 'unpaid', 'overdue', 'clubs', 'approval'];
+
+/** The filter another screen (or an attention card) asks Fakturace to open with: `state.filter`, or null for anything else. */
+export function filterFromState(raw: unknown): InvoiceFilter | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const value = (raw as Record<string, unknown>).filter;
+  return typeof value === 'string' && (INVOICE_FILTERS as readonly string[]).includes(value) ? (value as InvoiceFilter) : null;
+}
 
 /** How the recipient type is called on the screen. */
 export const RECIPIENT_LABEL: Record<RecipientType, string> = {
@@ -249,4 +259,20 @@ export function doklady(n: number): string {
   if (n === 1) return '1 doklad';
   if (n >= 2 && n <= 4) return `${n} doklady`;
   return `${n} dokladů`;
+}
+
+/**
+ * The invoices issued (Issued, part-paid or paid - the ones that count as turnover) on a day from `from` to `to`, both
+ * date-only and inclusive, by the issue date's Prague day. Účetní export shows it before an export is made. A range that
+ * is not two dates, or runs backwards, is nothing.
+ */
+export function issuedBetween(invoices: readonly Invoice[], from: string, to: string): { count: number; total: number } | null {
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  if (!DATE.test(from) || !DATE.test(to) || from > to) return null;
+  const inRange = invoices.filter((inv) => {
+    if (!counts(inv) || Number.isNaN(Date.parse(inv.issueDateUtc))) return false;
+    const day = pragueDateKey(new Date(inv.issueDateUtc));
+    return day >= from && day <= to;
+  });
+  return { count: inRange.length, total: inRange.reduce((sum, inv) => sum + inv.totalCzk, 0) };
 }
