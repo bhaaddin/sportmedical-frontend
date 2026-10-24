@@ -132,3 +132,28 @@ export function addendaLabel(count: number): string {
 
 /** The chip an order row carries: its addenda count on a root, "Dodatek" on an addendum, '' on a lone order. */
 export const groupChip = (o: ClubOrderView): string => (o.parentOrderId !== null ? 'Dodatek' : addendaLabel(o.addenda.length));
+
+const playersWord = (n: number): string => (n === 1 ? 'hráč' : n >= 2 && n <= 4 ? 'hráči' : 'hráčů');
+
+/**
+ * R10 (S-4): the one sentence the order's detail opens with - what the desk does next with this order. `null` when nothing
+ * waits on the desk (a cancelled order, a finished and billed one, one paid per person). Short Czech, one idea.
+ */
+export function nextStepOf(order: Pick<ClubOrderView, 'status' | 'registered' | 'totalSeats' | 'paymentMethod' | 'invoiceId'>): string | null {
+  const unbilled = order.paymentMethod === 'ClubInvoice' && order.invoiceId === null;
+  switch (order.status) {
+    case 'Invited':
+      return 'Čeká se na klub. Pošlete mu odkaz na formulář (Odkazy pro klub).';
+    case 'Requested':
+      return 'Klub poslal poptávku. Zpracujte ji a potvrďte termíny.';
+    case 'Confirmed': {
+      const missing = Math.max(0, order.totalSeats - order.registered);
+      if (missing > 0) return `Chybí ${missing} ${playersWord(missing)}. Pošlete klubu odkaz pro hráče.`;
+      return unbilled ? 'Všichni jsou zapsaní. Vystavte fakturu klubu.' : null;
+    }
+    case 'Completed':
+      return unbilled ? 'Hotovo. Zbývá vystavit fakturu klubu.' : null;
+    default:
+      return null;
+  }
+}

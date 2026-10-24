@@ -14,6 +14,7 @@ import type { DayAppointment } from '../../api/bookingContracts';
 import { isTerminalStatus } from '../../api/bookingContracts';
 import type { Invoice } from '../../api/billing';
 import type { Club } from '../../api/clubs';
+import type { ClubOrderView } from '../../api/clubOrders';
 import type { PatientDocument } from '../../api/documents';
 import { shortDayTime } from '../../components/patients/patientActivity';
 import { isOpen } from '../../pages/billing/invoiceView';
@@ -154,4 +155,38 @@ export function invoiceRelatedGroups(input: {
   groups.push(payments);
 
   return groups;
+}
+
+/**
+ * A club order (S-4, the order's detail): its club, its invoice (hidden for a person who may not bill) and its players
+ * (how many are registered of the seats, "zobrazit vše" = the club's players). Everything is on the order itself: no read.
+ */
+export function clubOrderRelatedGroups(input: {
+  order: Pick<ClubOrderView, 'clubId' | 'clubName' | 'invoiceId' | 'paymentMethod' | 'registered' | 'totalSeats'>;
+  /** The invoice's number when it is known (the invoice draft lists it); otherwise the chip says "Faktura". */
+  invoiceNumber?: string | null;
+  mayBill: boolean;
+}): RelatedGroup[] {
+  const { order } = input;
+  const ready = { data: [] as unknown[] };
+
+  const club = base('club', 'Klub', ready, 'Objednávka nemá klub.');
+  if (order.clubId !== '' && order.clubName !== '') {
+    club.total = 1;
+    club.entities = [{ kind: 'club', id: order.clubId, label: order.clubName }];
+  }
+
+  const invoice = base('invoice', 'Faktura', input.mayBill ? ready : { hidden: true },
+    order.paymentMethod === 'PerPerson' ? 'Platí se po osobách, faktura klubu nevzniká.' : 'Zatím nevyfakturováno.');
+  if (order.invoiceId !== null && order.invoiceId !== '') {
+    invoice.total = 1;
+    invoice.entities = [{ kind: 'invoice', id: order.invoiceId, label: input.invoiceNumber || 'Faktura' }];
+  }
+
+  const players = base('players', 'Hráči', ready, order.totalSeats > 0 ? `Zatím se nikdo nezapsal (0 z ${order.totalSeats} míst).` : 'Objednávka zatím nemá místa.');
+  players.total = order.registered;
+  players.notes = order.registered > 0 ? [`${order.registered} z ${order.totalSeats} míst`] : [];
+  players.viewAll = { to: `/clubs/hraci?clubId=${encodeURIComponent(order.clubId)}` };
+
+  return [club, invoice, players].filter((g) => g.status !== 'hidden');
 }
