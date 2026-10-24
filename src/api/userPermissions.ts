@@ -46,6 +46,14 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Vidět všechny pacienty',
     detail: 'Bez tohoto práva vidí jen pacienty objednané v kalendářích, ke kterým má přístup.',
   },
+  'clinical.view': {
+    label: 'Vidět zdravotní záznamy',
+    detail: 'Vyšetření, diagnostiku a výsledky pacientů, které smí vidět.',
+  },
+  'clinical.edit': {
+    label: 'Zapisovat zdravotní záznamy',
+    detail: 'Zakládat a měnit vyšetření a výsledky. Každá změna se zapíše do historie.',
+  },
   'patients.sensitive_identity.view': {
     label: 'Vidět rodné číslo a číslo pojištěnce',
     detail: 'Bez tohoto práva jsou tyto údaje skryté.',

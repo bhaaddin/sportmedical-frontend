@@ -63,7 +63,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 /** How many characters a new password must have. The server has the last word. */
-const MIN_PASSWORD = 8;
+/* The server (hardening B8) refuses a portal password shorter than 12; say so before it does. */
+const MIN_PASSWORD = 12;
 
 /** UTC instant as an iCalendar stamp: 20260929T083000Z. */
 function icsStamp(iso: string): string {
