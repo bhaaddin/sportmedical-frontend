@@ -95,4 +95,19 @@ describe('LunchPopover - the weekly button', () => {
     render(<LunchPopover {...base} band={{ ...base.band, state: 'moved', original: { from: '12:00', to: '12:30' } }} onMoveWeekly={vi.fn()} weekday={5} />);
     expect(screen.queryByTestId('lunch-move-weekly')).toBeNull();
   });
+  it('a press inside the pop-out never reaches the board it was opened from (React bubbles through the portal)', () => {
+    const boardDown = vi.fn();
+    const boardClick = vi.fn();
+    render(
+      <div onPointerDown={boardDown} onMouseDown={boardDown} onClick={boardClick}>
+        <LunchPopover {...base} onMoveWeekly={vi.fn()} weekday={5} />
+      </div>,
+    );
+    const go = screen.getByTestId('lunch-move-go');
+    fireEvent.pointerDown(go);
+    fireEvent.mouseDown(go);
+    fireEvent.click(go);
+    expect(boardDown).not.toHaveBeenCalled();
+    expect(boardClick).not.toHaveBeenCalled();
+  });
 });

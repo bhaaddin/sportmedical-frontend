@@ -38,6 +38,9 @@ export interface LunchPopoverProps {
   onClose: () => void;
 }
 
+/** Keeps the pop-out's own pointer events from reaching the board behind it (React bubbles them through the portal). */
+const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
 export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdit, mayBook, point, onMove, onMoveWeekly, weekday, onRemove, onRestore, onBook, onClose }: LunchPopoverProps) {
   const [start, setStart] = useState(band.from);
   const [calendarId, setCalendarId] = useState(targets[0]?.id ?? '');
@@ -75,7 +78,12 @@ export function LunchPopover({ band, dateLabel, targets, hours, bookings, mayEdi
       anchorPosition={{ top: point.y, left: point.x }}
       slotProps={{ paper: { sx: { width: 330, maxWidth: 'calc(100vw - 24px)', borderRadius: '13px', border: '1px solid', borderColor: 'divider', boxShadow: DESIGN.shadow.dialog } } }}
     >
-      <Box role="dialog" aria-label={LUNCH_TEXT.title(dateLabel)} data-testid="lunch-popover" data-state={band.state} sx={{ p: 2 }}>
+      {/*
+        The pop-out is a portal, but React still bubbles its pointer events to the board it was opened from - a press on a button here
+        started a slot selection underneath (found in a real browser: the click opened the slot menu instead of moving the lunch).
+      */}
+      <Box role="dialog" aria-label={LUNCH_TEXT.title(dateLabel)} data-testid="lunch-popover" data-state={band.state} sx={{ p: 2 }}
+        onPointerDown={stop} onPointerUp={stop} onPointerMove={stop} onMouseDown={stop} onMouseUp={stop} onClick={stop} onDoubleClick={stop} onContextMenu={stop}>
         <Typography sx={{ fontSize: 15, fontWeight: 700 }}>{`${LUNCH_TEXT.title(dateLabel)} · ${band.from}–${band.to}`}</Typography>
         <Typography data-testid="lunch-state" sx={{ fontSize: 12.5, fontWeight: 700, mt: 0.25 }}>{lunchBandLabel(band.state)}</Typography>
         {band.original ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{LUNCH_TEXT.original(band.original.from, band.original.to)}</Typography> : null}
