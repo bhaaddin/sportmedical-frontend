@@ -3,19 +3,20 @@
  * status and name; "Stáhnout seznam" downloads the filtered list as CSV.
  */
 import { useMemo, useState } from 'react';
-import { Box, Button, Link, Skeleton, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Link, Stack, TextField, Typography } from '@mui/material';
+import { Download } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { ATHLETE_STATUSES, clubBlocksApi, type ClubBlockAthleteStatus } from '../../api/clubBlocks';
 import { clubOrdersApi } from '../../api/clubOrders';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText } from '../../components/clubs/athleteList';
-import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
+import { StatusChip } from '../../components/ui';
+import { EntityLink, PageFrame, Shelf, TARGET_SX } from '../../ui/shelf';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
-import { FitBody, FitPage } from '../../components/ui/fit';
 import { downloadCsv } from '../statistics/csv';
 import { ExportGate } from '../../components/ui/ExportGate';
 import { formatSlotTime } from './clubOrders';
-import { ClubDot, LoadError, SelectFilter } from './subpages/common';
+import { ClubDot, SelectFilter } from './subpages/common';
 import { collectPlayers, filterPlayers, playersToCsv, telHref, type PlayerRow } from './subpages/players';
 
 export default function ClubPlayersPage() {
@@ -38,6 +39,10 @@ export default function ClubPlayersPage() {
   }, [all]);
   const activities = useMemo(() => [...new Set(all.map((p) => p.activityName).filter((a) => a !== ''))].sort((a, b) => a.localeCompare(b, 'cs')), [all]);
   const rows = useMemo(() => filterPlayers(all, { clubId, activity, status, search }), [all, clubId, activity, status, search]);
+  /* Who is registered but has no term yet (a cancelled visit does not count): said in the shelf's hint, never a list of its own. */
+  const withoutTerm = useMemo(() => rows.filter((p) => p.startUtc === null && p.status !== 'Cancelled').length, [rows]);
+  /* The club is a connected name (its page, a peek); in a clickable row the click stays its own. */
+  const clubName = (p: PlayerRow) => (p.clubId !== '' ? <EntityLink entity={{ kind: 'club', id: p.clubId, label: p.clubName }} onNavigate={(e) => e.stopPropagation()} /> : <span>{p.clubName}</span>);
 
   const phoneLink = (p: PlayerRow) =>
     p.phone ? (
@@ -57,7 +62,7 @@ export default function ClubPlayersPage() {
       cell: (p) => (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <ClubDot color={p.clubColorHex} />
-          <span>{p.clubName}</span>
+          {clubName(p)}
         </Stack>
       ),
     },
@@ -76,7 +81,7 @@ export default function ClubPlayersPage() {
       </Stack>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <ClubDot color={p.clubColorHex} />
-        <Typography variant="body2">{p.clubName}</Typography>
+        <Typography variant="body2" component="span">{clubName(p)}</Typography>
       </Stack>
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>{[p.activityName, term(p)].filter((s) => s !== '' && s !== '—').join(' · ')}</Typography>
       {price(p)}
@@ -85,23 +90,32 @@ export default function ClubPlayersPage() {
   );
 
   return (
-    <FitPage>
-      <PageHeader
-        title="Hráči klubů"
-        subtitle={`Zaregistrovaní přes odkazy klubů · ${rows.length}`}
-        actions={
-          <ExportGate>
-            {(blocked) => (
-              <Button variant="outlined" disabled={blocked || rows.length === 0} onClick={() => void downloadCsv('hraci-klubu.csv', playersToCsv(rows), 'players-csv')}>
-                Stáhnout seznam
-              </Button>
-            )}
-          </ExportGate>
-        }
-        mb={2}
-      />
-      <SoftCard sx={{ mb: 2, p: 1.5 }}>
-        <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'minmax(220px, 1.4fr) repeat(3, minmax(150px, 1fr))' } }}>
+    <PageFrame
+      fit
+      title="Hráči klubů"
+      purpose={`Zaregistrovaní přes odkazy klubů · ${rows.length}`}
+      actions={
+        <ExportGate>
+          {(blocked) => (
+            <Button variant="outlined" startIcon={<Download />} disabled={blocked || rows.length === 0} onClick={() => void downloadCsv('hraci-klubu.csv', playersToCsv(rows), 'players-csv')} sx={TARGET_SX}>
+              Stáhnout seznam
+            </Button>
+          )}
+        </ExportGate>
+      }
+    >
+      <Shelf
+        id="players"
+        title="Hráči"
+        hint={withoutTerm > 0 ? `${withoutTerm} bez termínu` : undefined}
+        count={blocksQuery.isPending || blocksQuery.isError ? undefined : rows.length}
+        layout="free"
+        grow
+        loading={blocksQuery.isPending}
+        error={blocksQuery.isError ? 'Hráče se nepodařilo načíst.' : false}
+        onRetry={() => void blocksQuery.refetch()}
+      >
+        <Box sx={{ display: 'grid', gap: 1, mb: 1.5, flexShrink: 0, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'minmax(220px, 1.4fr) repeat(3, minmax(150px, 1fr))' }, '& .MuiInputBase-root': { minHeight: { xs: 44, lg: 40 } } }}>
           <TextField size="small" label="Hledat jméno" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }} />
           <SelectFilter label="Klub" value={clubId} onChange={setClubId} options={[{ value: '', label: 'Všechny kluby' }, ...clubs.map(([id, n]) => ({ value: id, label: n }))]} />
           <SelectFilter label="Činnost" value={activity} onChange={setActivity} options={[{ value: '', label: 'Všechny činnosti' }, ...activities.map((a) => ({ value: a, label: a }))]} />
@@ -112,25 +126,16 @@ export default function ClubPlayersPage() {
             options={[{ value: '', label: 'Všechny' }, ...ATHLETE_STATUSES.map((s) => ({ value: s, label: ATHLETE_STATUS_LABEL[s] }))]}
           />
         </Box>
-      </SoftCard>
-
-      <FitBody>
-        {blocksQuery.isPending ? (
-          <Skeleton variant="rounded" height={160} />
-        ) : blocksQuery.isError ? (
-          <LoadError onRetry={() => void blocksQuery.refetch()} />
-        ) : (
-          <ResponsiveDataList
-            fill
-            rows={rows}
-            rowKey={(p) => p.id}
-            columns={columns}
-            renderCard={card}
-            ariaLabel="Hráči klubů"
-            empty="Zatím se nikdo přes odkazy klubů nezaregistroval."
-          />
-        )}
-      </FitBody>
-    </FitPage>
+        <ResponsiveDataList
+          fill
+          rows={rows}
+          rowKey={(p) => p.id}
+          columns={columns}
+          renderCard={card}
+          ariaLabel="Hráči klubů"
+          empty={all.length === 0 ? 'Zatím se nikdo přes odkazy klubů nezaregistroval.' : 'Tomuto filtru neodpovídá žádný hráč.'}
+        />
+      </Shelf>
+    </PageFrame>
   );
 }

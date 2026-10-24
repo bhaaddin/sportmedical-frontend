@@ -23,6 +23,10 @@
  *   { clubBlockId }                  the same, the club is found from the block
  *   { openOrderId } / { newOrder }   open an order's detail / the new-order chooser
  *
+ * Built as shelves (docs/ui-shelf-system.md, S-4): "Čeká na vás" (the inquiries clubs sent, only when there are any - the
+ * next step), the clubs this person opened or pinned (only when there are any), and "Kluby" - the search, the chips and the
+ * cards, a shelf that takes the height that is left and scrolls inside it.
+ *
  * The payer record itself - IČO, fakturační adresa, bankovní spojení - is edited
  * here for a new club ("Nový klub") and from the club's screen ("Upravit údaje"),
  * because an invoice to a club needs all of that and the day it is due is the
@@ -31,8 +35,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { invalidateClubWorld } from '../components/clubs/clubWorld';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typography } from '@mui/material';
-import { Search } from '@mui/icons-material';
+import { Alert, Box, Button, InputAdornment, TextField, Typography } from '@mui/material';
+import { Add, Search } from '@mui/icons-material';
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { clubsApi } from '../api/clubs';
@@ -45,8 +49,10 @@ import { liveTotalsByClub } from '../components/clubs/orders/orderMoney';
 import { partnerOrdersApi } from '../api/partnerOrders';
 import { useDevice } from '../layout/useDevice';
 import { toDateOnly } from '../utils/time';
-import { FilterChips, PageHeader, SoftCard } from '../components/ui';
-import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody, FitPage } from '../components/ui/fit';
+import { FilterChips } from '../components/ui';
+import { FIT_FILL_SX, FIT_SCROLL_SX } from '../components/ui/fit';
+import { AttentionCard, MUTED_SX, PageFrame, RecentAndPinned, Shelf, TARGET_SX, cardSurface } from '../ui/shelf';
+import { clubInquiries } from '../ui/shelf/attention';
 import { matchesFilter, matchesSearch } from './clubs/clubOrders';
 import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
@@ -243,63 +249,68 @@ export default function ClubsPage() {
     </>
   );
 
-  /* ── Loading and failure ── */
-
-  if (clubsQuery.isLoading) {
-    const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
-    return (
-      <Box>
-        <Skeleton variant="rounded" height={48} sx={{ mb: 2.5, maxWidth: 420 }} />
-        <Skeleton variant="rounded" height={44} sx={{ mb: 2 }} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 2 }}>
-          {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={150} />)}
-        </Box>
-      </Box>
-    );
-  }
-
-  if (clubsQuery.isError) {
-    return (
-      <Box>
-        <PageHeader title="Kluby a týmy" subtitle="Hromadné objednávky a registrační odkazy" />
-        <Alert
-          severity="error"
-          action={<Button color="inherit" size="small" onClick={() => void clubsQuery.refetch()}>Zkusit znovu</Button>}
-        >
-          Kluby se nepodařilo načíst.
-        </Alert>
-      </Box>
-    );
-  }
-
-  /* ── List: design-16 ── */
+  /* ── The page: Čeká na vás (club inquiries, only when there are any), the clubs this person opened or pinned, the clubs ── */
 
   const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
+  /* R10 next step: inquiries a club sent and nobody answered yet; read from the one orders list the cards already use. */
+  const inquiries = clubOrdersQuery.data === undefined ? null : clubInquiries({ now: new Date(), clubOrders: clubOrdersQuery.data });
+  const newClub = () => setEditing('new');
+  const newOrder = () => setEntry({});
+
+  const filters = (
+    <Box
+      data-filters={phone ? 'scroll' : 'wrap'}
+      sx={phone ? { order: 3, flexBasis: '100%', overflowX: 'auto', mx: -2, px: 2, pb: 0.5, '& [role="group"]': { flexWrap: 'nowrap' }, '& button': { flexShrink: 0, minHeight: 44 } } : undefined}
+    >
+      <FilterChips
+        ariaLabel="Filtr klubů"
+        options={chips.map((f) => ({ ...f, count: counts[f.key] }))}
+        value={filter}
+        onChange={setFilter}
+      />
+    </Box>
+  );
 
   return (
-    <FitPage data-testid="clubs-list" data-layout={device} data-columns={columns}>
-      <PageHeader
-        title="Kluby a týmy"
-        subtitle="Hromadné objednávky a registrační odkazy"
-        actions={
-          phone ? undefined : (
-            <>
-              <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-              <Button variant="contained" onClick={() => setEntry({})}>Nová objednávka</Button>
-            </>
-          )
-        }
-      />
+    <PageFrame
+      fit
+      title="Kluby a týmy"
+      purpose={clubsQuery.data === undefined ? 'Hromadné objednávky a registrační odkazy' : `Hromadné objednávky a registrační odkazy · ${counts.all} ${counts.all === 1 ? 'klub' : counts.all >= 2 && counts.all <= 4 ? 'kluby' : 'klubů'}`}
+      /* a phone pins both actions at the bottom (PinnedActions), so the frame pins nothing of its own */
+      primaryAction={phone ? undefined : { label: 'Nová objednávka', icon: <Add />, onClick: newOrder }}
+      actions={phone ? undefined : <Button variant="outlined" onClick={newClub} sx={TARGET_SX}>Nový klub</Button>}
+    >
+      {inquiries !== null && (
+        <Shelf id="club-inquiries" title="Čeká na vás" count={inquiries.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+          <AttentionCard group={inquiries} />
+        </Shelf>
+      )}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2.5, alignItems: { md: 'center' } }}>
+      <RecentAndPinned kinds={['club']} dense hideWhenEmpty limit={6} title="Připnuté a nedávné" hint="Kluby, ke kterým se vracíte" />
+
+      <Shelf
+        id="clubs"
+        title="Kluby"
+        count={clubsQuery.isLoading || clubsQuery.isError ? undefined : visible.length}
+        layout="free"
+        grow
+        controls={clubsQuery.isLoading || clubsQuery.isError || rows.length === 0 ? undefined : filters}
+        loading={clubsQuery.isLoading}
+        error={clubsQuery.isError ? 'Kluby se nepodařilo načíst.' : false}
+        onRetry={() => void clubsQuery.refetch()}
+        empty={rows.length === 0}
+        emptyState={{ text: 'Zatím tu žádný klub není. Přidejte klub, který objednává prohlídky pro své sportovce.', action: { label: 'Nový klub', onClick: newClub } }}
+      >
         <TextField
           fullWidth
           size={phone ? 'medium' : 'small'}
           placeholder="Název klubu nebo kontaktní osoba"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          sx={{ mb: 1.5, flexShrink: 0 }}
           slotProps={{
             input: {
+              sx: { minHeight: 44 },
               startAdornment: (
                 <InputAdornment position="start">
                   <Search sx={{ fontSize: 18, color: 'text.secondary' }} />
@@ -309,52 +320,40 @@ export default function ClubsPage() {
             htmlInput: { 'aria-label': 'Hledat klub' },
           }}
         />
-        <FilterChips
-          ariaLabel="Filtr klubů"
-          options={chips.map((f) => ({ ...f, count: counts[f.key] }))}
-          value={filter}
-          onChange={setFilter}
-        />
-      </Stack>
 
-      {missingParts.length > 0 ? (
-        <Alert
-          severity="warning"
-          sx={{ mb: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => missingParts.forEach((p) => p.retry())}>
-              Zkusit znovu
-            </Button>
-          }
-        >
-          Nepodařilo se načíst: {missingParts.map((p) => p.what).join(' · ')}. Karty ukazují jen to, co je známo.
-        </Alert>
-      ) : null}
+        {missingParts.length > 0 ? (
+          <Alert
+            severity="warning"
+            sx={{ mb: 1.5, flexShrink: 0 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => missingParts.forEach((p) => p.retry())} sx={TARGET_SX}>
+                Zkusit znovu
+              </Button>
+            }
+          >
+            Nepodařilo se načíst: {missingParts.map((p) => p.what).join(' · ')}. Karty ukazují jen to, co je známo.
+          </Alert>
+        ) : null}
 
-      {/* The clubs are the rest of the screen: the cards scroll inside it, the page does not (a phone's page flows). */}
-      <FitBody>
-        {rows.length === 0 ? (
-          <SoftCard sx={{ textAlign: 'center', py: 6 }}>
-            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Zatím tu žádný klub není.</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-              Přidejte klub nebo organizaci, která objednává prohlídky pro své sportovce.
-            </Typography>
-            <Button variant="contained" onClick={() => setEditing('new')} sx={{ minHeight: 44 }}>Nový klub</Button>
-          </SoftCard>
-        ) : visible.length === 0 ? (
-          <SoftCard sx={{ textAlign: 'center', py: 5 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Tomuto filtru neodpovídá žádný klub.
-            </Typography>
-          </SoftCard>
+        {visible.length === 0 ? (
+          <Box data-testid="clubs-list" data-layout={device} data-columns={columns} sx={(t) => ({ ...cardSurface(t, false), p: 2, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', borderStyle: 'dashed' })}>
+            <Typography sx={{ ...MUTED_SX, flex: '1 1 220px', fontSize: 14 }}>Tomuto filtru neodpovídá žádný klub.</Typography>
+            <Button variant="outlined" size="small" onClick={() => { setFilter('all'); setSearch(''); }} sx={TARGET_SX}>Zobrazit všechny</Button>
+          </Box>
         ) : (
+          /* The clubs are the rest of the screen: the cards scroll inside the shelf, the page does not (a phone's page flows). */
           <Box
             role="list"
             aria-label="Kluby"
+            data-testid="clubs-list"
+            data-layout={device}
+            data-columns={columns}
             sx={{
               display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: phone ? 1.5 : 2,
               /* rows as tall as their card: `auto` rows of a box with a fixed height would shrink to the cards' min-height */
               gridAutoRows: 'max-content', alignContent: 'start',
+              /* the first card's focus ring and shadow are not clipped by the scroller */
+              p: '4px', m: '-4px',
               ...(phone ? {} : { ...FIT_FILL_SX, ...FIT_SCROLL_SX }),
             }}
           >
@@ -371,14 +370,14 @@ export default function ClubsPage() {
             ))}
           </Box>
         )}
-      </FitBody>
+      </Shelf>
 
       <PinnedActions>
-        <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-        <Button variant="contained" onClick={() => setEntry({})}>Nová objednávka</Button>
+        <Button variant="outlined" onClick={newClub}>Nový klub</Button>
+        <Button variant="contained" onClick={newOrder}>Nová objednávka</Button>
       </PinnedActions>
 
       {dialogs}
-    </FitPage>
+    </PageFrame>
   );
 }

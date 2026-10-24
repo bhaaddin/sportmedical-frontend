@@ -142,7 +142,9 @@ describe.each([
       expect(await screen.findAllByTestId('order-card')).toHaveLength(4);
       expect(screen.queryAllByTestId('order-row')).toHaveLength(0);
     }
-    if (device === 'phone') expect(screen.getByTestId('pinned-actions')).toBeInTheDocument();
+    /* a phone pins the page's main action at the bottom (the shelf frame's bar), never twice */
+    if (device === 'phone') expect(within(screen.getByRole('region', { name: 'Hlavní akce' })).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Nová objednávka' })).toHaveLength(1);
   });
 });
 
@@ -402,7 +404,9 @@ describe('one screen (fitted page)', () => {
   it('desktop: the page is a fitted region and the table is the box that scrolls', async () => {
     render(<Wrap><ClubOrdersPage /></Wrap>);
     const root = await screen.findByTestId('club-orders');
-    expect(root).toHaveAttribute('data-fit-page');
+    /* the shelf page is the fitted page; the list sits in its growing "Objednávky" shelf */
+    expect(root.closest('[data-fit-page]')).toHaveAttribute('data-shelf-page');
+    expect(root.closest('section[data-shelf="orders"]')).not.toBeNull();
     await screen.findAllByTestId('order-row');
     expect(scrolls(root.querySelector('[data-list="table"]')!)).toBe(true);
     expect(root.querySelector('[data-list="table"] thead th')).not.toBeNull();
@@ -442,5 +446,65 @@ describe('one screen (fitted page)', () => {
     render(<Wrap><ClubOrdersPage /></Wrap>);
     const cards = await screen.findAllByTestId('order-card');
     expect(scrolls(cards[0].parentElement!)).toBe(false);
+  });
+});
+
+/* ── S-4: the shelf page ── */
+
+describe('ClubOrdersPage as shelves', () => {
+  it('one h1; the orders are the "Objednávky" shelf with the live count', async () => {
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findAllByTestId('order-row');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Objednávky' })).getByLabelText('Počet: 4')).toBeInTheDocument();
+  });
+
+  it('R10: "Čeká na vás" lists the inquiry a club sent, and a click opens that order here', async () => {
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const shelf = await screen.findByRole('region', { name: 'Čeká na vás' });
+    const link = within(shelf).getAllByRole('link').find((a) => a.textContent?.includes('FK Slaný'));
+    expect(link).toBeDefined();
+    await user.click(link!);
+    expect((await screen.findByTestId('order-detail'))).toHaveAttribute('data-status', 'Requested');
+    expect(screen.getByTestId('club-orders')).toHaveAttribute('data-docked', 'true');
+  });
+
+  it('no inquiry, no "Čeká na vás"', async () => {
+    list.mockResolvedValue(orders.filter((o) => o.status !== 'Requested'));
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findAllByTestId('order-row');
+    expect(screen.queryByRole('region', { name: 'Čeká na vás' })).not.toBeInTheDocument();
+  });
+
+  it('the detail opens with its next step and what it is connected to (club, players)', async () => {
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await user.click((await screen.findAllByTestId('order-row'))[2]);
+    const detail = await screen.findByTestId('order-detail');
+    expect(within(detail).getByTestId('order-next-step')).toHaveTextContent('Co dál: Chybí 18 hráčů. Pošlete klubu odkaz pro hráče.');
+    const related = within(detail).getByRole('region', { name: 'Související' });
+    expect(within(related).getByRole('link', { name: /FK Slaný/ })).toHaveAttribute('href', '/clubs/club-1');
+    expect(within(related).getByText('12 z 30 míst')).toBeInTheDocument();
+    /* no billing.manage in this test: the invoice relation is not drawn at all */
+    expect(related.querySelector('[data-related="invoice"]')).toBeNull();
+  });
+
+  it('a club name in a row opens the club page, not the order', async () => {
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const rows = await screen.findAllByTestId('order-row');
+    await user.click(within(rows[1]).getByRole('link', { name: /HC Kladno/ }));
+    expect(await screen.findByTestId('state')).toHaveTextContent('/clubs/club-2');
+  });
+
+  it('a filter that matches nothing offers to clear it', async () => {
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findAllByTestId('order-row');
+    await user.click(screen.getByRole('button', { name: /Dokončeno/ }));
+    expect(await screen.findByText('Tomuto filtru neodpovídá žádná objednávka.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zrušit filtr' }));
+    expect(await screen.findAllByTestId('order-row')).toHaveLength(4);
   });
 });

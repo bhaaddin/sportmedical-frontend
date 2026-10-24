@@ -44,7 +44,11 @@ import { OfferedDaysBlock } from './OfferedDaysBlock';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
 import { orderCode } from '../order/orderFormat';
-import { rangeText, registeredLine, seatPercent, STATUS_TONE } from './orderLogic';
+import { nextStepOf, rangeText, registeredLine, seatPercent, STATUS_TONE } from './orderLogic';
+import { usePermission } from '../../../auth/usePermission';
+import { RelatedCard } from '../../../ui/shelf/RelatedShelf';
+import { Shelf } from '../../../ui/shelf/Shelf';
+import { clubOrderRelatedGroups } from '../../../ui/shelf/related';
 import { lineValueCzk, priceText } from './orderMoney';
 import { formatPlayersTotal } from '../panel/seats';
 
@@ -69,6 +73,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   const phone = useIsPhone();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const mayBill = usePermission('billing.manage');
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [writeOpen, setWriteOpen] = useState(false);
@@ -127,11 +132,21 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     const today = todayInPrague();
     /* Etapa 12: unit price × seats per činnost, "bez ceny" when the server has no price; the rows' sum under them. */
     const lineValues = order.activitySeats.map((a) => lineValueCzk(a.seats, a.unitPriceCzk));
+    const nextStep = nextStepOf(order);
+    const related = clubOrderRelatedGroups({
+      order,
+      invoiceNumber: invoiceDraft?.alreadyInvoiced.find((x) => x.orderId === order.id)?.invoiceNumber ?? null,
+      mayBill,
+    });
     const linesTotal = lineValues.some((v) => v === null) ? null : lineValues.reduce<number>((sum, v) => sum + (v ?? 0), 0);
     return (
       <Stack spacing={2} data-testid="order-detail" data-status={order.status}>
         {order.status === 'Cancelled' ? (
           <Alert severity="info" data-testid="order-readonly">Zrušená objednávka — jen ke čtení. Co se s ní dělo, najdete v Historii.</Alert>
+        ) : null}
+        {/* R10: what the desk does next with this order, in one sentence (nothing when nothing waits on the desk). */}
+        {nextStep !== null ? (
+          <Alert severity="info" icon={false} data-testid="order-next-step" sx={{ fontWeight: 600 }}>{`Co dál: ${nextStep}`}</Alert>
         ) : null}
         <Block title="Souhrn">
           <Stack direction="row" sx={{ gap: 3, flexWrap: 'wrap', mb: 1.5 }}>
@@ -158,6 +173,11 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
             </Stack>
           ) : null}
         </Block>
+
+        {/* S-4: what the order is connected to - its club, its invoice, its players - as chips with a peek. */}
+        <Shelf id="order-related" title="Související" layout="grid" minCardWidth={150} stagger={false}>
+          {related.map((g) => <RelatedCard key={g.id} group={g} />)}
+        </Shelf>
 
         {hasGroup(order) ? (
           <OrderGroupBlock order={order} root={rootQuery.data} onOpen={setOrderId} />

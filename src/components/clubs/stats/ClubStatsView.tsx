@@ -12,7 +12,8 @@ import { useState } from 'react';
 import { Box, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ClubOrderStats } from '../../../api/clubOrders';
-import { FilterChips, SectionLabel, SoftCard, StatusChip } from '../../ui';
+import { FilterChips, SectionLabel, StatusChip } from '../../ui';
+import { cardSurface } from '../../../ui/shelf/shelfStyle';
 import { FIT_FILL_SX } from '../../ui/fit';
 import { alpha } from '@mui/material/styles';
 import { DARK, DESIGN, TONE_CSS, darkOf, toneColors } from '../../../theme';
@@ -30,7 +31,7 @@ import {
 /** A KPI that costs one short line of height (a phone keeps the board's KpiCard): label over figure, the hint in the tooltip. */
 function StatKpi({ label, value, hint, tone = 'ink' }: { label: string; value: React.ReactNode; hint?: string; tone?: 'ink' | 'red' | 'green' | 'primary' }) {
   return (
-    <SoftCard title={hint} sx={{ p: 1.5, minWidth: 0 }}>
+    <Box title={hint} data-card="metric" sx={(t) => ({ ...cardSurface(t, false), p: 1.5 })}>
       <SectionLabel sx={{ mb: 0.25, fontSize: 11, lineHeight: 1.3 }}>{label}</SectionLabel>
       <Typography
         sx={(t) => ({
@@ -40,7 +41,7 @@ function StatKpi({ label, value, hint, tone = 'ink' }: { label: string; value: R
       >
         {value}
       </Typography>
-    </SoftCard>
+    </Box>
   );
 }
 
