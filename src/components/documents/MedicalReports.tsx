@@ -32,11 +32,16 @@ import DocumentActions from './DocumentActions';
 import { formatDateOnly } from '../../utils/time';
 import { TONE_CSS, SectionLabel, SoftCard } from '../ui';
 
+/** 44 px under 1280 (a finger), the control's own size above. */
+const TARGET = { '@media (max-width: 1279.95px)': { minHeight: 44, minWidth: 44 } } as const;
+
 export interface MedicalReportsProps {
   documents: PatientDocument[];
   patientName: string;
   onChanged: () => void;
   onAdd: () => void;
+  /** Drawn inside a shelf that already carries the title, the count and "Přidat zprávu": no card and no header of its own. */
+  bare?: boolean;
 }
 
 /** A report belongs to no template - that absence is what keeps it out of the rules. */
@@ -81,7 +86,7 @@ export function specialtyLabel(doc: PatientDocument): string {
 }
 
 export default function MedicalReports({
-  documents, patientName, onChanged, onAdd,
+  documents, patientName, onChanged, onAdd, bare = false,
 }: MedicalReportsProps) {
   const [editing, setEditing] = useState<PatientDocument | null>(null);
   const [draft, setDraft] = useState<SpecialtyValue>({ specialtyCode: null, specialtyOther: null });
@@ -132,9 +137,11 @@ export default function MedicalReports({
     }
   };
 
+  const Frame = bare ? Box : SoftCard;
   return (
-    <SoftCard>
+    <Frame {...(bare ? { 'data-reports': '', sx: { p: 1.5 } } : {})}>
       <Box>
+        {!bare && (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', mb: 2 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <SectionLabel sx={{ mb: 0.25 }}>Lékařské zprávy</SectionLabel>
@@ -142,10 +149,11 @@ export default function MedicalReports({
               Zprávy od jiných lékařů. Nepočítají se mezi povinné dokumenty.
             </Typography>
           </Box>
-          <Button size="small" variant="outlined" startIcon={<Add />} onClick={onAdd} sx={{ flexShrink: 0 }}>
+          <Button size="small" variant="outlined" startIcon={<Add />} onClick={onAdd} sx={{ flexShrink: 0, ...TARGET }}>
             Přidat zprávu
           </Button>
         </Stack>
+        )}
 
         {error !== null && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -216,7 +224,7 @@ export default function MedicalReports({
                       </Tooltip>
                     )}
                     <Box sx={{ flex: 1 }} />
-                    <IconButton size="small" onClick={() => openEdit(doc)} aria-label="Změnit obor">
+                    <IconButton size="small" onClick={() => openEdit(doc)} aria-label="Změnit obor" sx={TARGET}>
                       <Edit fontSize="small" />
                     </IconButton>
                     <DocumentActions
@@ -239,6 +247,7 @@ export default function MedicalReports({
                         startIcon={<Check />}
                         disabled={busy}
                         onClick={() => void review(doc, true)}
+                        sx={TARGET}
                       >
                         Přijmout
                       </Button>
@@ -248,6 +257,7 @@ export default function MedicalReports({
                         startIcon={<Close />}
                         disabled={busy}
                         onClick={() => void review(doc, false)}
+                        sx={TARGET}
                       >
                         Zamítnout
                       </Button>
@@ -278,6 +288,6 @@ export default function MedicalReports({
           </Button>
         </DialogActions>
       </Dialog>
-    </SoftCard>
+    </Frame>
   );
 }

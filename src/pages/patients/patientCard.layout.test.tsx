@@ -134,7 +134,7 @@ describe('the card frame', () => {
 
 /* ── Dokumenty ── */
 
-const renderDocuments = (documents: unknown[], requirements: unknown[] | null = []) =>
+const renderDocuments = (documents: unknown[], requirements: unknown[] | null = [], documentsKnown = true) =>
   render(
     <MemoryRouter initialEntries={['/x']}>
       <Routes>
@@ -142,7 +142,7 @@ const renderDocuments = (documents: unknown[], requirements: unknown[] | null = 
           element={(
             <Outlet
               context={{
-                patient: PATIENT, profile: null, documents,
+                patient: PATIENT, profile: null, documents, documentsKnown,
                 templates: [
                   { id: 't1', name: 'Informovaný souhlas', description: '', isActive: true },
                   { id: 't2', name: 'Výpis', description: '', isActive: true },
@@ -195,6 +195,61 @@ describe('Dokumenty', () => {
   });
 });
 
+describe('Dokumenty as shelves', () => {
+  const need = (over: Record<string, unknown> = {}) => ({
+    templateId: 't2', templateName: 'Výpis', serviceName: 'Prohlídka', appointmentId: 'a1',
+    startUtc: '2026-11-02T08:00:00Z', standing: 'Missing', ...over,
+  });
+
+  it('draws Co chybí, Dokumenty, Nahrát dokument and Lékařské zprávy as named shelves', async () => {
+    setViewport(VIEWPORTS.desktop);
+    renderDocuments([]);
+    for (const name of ['Co chybí', 'Dokumenty', 'Nahrát dokument', 'Lékařské zprávy']) {
+      expect(await screen.findByRole('region', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('turns what an appointment still asks for into one press: the upload for exactly that template', async () => {
+    setViewport(VIEWPORTS.desktop);
+    const user = userEvent.setup();
+    renderDocuments([], [need({ blocksBooking: true })]);
+
+    const missing = await screen.findByRole('region', { name: 'Co chybí' });
+    const row = within(missing).getByTestId('requirement');
+    expect(row).toHaveTextContent('Prohlídka');
+    expect(row).toHaveTextContent('bez něj nejde objednat');
+    expect(row).toHaveAttribute('data-tone', 'red');
+    expect(within(missing).getByLabelText('Počet: 1')).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: 'Nahrát' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Výpis');
+  });
+
+  it('says it is still asking while the requirements have not come back', async () => {
+    setViewport(VIEWPORTS.desktop);
+    renderDocuments([], null);
+    const missing = await screen.findByRole('region', { name: 'Co chybí' });
+    expect(within(missing).getByRole('status')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('does not say "no documents" before the documents have been read', async () => {
+    setViewport(VIEWPORTS.desktop);
+    renderDocuments([], [], false);
+    await screen.findByRole('region', { name: 'Dokumenty' });
+    expect(screen.queryByText('Pacient zatím nemá žádný uložený dokument.')).toBeNull();
+  });
+
+  it('offers to add a report from the empty Lékařské zprávy shelf', async () => {
+    setViewport(VIEWPORTS.desktop);
+    const user = userEvent.setup();
+    renderDocuments([]);
+    const reports = await screen.findByRole('region', { name: 'Lékařské zprávy' });
+    expect(within(reports).getByText('Zatím tu žádná zpráva není.')).toBeInTheDocument();
+    await user.click(within(reports).getByRole('button', { name: 'Přidat zprávu' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+});
+
 /* ── Výsledky ── */
 
 const renderResults = () =>
@@ -213,7 +268,8 @@ describe('Výsledky', () => {
     setViewport(VIEWPORTS.phone);
     const { container } = renderResults();
 
-    expect(await screen.findByRole('listitem')).toBeInTheDocument();
+    const sessions = await screen.findByRole('region', { name: 'Sezení' });
+    expect(await within(sessions).findByRole('listitem')).toBeInTheDocument();
     expect(container.querySelector('table')).toBeNull();
     expect(screen.getByRole('button', { name: 'Otevřít zprávu' })).toBeInTheDocument();
   });
@@ -293,6 +349,36 @@ describe('Výsledky', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Zapsat naměřené hodnoty')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Uložit hodnoty' })).toBeInTheDocument();
+  });
+});
+
+describe('Výsledky as shelves', () => {
+  it('shows the latest session as four figures, against the session before', async () => {
+    setViewport(VIEWPORTS.desktop);
+    getByPatient.mockResolvedValue([
+      session({ id: 'new', measuredOn: '2026-09-18', vo2MaxMlMinKg: 55 }),
+      session({ id: 'old', measuredOn: '2026-03-01', vo2MaxMlMinKg: 50 }),
+    ]);
+    renderResults();
+
+    const latest = await screen.findByRole('region', { name: 'Poslední sezení' });
+    const cards = within(latest).getAllByRole('listitem');
+    expect(cards).toHaveLength(4);
+    expect(cards[0]).toHaveTextContent('VO₂ max');
+    expect(cards[0]).toHaveTextContent('55,0');
+    expect(cards[0]).toHaveTextContent('+10,0 % oproti minule');
+    expect(within(screen.getByRole('region', { name: 'Sezení' })).getByLabelText('Počet: 2')).toBeInTheDocument();
+  });
+
+  it('has no latest shelf without a session, and offers the first measurement', async () => {
+    setViewport(VIEWPORTS.desktop);
+    getByPatient.mockResolvedValue([]);
+    renderResults();
+
+    const sessions = await screen.findByRole('region', { name: 'Sezení' });
+    expect(await within(sessions).findByText('Zatím tu žádný výsledek není.')).toBeInTheDocument();
+    expect(within(sessions).getAllByRole('button', { name: 'Nové měření' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('region', { name: 'Poslední sezení' })).toBeNull();
   });
 });
 

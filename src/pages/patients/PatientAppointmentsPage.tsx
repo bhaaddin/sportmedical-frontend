@@ -14,23 +14,22 @@
  * recognise one. Drawing any of the three would be furniture, or worse, a
  * label that is quietly wrong. `eventName` holds the real activity.
  *
- * Three layouts: a card per appointment on a phone (with "Objednat" pinned at
- * the bottom), three columns on an iPad, the full table on a desktop.
+ * Shelves (docs/ui-shelf-system.md): Nadcházející (a row of cards, each opens
+ * its booking), Minulé (the table; cards on a phone, three columns on an iPad)
+ * and Zrušené (only when there are any). "Objednat termín" is the card's own
+ * action in its header, pinned on a phone - never drawn twice.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Alert, Box, Button, CircularProgress, Stack, Typography,
-} from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import { activitiesApi } from '../../api/activities';
 import { shownPrice } from '../../components/booking/grid/appointmentPrice';
-import { SectionLabel, StatusChip } from '../../components/ui';
+import { StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
 import { ResponsiveDataList } from '../../components/ui/ResponsiveDataList';
 import type { DataColumn } from '../../components/ui/ResponsiveDataList';
-import { PinnedActionBar } from '../../components/ui/PinnedActionBar';
-import { useIsPhone } from '../../layout/useDevice';
+import { EntityCard, Shelf } from '../../ui/shelf';
 import { fetchAllAppointments } from '../../components/patients/appointmentsSource';
 import { isCancelled as cancelledOrNoShow, shortDay } from '../../components/patients/patientActivity';
 import type { PatientAppointment } from '../../components/patients/patientActivity';
@@ -199,15 +198,20 @@ function AppointmentRows({
   );
 }
 
+/** "út 24. 9. 2026 · 10:00–10:30": what an upcoming card is called (no person, so nothing to hide). */
+const whenLabel = (a: PatientAppointment) =>
+  `${shortDay(a.startTime)} ${yearOf(a)} · ${formatPragueTime(a.startTime)}–${formatPragueTime(a.endTime)}`;
+
 export default function PatientAppointmentsPage() {
-  const { patient } = useOutletContext<PatientContext>();
+  const { patient, upcoming: bookingWindow } = useOutletContext<PatientContext>();
   const navigate = useNavigate();
-  const phone = useIsPhone();
   const [all, setAll] = useState<PatientAppointment[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
     fetchAllAppointments()
       .then((rows) => {
         if (cancelled) return;
@@ -220,7 +224,7 @@ export default function PatientAppointmentsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   /*
    * Filtered here because the server has no way to ask for one patient's
@@ -235,6 +239,15 @@ export default function PatientAppointmentsPage() {
   );
 
   const { upcoming, past } = useMemo(() => splitAppointments(mine), [mine]);
+  /* The history is what happened; a cancellation or a no-show is its own, quieter shelf. */
+  const history = useMemo(() => past.filter((a) => !isCancelled(a)), [past]);
+  const cancelledRows = useMemo(() => past.filter(isCancelled), [past]);
+
+  /* The card's booking window knows each upcoming booking's calendar, which is what opens its detail exactly. */
+  const calendarOf = useMemo(
+    () => new Map((bookingWindow ?? []).flatMap((d) => (d.calendarId === null ? [] : [[d.id, d.calendarId] as const]))),
+    [bookingWindow],
+  );
 
   /* The catalogue, for the price of each činnost by name (this route sends no money). */
   const activitiesQuery = useQuery({
@@ -248,64 +261,65 @@ export default function PatientAppointmentsPage() {
     return (a) => shownPrice(null, byName.get(a.eventName) ?? null);
   }, [activitiesQuery.data]);
 
-  if (failed) {
-    return <Alert severity="warning">Termíny se nepodařilo načíst. Zkuste to prosím znovu.</Alert>;
-  }
-
-  if (all === null) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  /* The calendar opens its booking drawer on `newAppointment`, for this
-     patient. On a phone it is the screen's main action and is pinned. */
-  const book = (
-    <Button
-      variant="contained"
-      onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } })}
-      sx={{ minHeight: 44 }}
-    >
-      Objednat
-    </Button>
-  );
+  /* The calendar opens its booking drawer on `newAppointment`, for this patient (the card's header carries the same
+     action; on a phone it is pinned there, so this page pins nothing of its own). */
+  const book = () => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } });
+  const loading = all === null && !failed;
+  const error = failed ? 'Termíny se nepodařilo načíst. Zkuste to prosím znovu.' : false;
+  const retry = () => setAttempt((n) => n + 1);
 
   return (
-    <Stack spacing={2.5}>
-      <Box>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-          <SectionLabel sx={{ mb: 0 }}>Nadcházející termíny</SectionLabel>
-          <Box sx={{ flex: 1 }} />
-          {!phone && book}
-        </Stack>
+    <Stack spacing={3} data-shelf-section="terminy">
+      <Shelf
+        id="upcoming"
+        title="Nadcházející"
+        count={all === null ? undefined : upcoming.length}
+        countTone="primary"
+        layout="row"
+        minCardWidth={260}
+        cardHeight={112}
+        skeletons={2}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        empty={upcoming.length === 0}
+        emptyState={{ text: `${patient.firstName} nemá objednaný žádný termín.`, action: { label: 'Objednat termín', onClick: book } }}
+      >
+        {upcoming.map((a) => {
+          const calendarId = calendarOf.get(a.id);
+          return (
+            <EntityCard
+              key={a.id}
+              entity={{ kind: 'appointment', id: a.id, label: whenLabel(a), ...(calendarId !== undefined ? { calendarId } : {}) }}
+              subtitle={a.eventName === '' ? 'Termín' : a.eventName}
+              detail={[priceOf(a).text, a.notes].filter((x) => x !== '').join(' · ')}
+              status={{ label: statusOf(a).text, tone: statusOf(a).tone }}
+            />
+          );
+        })}
+      </Shelf>
 
-        {upcoming.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {patient.firstName} nemá objednaný žádný termín.
-          </Typography>
-        ) : (
-          <AppointmentRows appointments={upcoming} label="Nadcházející termíny" priceOf={priceOf} />
-        )}
-      </Box>
+      {!failed && (
+        <Shelf
+          id="past"
+          title="Minulé"
+          hint="Od nejnovějšího"
+          count={all === null ? undefined : history.length}
+          layout="free"
+          stagger={false}
+          loading={loading}
+          empty={history.length === 0}
+          emptyState={{ text: 'Zatím tu žádný proběhlý termín není.' }}
+        >
+          <AppointmentRows appointments={history} label="Historie termínů" priceOf={priceOf} />
+        </Shelf>
+      )}
 
-      <Box>
-        <SectionLabel sx={{ mb: 0.25 }}>Historie</SectionLabel>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
-          Proběhlé a zrušené termíny, od nejnovějšího.
-        </Typography>
-
-        {past.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Zatím tu žádný termín není.
-          </Typography>
-        ) : (
-          <AppointmentRows appointments={past} label="Historie termínů" priceOf={priceOf} />
-        )}
-      </Box>
-
-      {phone && <PinnedActionBar label="Objednat termín">{book}</PinnedActionBar>}
+      {cancelledRows.length > 0 && (
+        <Shelf id="cancelled" title="Zrušené" hint="Zrušené a nedorazil" count={cancelledRows.length} countTone="grey" layout="free" stagger={false}>
+          <AppointmentRows appointments={cancelledRows} label="Zrušené termíny" priceOf={priceOf} />
+        </Shelf>
+      )}
     </Stack>
   );
 }
