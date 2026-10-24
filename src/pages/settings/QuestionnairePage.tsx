@@ -58,6 +58,8 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
+import { Shelf } from '../../ui/shelf';
 import {
   draftOf,
   isActive,
@@ -426,8 +428,8 @@ export default function QuestionnairePage() {
         clicking anything, whether what they are looking at is live or a copy
         they may safely take apart.
       */}
-      <Card variant="outlined" sx={{ mt: 2 }}>
-        <CardContent>
+      <Box sx={{ mt: 3 }}>
+      <SettingsBoard id="questionnaire-version" title="Verze dotazníku" hint="Nasazeno, nebo koncept">
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' } }}>
             <Box sx={{ flexGrow: 1 }}>
               {shown === null ? (
@@ -499,8 +501,8 @@ export default function QuestionnairePage() {
               )}
             </Stack>
           </Stack>
-        </CardContent>
-      </Card>
+      </SettingsBoard>
+      </Box>
 
       {createDialog}
 
@@ -535,7 +537,9 @@ export default function QuestionnairePage() {
         </Dialog>
       )}
 
-      <Stack spacing={2} sx={{ mt: 3 }}>
+      <Box sx={{ mt: 3 }}>
+      <Shelf id="questionnaire-sections" title="Otázky" hint="Po sekcích" count={sections.length} layout="free" stagger={false}>
+      <Stack spacing={2}>
         {sections.map((section) => (
           <Card key={`${section.number}-${section.title}`} variant="outlined">
             <CardContent>
@@ -722,6 +726,8 @@ export default function QuestionnairePage() {
           </Card>
         ))}
       </Stack>
+      </Shelf>
+      </Box>
 
       {editable && (
         <Button

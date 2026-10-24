@@ -19,13 +19,15 @@ import { Alert, Box, Button, FormControlLabel, Stack, Switch, TextField, Typogra
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { DESIGN } from '../../theme';
-import { SectionLabel, SoftCard, StatusChip } from '../../components/ui';
+import { SoftCard, StatusChip } from '../../components/ui';
 import { TYPE } from '../../components/settings/settingsStyle';
 import { useDevice } from '../../layout/useDevice';
 import {
-  MEDIA_STORAGE_QUERY_KEY, mediaStorageApi, type MediaStorageSettings, type MediaStorageUpdate,
+  MEDIA_STORAGE_QUERY_KEY, isMediaStorageReady, mediaStorageApi, type MediaStorageSettings, type MediaStorageUpdate,
 } from '../../api/mediaStorageSettings';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
+import { MetricCard, Shelf } from '../../ui/shelf';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import { StatusPanel } from './mediaStorage/StatusPanel';
 
@@ -129,8 +131,7 @@ export default function MediaStorageSettingsPage() {
     <Stack spacing={2.5} component="form" noValidate onSubmit={(event) => { event.preventDefault(); submit(); }}>
       {failure !== null && <Alert severity="error">{failure}</Alert>}
 
-      <SoftCard>
-        <SectionLabel>Cloudinary</SectionLabel>
+      <SettingsBoard id="media-settings" title="Nastavení" hint="Cloudinary">
         <FormControlLabel
           control={<Switch checked={draft.enabled} onChange={(event) => edit({ enabled: event.target.checked })} slotProps={{ input: { 'aria-label': 'Úložiště médií zapnuto' } }} />}
           label={draft.enabled ? 'Úložiště je zapnuté' : 'Úložiště je vypnuté'}
@@ -180,7 +181,7 @@ export default function MediaStorageSettingsPage() {
             slotProps={{ htmlInput: { autoComplete: 'off' }, input: { sx: { minHeight: 44 } } }}
           />
         </Stack>
-      </SoftCard>
+      </SettingsBoard>
 
       <Typography sx={[TYPE.caption, { color: 'text.secondary' }]}>
         Zapnutím úložiště se nic nenahrává — soubory se posílají, až když je na obrazovce Média a texty nahrajete.
@@ -188,7 +189,28 @@ export default function MediaStorageSettingsPage() {
     </Stack>
   );
 
-  const panel = saved === undefined ? null : <StatusPanel saved={saved} />;
+  const ready = saved !== undefined && isMediaStorageReady(saved);
+  const missing = saved === undefined ? [] : [
+    saved.enabled ? null : 'zapnout úložiště',
+    saved.cloudName.trim() !== '' ? null : 'vyplnit cloud name',
+    saved.hasSecret ? null : 'uložit API secret',
+  ].filter((part): part is string => part !== null);
+  const statusShelf = saved === undefined ? null : (
+    <Shelf id="media-status" title="Stav úložiště" layout="grid" minCardWidth={210} cardHeight={112} stagger={false}>
+      <MetricCard
+        label="Stav"
+        value={ready ? 'Nastaveno' : 'Nenastaveno'}
+        tone={ready ? 'green' : 'grey'}
+        hint={ready
+          ? 'Údaje jsou vyplněné a uložené. Zda je Cloudinary přijme, se ukáže při prvním nahrání souboru.'
+          : `Aby šlo nahrávat fotky a videa, je potřeba ${missing.join(', ')}.`}
+      />
+      <MetricCard label="Úložiště" value={saved.enabled ? 'Zapnuté' : 'Vypnuté'} hint="Zapnutím se nic nenahrává" />
+      <MetricCard label="API secret" value={saved.hasSecret ? 'Uložen' : 'Chybí'} tone={saved.hasSecret ? 'grey' : 'red'} hint="Nikdy se znovu nezobrazí" />
+    </Shelf>
+  );
+
+  const panel = saved === undefined ? null : <StatusPanel />;
 
   return (
     <SettingsScreen
@@ -203,7 +225,7 @@ export default function MediaStorageSettingsPage() {
       error={query.isError ? 'Nastavení úložiště médií se nepodařilo načíst.' : undefined}
       onRetry={() => void query.refetch()}
     >
-      {form === null ? null : device === 'desktop' ? <Box data-layout="desktop">{form}</Box> : device === 'tablet' ? (
+      {form === null ? null : <Stack spacing={3}>{statusShelf}{device === 'desktop' ? <Box data-layout="desktop">{form}</Box> : device === 'tablet' ? (
         <Box data-layout="tablet" sx={{ display: 'grid', gap: 3, gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'start' }}>
           {form}
           <SoftCard tone="muted">{panel}</SoftCard>
@@ -213,7 +235,7 @@ export default function MediaStorageSettingsPage() {
           <SoftCard tone="muted">{panel}</SoftCard>
           {form}
         </Stack>
-      )}
+      )}</Stack>}
     </SettingsScreen>
   );
 }

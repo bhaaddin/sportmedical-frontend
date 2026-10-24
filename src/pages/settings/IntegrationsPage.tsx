@@ -10,11 +10,12 @@
  * screen says "uloženo"; typing in it replaces the stored one.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, FormControlLabel, Skeleton, Stack, Switch, TextField, Typography } from '@mui/material';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
+import { Alert, Box, FormControlLabel, Stack, Switch, TextField, Typography } from '@mui/material';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
+import { MetricCard, Shelf } from '../../ui/shelf';
 import { StatusChip } from '../../components/ui';
-import { TYPE, settingsLine } from '../../components/settings/settingsStyle';
+import { TYPE } from '../../components/settings/settingsStyle';
 import { integrationsApi, integrationsErrorText, type IntegrationsSettings } from './integrationsApi';
 
 interface Draft {
@@ -114,59 +115,46 @@ export default function IntegrationsPage() {
 
   const complete = loaded !== null && loaded.adam.enabled && loaded.adam.baseUrl !== '' && loaded.adam.username !== '' && loaded.adam.hasPassword;
 
-  const aside = (
-    <Stack spacing={1.5}>
-      <Box>
-        <Typography sx={TYPE.itemName}>ADAM</Typography>
-        <Typography sx={TYPE.caption}>
-          {complete
-            ? 'Údaje jsou uložené. Spojení se zatím neověřuje.'
-            : 'Nepřipojeno. Vyplňte údaje a uložte je.'}
-        </Typography>
-      </Box>
-      <Box>
-        <Typography sx={TYPE.itemName}>MEDISTAR</Typography>
-        <Typography sx={TYPE.caption}>Ukončeno — už se nepoužívá.</Typography>
-      </Box>
-    </Stack>
-  );
-
   return (
     <SettingsScreen
       title="Integrace"
       subtitle="Napojení na ADAM — adresa, uživatel a heslo. Údaje se jen ukládají, spojení se zatím neověřuje."
       save={{ dirty, saving, onSave: () => { void save(); }, onDiscard: discard }}
-      aside={aside}
-      asideTitle="Stav napojení"
+      aside={false}
+      loading={loadError === null && (draft === null || loaded === null)}
+      error={loadError ?? undefined}
+      onRetry={() => { void load(); }}
     >
-      {loadError !== null ? (
-        <Alert
-          severity="error"
-          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => { void load(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
-        >
-          {loadError}
-        </Alert>
-      ) : draft === null || loaded === null ? (
-        <Box aria-busy="true" aria-label="Načítám integrace">
-          <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3, mb: 2 }} />
-          <Skeleton variant="rounded" height={96} sx={{ borderRadius: 3 }} />
-        </Box>
-      ) : (
+      {draft === null || loaded === null ? null : (
         <Stack spacing={3}>
           {saved && <Alert severity="success">Uloženo.</Alert>}
           {saveError !== null && <Alert severity="error">{saveError}</Alert>}
 
+          <Shelf id="integrations-status" title="Připojení" layout="grid" minCardWidth={240} cardHeight={112} stagger={false}>
+            <MetricCard
+              label="ADAM"
+              value={complete ? 'Údaje uloženy' : 'Nepřipojeno'}
+              tone={complete ? 'green' : 'grey'}
+              hint={complete ? 'Údaje jsou uložené. Spojení se zatím neověřuje.' : 'Vyplňte údaje a uložte je.'}
+            />
+            <MetricCard label="MEDISTAR" value="Ukončeno" hint="Už se nepoužívá" />
+          </Shelf>
+
           {/* ADAM */}
-          <Box component="section" aria-label="ADAM" sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper', p: 3 }}>
-            <Stack direction="row" spacing={1.5} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}>
-              <Typography component="h2" sx={TYPE.sectionTitle}>ADAM</Typography>
-              <StatusChip tone="grey">Nepřipojeno</StatusChip>
-              {complete && <StatusChip tone="blue">Údaje uloženy</StatusChip>}
-            </Stack>
+          <SettingsBoard
+            id="integration-adam"
+            title="ADAM"
+            controls={(
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                <StatusChip tone="grey">Nepřipojeno</StatusChip>
+                {complete && <StatusChip tone="blue">Údaje uloženy</StatusChip>}
+              </Stack>
+            )}
+            padding={3}
+          >
             <Typography sx={[TYPE.caption, { mb: 2.5 }]}>
               Přístup do systému ADAM. Zatím se jen ukládá — nic se z ordinace do ADAM neodesílá.
             </Typography>
-
             <FormControlLabel
               control={
                 <Switch
@@ -221,18 +209,19 @@ export default function IntegrationsPage() {
                 )}
               </Box>
             </Box>
-          </Box>
+          </SettingsBoard>
 
           {/* MEDISTAR */}
-          <Box component="section" aria-label="MEDISTAR" sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper', p: 3 }}>
-            <Stack direction="row" spacing={1.5} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}>
-              <Typography component="h2" sx={TYPE.sectionTitle}>MEDISTAR</Typography>
-              <StatusChip tone="beige">Ukončeno</StatusChip>
-            </Stack>
+          <SettingsBoard
+            id="integration-medistar"
+            title="MEDISTAR"
+            controls={<StatusChip tone="beige">Ukončeno</StatusChip>}
+            padding={3}
+          >
             <Typography sx={TYPE.caption}>
               MEDISTAR se přestává používat, proto tu nejsou žádná pole. Rezervace a pacienti žijí v tomto systému.
             </Typography>
-          </Box>
+          </SettingsBoard>
         </Stack>
       )}
     </SettingsScreen>

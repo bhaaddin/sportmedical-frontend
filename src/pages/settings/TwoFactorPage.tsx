@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Divider, Skeleton, Stack, TextField, Typography,
+  Alert, Box, Button, Chip, Divider, Skeleton, Stack, TextField, Typography,
 } from '@mui/material';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { twoFactorApi } from '../../api/twoFactor';
 import type { TwoFactorSetup } from '../../api/twoFactor';
 import { errorText } from '../../components/booking/errorText';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 
 export default function TwoFactorPage() {
   const { t } = useTranslation();
@@ -66,8 +67,8 @@ export default function TwoFactorPage() {
 
       {/* Recovery codes — shown once, right after enabling. */}
       {recoveryCodes !== null ? (
-        <Card variant="outlined" sx={{ mb: 2, borderColor: 'warning.main' }}>
-          <CardContent>
+        <Box sx={{ mb: 3 }}>
+          <SettingsBoard id="two-factor-recovery" title="Záložní kódy" hint="Uložte si je teď">
             <Typography sx={{ fontWeight: 700, mb: 1 }}>Záložní kódy — uložte si je teď</Typography>
             <Alert severity="warning" sx={{ mb: 2 }}>
               Zobrazí se jen jednou. Každý kód použijete jednou, když nemáte telefon po ruce.
@@ -78,12 +79,11 @@ export default function TwoFactorPage() {
               ))}
             </Stack>
             <Button variant="contained" onClick={() => setRecoveryCodes(null)}>Mám uloženo</Button>
-          </CardContent>
-        </Card>
+          </SettingsBoard>
+        </Box>
       ) : null}
 
-      <Card variant="outlined">
-        <CardContent>
+      <SettingsBoard id="two-factor" title="Dvoufázové ověření" hint="Platí jen pro váš účet">
           {statusQuery.isLoading ? (
             <Box aria-busy="true" aria-label="Načítám stav ověření">
               <Skeleton variant="text" height={32} width="60%" />
@@ -185,8 +185,7 @@ export default function TwoFactorPage() {
               </Box>
             </Stack>
           )}
-        </CardContent>
-      </Card>
+      </SettingsBoard>
     </SettingsScreen>
   );
 }

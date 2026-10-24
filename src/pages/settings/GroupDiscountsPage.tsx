@@ -23,7 +23,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Divider,
   InputAdornment,
   Stack,
@@ -46,8 +45,10 @@ import {
 import type { GroupDiscountSettings, GroupDiscountTier } from '../../api/groupDiscounts';
 import { activitiesApi } from '../../api/activities';
 import { formatCzk } from '../../components/booking/appointmentEdit';
-import { SectionLabel, SoftCard, DESIGN } from '../../components/ui';
+import { DESIGN, SoftCard } from '../../components/ui';
+import { Shelf } from '../../ui/shelf';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import {
   dearestPriced,
@@ -99,16 +100,19 @@ export default function GroupDiscountsPage() {
     onError: () => setSaved(false),
   });
 
-  if (query.isPending) {
+  if (query.isPending || query.isError || !query.data) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <SettingsScreen
+        title="Doporučené hladiny slev"
+        subtitle="Doporučené hladiny — slevu klubu určuje administrátor na kartě klubu"
+        scope="pricing"
+        loading={query.isPending}
+        error={query.isPending ? undefined : 'Skupinové slevy se nepodařilo načíst.'}
+        onRetry={() => void query.refetch()}
+      >
+        {null}
+      </SettingsScreen>
     );
-  }
-
-  if (query.isError || !query.data) {
-    return <Alert severity="error">Skupinové slevy se nepodařilo načíst.</Alert>;
   }
 
   const { defaults, maxTiers } = query.data;
@@ -174,6 +178,7 @@ export default function GroupDiscountsPage() {
         ) : null}
         {saved ? <Alert severity="success">Uloženo.</Alert> : null}
 
+        <Shelf id="group-tiers" title="Stupně" count={draft.length} layout="free" stagger={false}>
         <StackTable component={SoftCard} sx={{ p: 0 }}>
           <Table>
             <TableHead>
@@ -269,6 +274,7 @@ export default function GroupDiscountsPage() {
             </TableBody>
           </Table>
         </StackTable>
+        </Shelf>
 
         <Box
           sx={{
@@ -278,8 +284,7 @@ export default function GroupDiscountsPage() {
             alignItems: 'start',
           }}
         >
-          <SoftCard>
-            <SectionLabel>Jak se hladiny použijí</SectionLabel>
+          <SettingsBoard id="group-how" title="Jak se hladiny použijí">
             <Typography variant="body2" sx={{ mb: 2 }}>
               Hladiny jsou jen doporučení: podle počtu osob ukazují, jakou slevu je rozumné
               klubu nabídnout. Skutečnou slevu určuje administrátor u každého klubu zvlášť
@@ -290,10 +295,9 @@ export default function GroupDiscountsPage() {
               <Button variant="outlined" component={RouterLink} to="/nastaveni/cenik">Otevřít ceník</Button>
               <Button variant="outlined" component={RouterLink} to="/clubs">Kluby</Button>
             </Stack>
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard>
-            <SectionLabel>Příklad</SectionLabel>
+          <SettingsBoard id="group-example" title="Příklad" hint="Co by zaplatil vzorový počet osob">
             <Stack spacing={0.75}>
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
                 <Typography variant="body2">
@@ -322,7 +326,7 @@ export default function GroupDiscountsPage() {
                 Žádná činnost zatím nemá cenu v ceníku; příklad počítá se základem 100, aby byla vidět procenta.
               </Typography>
             )}
-          </SoftCard>
+          </SettingsBoard>
         </Box>
       </Stack>
     </SettingsScreen>

@@ -189,6 +189,12 @@ const PAGE_PATH = {
   'set-firma': '/nastaveni/firma-a-faktury',
   'set-hours': '/working-hours',
   'set-2fa': '/nastaveni/zabezpeceni',
+  /* Phase 2, S-8: A7 system screens, money settings, clubs, A6 texts */
+  'set-media': '/nastaveni/uloziste-medii', 'set-integrace': '/nastaveni/integrace', 'set-historie': '/nastaveni/historie-zmen',
+  'set-security': '/nastaveni/zabezpeceni-a-zalohy', 'set-admin': '/admin', 'set-slevy': '/nastaveni/slevy',
+  'set-skupinove': '/nastaveni/skupinove-slevy', 'set-kluby': '/nastaveni/kluby', 'set-email': '/nastaveni/sablony-emailu',
+  'set-pripominky': '/nastaveni/pripominky', 'set-souhlasy': '/nastaveni/souhlasy', 'set-pravidla': '/pravidla-dokumentu',
+  'set-dotaznik': '/dotaznik-nastaveni', 'set-sablony': '/dokumenty-sablony',
   /* Phase 2, S-2 */
   /* Phase 2, S-3 */
   billing: '/billing', cashier: '/cashier', export: '/accounting-export', cenik: '/nastaveni/cenik',

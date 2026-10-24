@@ -20,10 +20,11 @@ import toast from 'react-hot-toast';
 import { COMPANY_SETTINGS_QUERY_KEY, companySettingsApi, type CompanySettings } from '../../api/companySettings';
 import type { AresSubject } from '../../api/ares';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
-import { SoftCard, StatusChip } from '../../components/ui';
+import { StatusChip } from '../../components/ui';
 import { AresFillButton, AresOverrideCaption, AresStatusLine, applyAresFill, useAresFill } from '../../components/common/AresFill';
 import { TYPE, settingsLine } from '../../components/settings/settingsStyle';
 import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 type Draft = Record<keyof Omit<CompanySettings, 'invoiceDueDays'>, string> & { invoiceDueDays: string };
@@ -256,11 +257,10 @@ export default function CompanyInvoiceSettingsPage() {
   };
 
   const card = (id: string, title: string, caption: string, children: React.ReactNode) => (
-    <SoftCard component="section" aria-labelledby={id}>
-      <Typography id={id} component="h2" sx={TYPE.sectionTitle}>{title}</Typography>
-      <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2 }]}>{caption}</Typography>
+    <SettingsBoard id={id} title={title}>
+      <Typography sx={[TYPE.caption, { mb: 2 }]}>{caption}</Typography>
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: twoCols, alignItems: 'start' }}>{children}</Box>
-    </SoftCard>
+    </SettingsBoard>
   );
 
   const canDeriveIban = draft !== null && ibanFromBankAccount(draft.bankAccount) !== null;

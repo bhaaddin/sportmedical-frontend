@@ -31,7 +31,7 @@ import toast from 'react-hot-toast';
 import { clubSettingsApi, CLUB_SETTINGS_QUERY_KEY } from '../../api/clubs';
 import type { ClubSettings } from '../../api/clubs';
 import { useIsPhone } from '../../layout/useDevice';
-import { SectionLabel, SoftCard } from '../../components/ui';
+import { SettingsBoard } from './SettingsBoard';
 import { SettingsScreen } from './SettingsFrame';
 import { MAX_PAYER_TEXT, MAX_REGISTRATION_LINK_DAYS } from '../../api/fieldLimits';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
@@ -196,8 +196,7 @@ export default function ClubSettingsPage() {
         <Stack spacing={2.5} component="form" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
           {failure !== null ? <Alert severity="error">{failure}</Alert> : null}
 
-          <SoftCard>
-            <SectionLabel>Registrační odkaz klubu</SectionLabel>
+          <SettingsBoard id="club-1" title="Registrační odkaz klubu">
             <TextField
               label="Platnost odkazu"
               value={draft.registrationLinkValidityDays}
@@ -211,10 +210,9 @@ export default function ClubSettingsPage() {
                 input: { endAdornment: <InputAdornment position="end">dní</InputAdornment> },
               }}
             />
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard>
-            <SectionLabel>Velikost bloku</SectionLabel>
+          <SettingsBoard id="club-2" title="Velikost bloku">
             <TextField
               label="Minimální počet sportovců pro blok (nepovinné)"
               value={draft.minimumPlayers}
@@ -228,10 +226,9 @@ export default function ClubSettingsPage() {
                 input: { endAdornment: <InputAdornment position="end">sportovců</InputAdornment> },
               }}
             />
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard>
-            <SectionLabel>Klubové objednávky</SectionLabel>
+          <SettingsBoard id="club-3" title="Klubové objednávky">
             <Stack spacing={2}>
               <TextField
                 label="Otevřít nevyužitou kapacitu veřejnosti X dní před termínem"
@@ -284,10 +281,9 @@ export default function ClubSettingsPage() {
                 </Typography>
               </Box>
             </Stack>
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard>
-            <SectionLabel>Kdo hradí vyšetření — věty pro rodiče</SectionLabel>
+          <SettingsBoard id="club-4" title="Kdo hradí vyšetření — věty pro rodiče">
             <Stack spacing={2}>
               <TextField
                 label="Když platí klub fakturou"
@@ -314,16 +310,15 @@ export default function ClubSettingsPage() {
                 slotProps={{ htmlInput: { maxLength: MAX_PAYER_TEXT } }}
               />
             </Stack>
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard tone="muted">
-            <SectionLabel>Jak se to používá</SectionLabel>
+          <SettingsBoard id="club-5" title="Jak se to používá">
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Horní strop počtu hráčů neexistuje — kalkulačka spočítá, kolik dní blok potřebuje.
               Slevu pro klub nastavuje administrátor v kartě klubu v sekci{' '}
               <Box component={RouterLink} to="/clubs" sx={{ color: 'primary.main' }}>Kluby a týmy</Box>.
             </Typography>
-          </SoftCard>
+          </SettingsBoard>
         </Stack>
       )}
     </SettingsScreen>

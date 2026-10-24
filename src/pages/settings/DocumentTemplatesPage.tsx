@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { documentsApi } from '../../api/documents';
 import type { DocumentTemplate } from '../../api/documents';
 import { documentRequirementsApi } from '../../api/documentRequirements';
-import { AsyncSection } from '../../components/booking/AsyncSection';
+import { Shelf } from '../../ui/shelf';
 import { errorText } from '../../components/booking/errorText';
 import {
   STALE_FIRST_VISIT_TEXT, TEMPLATE_PROBLEM_TEXT, describesACancelledRule,
@@ -123,14 +123,16 @@ export default function DocumentTemplatesPage() {
         vidět, takže ho lze kdykoli zapnout zpátky.
       </Alert>
 
-      <AsyncSection
-        isLoading={templatesQuery.isLoading}
-        isSettled={templatesQuery.isSuccess || templatesQuery.isError}
-        error={templatesQuery.error}
-        isEmpty={templates.length === 0}
-        emptyText="Ordinace nemá založený žádný druh dokumentu."
+      <Shelf
+        id="document-templates"
+        title="Šablony"
+        count={templatesQuery.isLoading || templatesQuery.error ? undefined : templates.length}
+        layout="free"
+        loading={templatesQuery.isLoading || !(templatesQuery.isSuccess || templatesQuery.isError)}
+        error={templatesQuery.error ? errorText(templatesQuery.error, t) : false}
         onRetry={() => void templatesQuery.refetch()}
-        skeletonRows={4}
+        empty={templates.length === 0}
+        emptyState={{ text: 'Ordinace nemá založený žádný druh dokumentu.' }}
       >
         <Stack spacing={1.5}>
           {templates.map((template) => (
@@ -185,7 +187,7 @@ export default function DocumentTemplatesPage() {
             </Card>
           ))}
         </Stack>
-      </AsyncSection>
+      </Shelf>
 
       <Dialog
         open={draft !== null}

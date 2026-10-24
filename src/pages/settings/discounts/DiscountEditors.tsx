@@ -13,7 +13,8 @@ import { useState } from 'react';
 import type { Theme } from '@mui/material/styles';
 import { toneColors } from '../../../theme';
 import { useIsPhone } from '../../../layout/useDevice';
-import { SectionLabel, SoftCard } from '../../../components/ui';
+import { SectionLabel } from '../../../components/ui';
+import { SettingsBoard } from '../SettingsBoard';
 import { ResponsiveDataList, type DataColumn } from '../../../components/ui/ResponsiveDataList';
 import { TYPE, settingsGrey } from '../../../components/settings/settingsStyle';
 import {
@@ -22,15 +23,13 @@ import {
   nextKey, parseWhole, rangeFor, rangeText, roleName,
 } from './discountLogic';
 
-/** A titled card: the section title (18/700) and one sentence under it. */
+/** A titled block of the screen: a shelf board (the section title) with one sentence over its fields. */
 export function SectionCard({ id, title, caption, children }: { id: string; title: string; caption?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <SoftCard component="section" aria-labelledby={id}>
-      <Typography id={id} component="h2" sx={TYPE.sectionTitle}>{title}</Typography>
-      {caption !== undefined && <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2, maxWidth: 720 }]}>{caption}</Typography>}
-      {caption === undefined && <Box sx={{ mb: 2 }} />}
+    <SettingsBoard id={id} title={title}>
+      {caption !== undefined && <Typography sx={[TYPE.caption, { mb: 2, maxWidth: 720 }]}>{caption}</Typography>}
       {children}
-    </SoftCard>
+    </SettingsBoard>
   );
 }
 

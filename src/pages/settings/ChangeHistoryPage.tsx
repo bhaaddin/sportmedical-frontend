@@ -10,11 +10,13 @@
 import { StackTable } from "../../components/ui/StackTable";
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, MenuItem, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Box, Button, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Typography,
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
+import { Shelf } from '../../ui/shelf';
 import { SETTINGS_SECTIONS, scopeOf } from './catalogue';
 import { useIsPhone } from '../../layout/useDevice';
 import { TYPE, settingsGrey, settingsLine } from '../../components/settings/settingsStyle';
@@ -109,6 +111,7 @@ export default function ChangeHistoryPage() {
       }
     >
       {/* Filters */}
+      <SettingsBoard id="change-filter" title="Filtr" hint="Podle oblasti, data a autora">
       <Box
         component="form"
         onSubmit={(e) => { e.preventDefault(); apply(); }}
@@ -118,12 +121,6 @@ export default function ChangeHistoryPage() {
           gap: 2,
           gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr)) auto' },
           alignItems: 'end',
-          mb: 3,
-          p: 2.5,
-          border: '1px solid',
-          borderColor: settingsLine,
-          borderRadius: 3,
-          bgcolor: 'background.paper',
         }}
       >
         <Box>
@@ -186,27 +183,23 @@ export default function ChangeHistoryPage() {
           </Button>
         </Stack>
       </Box>
+      </SettingsBoard>
 
-      {error !== null ? (
-        <Alert
-          severity="error"
-          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={() => { void load(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
+      <Box sx={{ mt: 3 }}>
+        <Shelf
+          id="change-list"
+          title="Změny"
+          count={result === null || error !== null ? undefined : total}
+          layout="free"
+          loading={result === null && error === null}
+          error={error !== null ? error : false}
+          onRetry={() => { void load(); }}
+          empty={result !== null && result.items.length === 0}
+          emptyState={{ text: 'Žádné změny', action: { label: 'Všechny změny', onClick: reset } }}
+          stagger={false}
         >
-          {error}
-        </Alert>
-      ) : result === null ? (
-        <Box aria-busy="true" aria-label="Načítám historii změn">
-          <Skeleton variant="rounded" height={52} sx={{ borderRadius: 2, mb: 1 }} />
-          <Skeleton variant="rounded" height={52} sx={{ borderRadius: 2, mb: 1 }} />
-          <Skeleton variant="rounded" height={52} sx={{ borderRadius: 2 }} />
-        </Box>
-      ) : result.items.length === 0 ? (
-        <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed', borderColor: settingsLine, borderRadius: 3 }}>
-          <Typography sx={TYPE.itemName}>Žádné změny</Typography>
-          <Typography sx={TYPE.caption}>Pro tenhle filtr se nic nezměnilo. Zkuste širší období nebo všechny oblasti.</Typography>
-        </Box>
-      ) : (
-        <>
+          {result !== null && (
+            <>
           {phone ? (
             <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.5 }}>
               {result.items.map((entry, index) => (
@@ -224,7 +217,7 @@ export default function ChangeHistoryPage() {
               ))}
             </Box>
           ) : (
-            <StackTable sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper' }}>
+            <StackTable sx={{ borderRadius: 3 }}>
               <Table aria-label="Historie změn">
                 <TableHead>
                   <TableRow>
@@ -277,8 +270,10 @@ export default function ChangeHistoryPage() {
               </Button>
             </Stack>
           </Stack>
-        </>
-      )}
+            </>
+          )}
+        </Shelf>
+      </Box>
     </SettingsScreen>
   );
 }

@@ -31,7 +31,7 @@ import {
   saveConsentSettings,
 } from '../../api/consentSettings';
 import type { ConsentSettings } from '../../api/consentSettings';
-import { SectionLabel, SoftCard } from '../../components/ui';
+import { SettingsBoard } from './SettingsBoard';
 import { SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
@@ -98,15 +98,15 @@ export default function ConsentSettingsPage() {
       }
       asideTitle="Tak to uvidí pacient"
     >
-      <SoftCard>
+      <Stack spacing={3}>
+      <SettingsBoard id="consent-legal" title="Zákonné">
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Souhlas s poskytnutím zdravotní služby a souhlasy vázané na činnost se řídí zákonem a
+          nastavením činnosti, proto tu nejsou.
+        </Typography>
+      </SettingsBoard>
+      <SettingsBoard id="consent-optional" title="Marketingový souhlas" hint="Volitelné">
         <Stack spacing={2.5}>
-          <Box>
-            <SectionLabel>Marketingový souhlas</SectionLabel>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Souhlas s poskytnutím zdravotní služby a souhlasy vázané na činnost se řídí zákonem a
-              nastavením činnosti, proto tu nejsou.
-            </Typography>
-          </Box>
 
           <FormControlLabel
             control={
@@ -152,7 +152,8 @@ export default function ConsentSettingsPage() {
           )}
           {saved && <Alert severity="success">Uloženo.</Alert>}
         </Stack>
-      </SoftCard>
+      </SettingsBoard>
+      </Stack>
     </SettingsScreen>
   );
 }

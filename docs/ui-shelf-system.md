@@ -362,9 +362,9 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 15 | `/cashier` | Pokladna (311) | **Done (S-3)**: Dnešní tržba (metrics), Dnešní transakce (free + grow; item name + patient EntityLink). Not built: K zaplacení dnes (needs a join of today's visits and invoices) | Dnešní tržba (metrics), K zaplacení dnes (list of today's open visits), Poslední platby | patient chips, invoice, appointment | A3 | done |
 | 16 | `/accounting-export` | Účetní export (217) | **Done (S-3)**: Nový export (board; says how many invoices were issued in the period, `issuedBetween`, link to Fakturace), Poslední exporty (free + grow) | Období (board), Připraveno k exportu (metric), Poslední exporty | invoices in the range, billing | A3 | done |
 | 17 | `/nastaveni/cenik` | Ceník (staff, 324) | **Done (S-3)**: Bez ceny (active činnosti no row bills as chips, rows at zero; editors only, when non-empty), Položky ceníku (free + grow). One list: a row has no category field | one shelf per kategorie (položky ceníku), Bez ceny (attention) | činnost that uses an item, discounts | A3 | done |
-| 18 | `/nastaveni/slevy` | Slevy (196) | SettingsFrame | Slevy (cards), Kdo je používá | clubs, group discounts | A3 | P3 |
-| 19 | `/nastaveni/skupinove-slevy` | Skupinové slevy (330) | SettingsFrame | Stupně (cards), Příklad výpočtu | clubs, orders | A3 | P3 |
-| 20 | `/nastaveni/firma-a-faktury` | Firma a faktury (336) | SettingsFrame | Firma, Číslování faktur (preview), Bankovní účet | invoices | A3 | P3 |
+| 18 | `/nastaveni/slevy` | Slevy (196) | **Done (S-8)**: Skupinové slevy / Balíčkové slevy / Ruční sleva as shelf boards (`SettingsBoard`), Náhled stays in the frame | Slevy (cards), Kdo je používá | clubs, group discounts | A3 | done |
+| 19 | `/nastaveni/skupinove-slevy` | Skupinové slevy (330) | **Done (S-8)**: Stupně (free + count), Jak se hladiny použijí, Příklad (boards); the loading/error state stays in the frame | Stupně (cards), Příklad výpočtu | clubs, orders | A3 | done |
+| 20 | `/nastaveni/firma-a-faktury` | Firma a faktury (336) | **Done (S-8)**: Firma, Sídlo, Kontakt, Platba as boards; Náhled hlavičky faktury in the frame | Firma, Číslování faktur (preview), Bankovní účet | invoices | A3 | done |
 | 21 | `/clubs` | Přehled klubů (382) | FitPage + SoftCard cards | Čeká na vás (inquiries), Kluby (club cards: seats, next term, owed), Připnuté kluby | club chips + peek, orders, invoices, planner (link, out of scope) | A4 | P1 |
 | 22 | `/clubs/objednavky` | Objednávky klubů (264) | FitPage + list + detail | Poptávky (Requested), Potvrzené, Dokončené (status shelves), detail with RelatedShelf (club, invoice, players) | club, invoice, planner window | A4 | P1 |
 | 23 | `/clubs/rezervace` | Rezervace (172) | ResponsiveDataList | Dnes, Tento týden (windows), Bez obsazení (attention) | club, order, calendar day | A4 | P2 |
@@ -373,7 +373,7 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 26 | `/clubs/fakturace` | Fakturace klubů (162) | KpiCard + list | K vyfakturování (attention), Faktury klubů | club, invoice, order | A4 | P2 |
 | 27 | `/clubs/:clubId/kalendar` | Plánovač klubu | planner stage | **Out** - fixed layout | - | - | out |
 | 27a | `/clubs/:clubId` | Stránka klubu (Stage 5a) | shelf page: Statistiky, Objednávky, Nejbližší termíny, Poslední změny, Hráči, Odkazy | **In** - `pages/clubs/overview`, `docs/stage5a-2026-10.md` | - | - | done |
-| 28 | `/nastaveni/kluby` | Nastavení klubů (302) | SettingsFrame | Výchozí hodnoty, Odkazy a platnost | clubs, orders | A4 | P3 |
+| 28 | `/nastaveni/kluby` | Nastavení klubů (302) | **Done (S-8)**: the five blocks are boards (Registrační odkaz, Velikost bloku, Klubové objednávky, Kdo hradí, Jak se to používá) | Výchozí hodnoty, Odkazy a platnost | clubs, orders | A4 | done |
 | 29 | `/vyhrazeni` | Vyhrazení partnerů (735) | FitPage + SoftCard | Aktivní vyhrazení (cards), Končí brzy (attention) | partner/club, calendar, orders | A4 | P2 |
 | 30 | `/intake-review` | Kontrola registrací (509) | **Done (S-2)** | Čeká (oldest first, cards), Možné shody (patient cards), Vyřízeno dnes | patient chips (match candidates), registration link settings | A2 | done |
 | 31 | `/hodnoceni-pacientu` | Hodnocení pacientů (145) | **Done (S-2)** | metrics (průměr, počet), Nová hodnocení (cards), K vyřízení | patient, appointment | A2 | done |
@@ -397,19 +397,19 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 49 | `/nastaveni/udaje-pacienta` | Údaje o pacientovi (217) | SettingsFrame | Karta, Seznam (two boards of fields) | patient card, register | A6 | P3 |
 | 50 | `/nastaveni/rychla-registrace` | Rychlá registrace (226) | SettingsFrame | Pole, Platnost odkazu | intake, quick link | A6 | P3 |
 | 51 | `/nastaveni/odkaz-registrace` | Odkaz pro registraci (306) | SettingsFrame | Odkaz (board), Kdo se zaregistroval | intake review, patients | A6 | P3 |
-| 52 | `/dotaznik-nastaveni` | Dotazník (1163) | SettingsFrame | Otázky (cards by section), Náhled | činnost that asks it | A6 | P3 |
-| 53 | `/nastaveni/souhlasy` | Souhlasy (158) | SettingsFrame | Zákonné (read-only), Volitelné | patient card, činnost | A6 | P3 |
-| 54 | `/pravidla-dokumentu` | Pravidla dokumentů (554) | SettingsFrame | Pravidla (cards per služba), Bez pravidla | služba, template, patient documents | A6 | P3 |
-| 55 | `/dokumenty-sablony` | Šablony dokumentů (262) | SettingsFrame | Šablony (cards), Nepoužité | rules that use it | A6 | P3 |
-| 56 | `/nastaveni/sablony-emailu` | Šablony e-mailů (290) | SettingsFrame | Šablony (cards), Náhled | reminders, orders | A6 | P3 |
-| 57 | `/nastaveni/pripominky` | Připomínky (156) | SettingsFrame | Pravidla, Fronta (failed count -> system health) | e-mail templates, outgoing queue | A6 | P3 |
+| 52 | `/dotaznik-nastaveni` | Dotazník (1163) | **Done (S-8)**: Verze dotazníku (board), Otázky (shelf of section cards) | Otázky (cards by section), Náhled | činnost that asks it | A6 | done |
+| 53 | `/nastaveni/souhlasy` | Souhlasy (158) | **Done (S-8)**: Zákonné (board, read-only sentence), Marketingový souhlas (board) | Zákonné (read-only), Volitelné | patient card, činnost | A6 | done |
+| 54 | `/pravidla-dokumentu` | Pravidla dokumentů (554) | **Done (S-8)**: Nové pravidlo (board), Pravidla (shelf: count, loading / error / empty) | Pravidla (cards per služba), Bez pravidla | služba, template, patient documents | A6 | done |
+| 55 | `/dokumenty-sablony` | Šablony dokumentů (262) | **Done (S-8)**: Šablony (shelf: count, loading / error / empty) | Šablony (cards), Nepoužité | rules that use it | A6 | done |
+| 56 | `/nastaveni/sablony-emailu` | Šablony e-mailů (290) | **Done (S-8)**: Šablony (shelf), Úprava šablony (board) | Šablony (cards), Náhled | reminders, orders | A6 | done |
+| 57 | `/nastaveni/pripominky` | Připomínky (156) | **Done (S-8)**: Předstih (board); the frame carries loading / error | Pravidla, Fronta (failed count -> system health) | e-mail templates, outgoing queue | A6 | done |
 | 58 | `/nastaveni/vzhled-kalendare` | Vzhled kalendáře (331) | SettingsFrame | Barvy, Svátky a pauzy (preview) | calendar | A6 | P3 |
 | 59 | `/nastaveni/media-a-texty` | Média a texty webu (436) | SettingsFrame | Stránky (cards), Obrázky | public site | A6 | P3 |
-| 60 | `/nastaveni/uloziste-medii` | Úložiště médií (219) | SettingsFrame | Stav úložiště (metrics), Nastavení | system health | A7 | P3 |
-| 61 | `/nastaveni/integrace` | Integrace (240) | SettingsFrame | Připojení (cards with status), Poslední události | system health | A7 | P3 |
-| 62 | `/nastaveni/historie-zmen` | Historie změn (284) | SettingsFrame + table | Změny (grow), Filtr podle autora a důvodu | the changed screen, audit log | A7 | P2 |
-| 63 | `/nastaveni/zabezpeceni` | Zabezpečení / 2FA (192) | SettingsFrame | Dvoufázové ověření (board), Aktivní relace | account | A7 | P2 |
-| 64 | `/admin` | Správa (264) | SettingsFrame | Správa účtu a kliniky (cards), Nebezpečné akce | staff, audit | A7 | P3 |
+| 60 | `/nastaveni/uloziste-medii` | Úložiště médií (219) | **Done (S-8)**: Stav úložiště (metric cards: Stav / Úložiště / API secret), Nastavení (board); the explanation stays in the frame / below | Stav úložiště (metrics), Nastavení | system health | A7 | done |
+| 61 | `/nastaveni/integrace` | Integrace (240) | **Done (S-8)**: Připojení (metric cards), ADAM and MEDISTAR boards with their status chips in the header. No event log exists, so no Poslední události | Připojení (cards with status), Poslední události | system health | A7 | done |
+| 62 | `/nastaveni/historie-zmen` | Historie změn (284) | **Done (S-8)**: Filtr (board), Změny (free, count, empty / error states of the shelf) | Změny (grow), Filtr podle autora a důvodu | the changed screen, audit log | A7 | done |
+| 63 | `/nastaveni/zabezpeceni` | Zabezpečení / 2FA (192) | **Done (S-8)**: Dvoufázové ověření (board), Záložní kódy (board, only after enabling). No Aktivní relace: the account has no sessions endpoint | Dvoufázové ověření (board), Aktivní relace | account | A7 | done |
+| 64 | `/admin` | Správa (264) | **Done (S-8)**: Firemní údaje, Kontaktní údaje, Online rezervace as boards | Správa účtu a kliniky (cards), Nebezpečné akce | staff, audit | A7 | done |
 | 65 | `/system-health` | Zdraví systému (316) | **Done (S-5)** | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | done |
 | 66 | `/staff-management` | Tým (608) | **Done (S-5)** | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | done |
 | 67 | `/audit-log` | Audit (255) | **Done (S-5)** | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | done |
