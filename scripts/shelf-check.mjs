@@ -117,6 +117,23 @@ const measurePage = () => {
   return out;
 };
 
+/** Replaces birth-number / long-digit shapes on the page with dots (before a screenshot); returns how many. */
+const maskIdentifiers = () => {
+  const shape = /\d{6}\s*\/\s*\d{3,4}|\d{9,}/g;
+  let n = 0;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    const text = node.nodeValue ?? '';
+    if (shape.test(text)) { node.nodeValue = text.replace(shape, '••••'); n += 1; }
+    shape.lastIndex = 0;
+  }
+  for (const input of document.querySelectorAll('input, textarea')) {
+    if (shape.test(input.value)) { input.value = input.value.replace(shape, '••••'); n += 1; }
+    shape.lastIndex = 0;
+  }
+  return n;
+};
+
 /** Every visible interactive element in the page region that is smaller than `min` px. */
 const smallTargets = (min) => {
   const region = document.getElementById('fit-region');
@@ -208,6 +225,9 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   await openPage(page, name, href);
 
   const shot = join(OUT, `${name}${label}-${vp.label}.jpg`);
+  /* Privacy: nothing shaped like a birth number or an insurance number reaches a screenshot (text or a field's value). */
+  const masked = await page.evaluate(maskIdentifiers);
+  if (masked > 0) notes.push(`${where}: ${masked} identifier-shaped value(s) masked before the screenshot`);
   await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };
