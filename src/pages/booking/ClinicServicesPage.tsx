@@ -40,6 +40,8 @@ import { errorText } from '../../components/booking/errorText';
 import { isDuplicateName } from '../../api/duplicateName';
 import { SettingsScreen } from '../settings/SettingsFrame';
 import { FIELD_LIMITS } from '../../api/fieldLimits';
+import { AttentionCard, Shelf } from '../../ui/shelf';
+import { servicesAttention } from './clinicServiceState';
 import {
   movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
@@ -273,6 +275,8 @@ export default function ClinicServicesPage() {
   const calendarOptions = offerable(allCalendars, editingId);
 
 
+  const attention = servicesAttention(services);
+
   return (
     <SettingsScreen
       title="Služby"
@@ -305,6 +309,13 @@ export default function ClinicServicesPage() {
         onRetry={() => void servicesQuery.refetch()}
         skeletonRows={3}
       >
+        {attention !== null && (device !== 'phone' || selected === null) && (
+          <Box sx={{ mb: 3 }}>
+            <Shelf id="services-attention" title="Vyžaduje pozornost" count={attention.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+              <AttentionCard group={attention} />
+            </Shelf>
+          </Box>
+        )}
         {/*
           * Master-detail. A phone shows the list or the opened služba, never
           * both; a tablet and a desktop show the list beside the detail.
@@ -319,6 +330,7 @@ export default function ClinicServicesPage() {
           data-layout={device}
         >
           {(device !== 'phone' || selected === null) && (
+            <Shelf id="services" title="Služby" count={allServices.filter((svc) => svc.isActive).length} layout="free">
             <ServiceList
               services={allServices}
               selectedId={selected?.id ?? null}
@@ -337,6 +349,7 @@ export default function ClinicServicesPage() {
                   : undefined
               }
             />
+            </Shelf>
           )}
           {selected !== null && (
             <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>

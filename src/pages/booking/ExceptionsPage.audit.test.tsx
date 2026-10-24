@@ -109,7 +109,8 @@ describe('the list', () => {
       exception({ id: 'c', date: '2026-10-28', isClosed: false, workerUserId: 'u1', reason: '', isClosedToPublic: false }),
     ]);
     renderScreen(<ExceptionsPage />, '/exceptions');
-    const rows = (await screen.findAllByRole('row')).slice(1);
+    await screen.findByText('Servis');
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-card="exception"]'));
     expect(within(rows[0]).getByText('Zavřeno', { selector: '.MuiChip-label' })).toBeInTheDocument();
     expect(within(rows[1]).getByText('Jiný čas')).toBeInTheDocument();
     expect(within(rows[1]).getByText('10:00–14:30')).toBeInTheDocument();
@@ -121,7 +122,8 @@ describe('the list', () => {
   it('marks "different hours" that are also off the web with a second chip', async () => {
     listExceptions.mockResolvedValue([exception({ isClosed: false, startTime: '10:00:00', endTime: '12:00:00', isClosedToPublic: true })]);
     renderScreen(<ExceptionsPage />, '/exceptions');
-    const row = (await screen.findAllByRole('row'))[1];
+    await screen.findByText('Online objednávky vypnuty');
+    const row = document.querySelector<HTMLElement>('[data-card="exception"]') as HTMLElement;
     expect(within(row).getByText('Jiný čas')).toBeInTheDocument();
     expect(within(row).getByText('Online objednávky vypnuty')).toBeInTheDocument();
   });

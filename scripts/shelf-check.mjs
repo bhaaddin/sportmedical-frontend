@@ -189,6 +189,8 @@ const PAGE_PATH = {
   'set-firma': '/nastaveni/firma-a-faktury',
   'set-hours': '/working-hours',
   'set-2fa': '/nastaveni/zabezpeceni',
+  /* Phase 2, A5 rows 37-45 */
+  activities: '/activities', services: '/nastaveni/sluzby', blocks: '/blokovany-cas', exceptions: '/exceptions', holidays: '/svatky', absences: '/nepritomnosti',
   /* Phase 2, S-2 */
   /* Phase 2, S-3 */
   clubs: '/clubs', 'clubs-orders': '/clubs/objednavky', 'clubs-hraci': '/clubs/hraci', 'clubs-fakturace': '/clubs/fakturace', 'clubs-stats': '/clubs/statistiky', vyhrazeni: '/vyhrazeni',

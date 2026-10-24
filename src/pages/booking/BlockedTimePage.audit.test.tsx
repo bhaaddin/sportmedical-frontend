@@ -65,7 +65,7 @@ describe('the list', () => {
     /* 23:30 UTC on 1 Dec is 00:30 on 2 Dec in Prague and 18:30 on 1 Dec in New York. */
     listBlocks.mockResolvedValue([block({ startUtc: '2026-12-01T23:30:00Z', endUtc: '2026-12-02T00:30:00Z' })]);
     renderScreen(<BlockedTimePage />, '/blokovany-cas');
-    const row = (await screen.findByText('Servis přístroje')).closest('tr') as HTMLElement;
+    const row = (await screen.findByText('Servis přístroje')).closest('[data-card="block"]') as HTMLElement;
     expect(within(row).getByText(/2\. ?12\. ?2026/)).toBeInTheDocument();
     expect(within(row).getByText(/00:30–01:30/)).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('the list', () => {
     ]);
     renderScreen(<BlockedTimePage />, '/blokovany-cas');
     await screen.findByText('Brzy');
-    const reasons = screen.getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell')[2].textContent);
+    const reasons = Array.from(document.querySelectorAll('[data-card="block"]')).map((card) => card.querySelector('span')?.textContent);
     expect(reasons).toEqual(['Brzy', 'Pozdě']);
   });
 

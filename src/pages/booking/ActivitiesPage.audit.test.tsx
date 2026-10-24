@@ -75,7 +75,7 @@ const create = async () => {
 describe('the list', () => {
   it('shows the name, the length, the note, the price read through the price list and whether the web may book it', async () => {
     renderScreen(<ActivitiesPage />, '/activities');
-    const row = (await screen.findByText('Základní prohlídka')).closest('tr') as HTMLElement;
+    const row = (await screen.findByText('Základní prohlídka')).closest('[data-card="activity"]') as HTMLElement;
     expect(within(row).getByText('30 min')).toBeInTheDocument();
     expect(within(row).getByText('Přijďte nalačno')).toBeInTheDocument();
     expect(within(row).getByText('1500 Kč')).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe('the list', () => {
     });
     renderScreen(<ActivitiesPage />, '/activities');
     await screen.findByText('První');
-    const names = screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent);
+    const names = Array.from(document.querySelectorAll('[data-card="activity"] h3')).map((h) => h.textContent);
     expect(names).toEqual(['První', 'Druhá']);
     expect(screen.getByRole('button', { name: /Archivované \(1\)/ })).toBeInTheDocument();
   });

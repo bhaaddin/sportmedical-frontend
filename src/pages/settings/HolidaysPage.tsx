@@ -49,6 +49,8 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import { SettingsScreen } from './SettingsFrame';
+import { Shelf, TARGET_SX } from '../../ui/shelf';
+import { SettingsItemCard } from '../booking/SettingsItemCard';
 import EditIcon from '@mui/icons-material/Edit';
 import { holidaysApi } from '../../api/holidays';
 import { FIELD_LIMITS, HOLIDAY_YEAR_MAX, HOLIDAY_YEAR_MIN } from '../../api/fieldLimits';
@@ -196,6 +198,102 @@ export default function HolidaysPage() {
   /* The dialog's own refusal is shown inside the dialog: behind a modal the page banner is out of sight. */
   const failure = setWorking.error ?? setOnline.error ?? reset.error;
 
+  const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+  const yearReady = !holidays.isPending && !holidays.isError;
+  const upcoming = rows.filter((holiday) => holiday.date >= todayKey);
+  const past = rows.filter((holiday) => holiday.date < todayKey).reverse();
+  const openAdd = () => { save.reset(); setEditing({ date: `${year}-01-01`, name: '', isHoliday: true, existing: false }); };
+
+  const dayCard = (holiday: ClinicHoliday) => {
+    const working = !holiday.isHoliday;
+    const online = onlineState(holiday.date, perCalendar);
+
+    return (
+      <SettingsItemCard
+        key={holiday.date}
+        kind="holiday"
+        id={holiday.date}
+        title={<span style={{ textTransform: 'capitalize' }}>{czechDate(holiday.date)}</span>}
+        status={<StatusChip holiday={holiday} />}
+        dim={holiday.date < todayKey}
+        actions={
+          <>
+            <Box sx={{ flex: 1 }} />
+            <IconButton
+              aria-label="Upravit"
+              sx={TARGET_SX}
+              onClick={() => {
+                save.reset();
+                setEditing({
+                  date: holiday.date,
+                  name: holiday.name,
+                  isHoliday: holiday.isHoliday,
+                  existing: true,
+                });
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+
+            {/* Only an amended day can be put back; a statutory one is already
+                where the law left it. */}
+            {holiday.isAmended && (
+              <Tooltip title="Zpět na státní kalendář">
+                <span>
+                  <IconButton
+                    aria-label="Vrátit"
+                    sx={TARGET_SX}
+                    disabled={busy || (!holiday.isHoliday && !exceptionsKnown)}
+                    onClick={() => reset.mutate(holiday)}
+                  >
+                    <UndoIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </>
+        }
+      >
+        <span>{holiday.name}</span>
+        <FormControlLabel
+          sx={{ ...TARGET_SX, mr: 0 }}
+          control={
+            <Switch
+              checked={working}
+              /* Closing again has to clear online-only exceptions,
+                 so it waits until they are known. */
+              disabled={busy || (working && !exceptionsKnown)}
+              onChange={(event) =>
+                setWorking.mutate({ holiday, working: event.target.checked })}
+            />
+          }
+          label="Pracujeme v tento den"
+        />
+        {working ? (
+          <FormControlLabel
+            sx={{ ...TARGET_SX, mr: 0 }}
+            control={
+              <Switch
+                size="small"
+                checked={online !== 'open'}
+                disabled={busy || !exceptionsKnown}
+                onChange={(event) =>
+                  setOnline.mutate({ holiday, closeOnline: event.target.checked })}
+              />
+            }
+            label={online === 'partly'
+              ? 'Online objednávky vypnuty (jen v některých kalendářích)'
+              : 'Online objednávky vypnuty'}
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            Zavřeno – nikdo se nemůže objednat.
+          </Typography>
+        )}
+      </SettingsItemCard>
+    );
+  };
+
   return (
     <SettingsScreen
       title="Svátky a dovolené"
@@ -204,167 +302,80 @@ export default function HolidaysPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => { save.reset(); setEditing({ date: `${year}-01-01`, name: '', isHoliday: true, existing: false }); }}
+          onClick={openAdd}
         >
           Přidat vlastní volno
         </Button>
       }
     >
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Pokud v některý svátek pracujete, zapněte u něj <strong>Pracujeme v tento den</strong> – pak
-        ten den platí vaše běžná pracovní doba a dá se objednat.
-        {' '}<strong>Online objednávky vypnuty</strong> znamená: pracuje se, recepce objednává, ale přes
-        internet si ten den nikdo termín nevezme.
-      </Typography>
+      <Shelf id="holidays-year" title="Rok" layout="board">
+        <Box sx={{ p: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Pokud v některý svátek pracujete, zapněte u něj <strong>Pracujeme v tento den</strong> – pak
+          ten den platí vaše běžná pracovní doba a dá se objednat.
+          {' '}<strong>Online objednávky vypnuty</strong> znamená: pracuje se, recepce objednává, ale přes
+          internet si ten den nikdo termín nevezme.
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <Button variant="outlined" size="small" sx={TARGET_SX} disabled={year <= HOLIDAY_YEAR_MIN} onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
+          <Typography sx={{ fontWeight: 700, fontSize: 20, px: 1 }}>{year}</Typography>
+          <Button variant="outlined" size="small" sx={TARGET_SX} disabled={year >= HOLIDAY_YEAR_MAX} onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
+        </Stack>
+        </Box>
+      </Shelf>
 
-      <Stack direction="row" spacing={1} sx={{ my: 2.5, alignItems: 'center' }}>
-        <Button variant="outlined" size="small" disabled={year <= HOLIDAY_YEAR_MIN} onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
-        <Typography sx={{ fontWeight: 700, fontSize: 20, px: 1 }}>{year}</Typography>
-        <Button variant="outlined" size="small" disabled={year >= HOLIDAY_YEAR_MAX} onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
-      </Stack>
+      <Box sx={{ mt: 2 }}>
+        {failure !== null && (
+          <Alert severity="error" sx={{ mb: 2 }}>{errorText(failure, t)}</Alert>
+        )}
 
-      {failure !== null && (
-        <Alert severity="error" sx={{ mb: 2 }}>{errorText(failure, t)}</Alert>
-      )}
+        {(calendars.isError || exceptionQueries.some((query) => query.isError)) && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Nepodařilo se načíst výjimky kalendářů, takže teď nejde přepnout online objednávky ani
+            znovu zavřít svátek, ve kterém pracujete. Zkuste stránku načíst znovu.
+          </Alert>
+        )}
 
-      {(calendars.isError || exceptionQueries.some((query) => query.isError)) && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Nepodařilo se načíst výjimky kalendářů, takže teď nejde přepnout online objednávky ani
-          znovu zavřít svátek, ve kterém pracujete. Zkuste stránku načíst znovu.
-        </Alert>
-      )}
+        {blocked !== null && (
+          <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setBlocked(null)}>
+            {czechDate(blocked.date)}: v kalendáři {blocked.calendars.join(', ')} už na tento den je
+            jiná výjimka, takže tam online objednávky vypnout nešly. Upravte ten den ve Výjimkách.
+          </Alert>
+        )}
+      </Box>
 
-      {blocked !== null && (
-        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setBlocked(null)}>
-          {czechDate(blocked.date)}: v kalendáři {blocked.calendars.join(', ')} už na tento den je
-          jiná výjimka, takže tam online objednávky vypnout nešly. Upravte ten den ve Výjimkách.
-        </Alert>
-      )}
-
-      {holidays.isPending && (
-        <Card><CardContent sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" color="text.secondary">Načítáme rok…</Typography>
-        </CardContent></Card>
-      )}
-
-      {holidays.isError && (
-        <Alert severity="error">{errorText(holidays.error, t)}</Alert>
-      )}
-
-      {/*
-        A year with nothing in it cannot happen — the law gives thirteen days —
-        so an empty list means the request answered with nothing, which is worth
-        saying rather than showing a blank page.
-      */}
-      {!holidays.isPending && !holidays.isError && rows.length === 0 && (
-        <Card><CardContent>
-          <Typography variant="body2" color="text.secondary">
-            Pro tento rok jsme nedostali žádné dny. To by nemělo nastat — státní
-            svátky přidává systém sám. Zkuste stránku načíst znovu.
-          </Typography>
-        </CardContent></Card>
-      )}
-
-      <Stack spacing={1}>
-        {rows.map((holiday) => {
-          const working = !holiday.isHoliday;
-          const online = onlineState(holiday.date, perCalendar);
-
-          return (
-            <Card key={holiday.date} variant="outlined">
-              <CardContent sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                flexWrap: 'wrap',
-                py: 1.5,
-                '&:last-child': { pb: 1.5 },
-              }}>
-                <Box sx={{ minWidth: 220 }}>
-                  <Typography sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
-                    {czechDate(holiday.date)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {holiday.name}
-                  </Typography>
-                </Box>
-
-                <StatusChip holiday={holiday} />
-
-                <Box sx={{ flex: 1 }} />
-
-                <Stack sx={{ minWidth: 250 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={working}
-                        /* Closing again has to clear online-only exceptions,
-                           so it waits until they are known. */
-                        disabled={busy || (working && !exceptionsKnown)}
-                        onChange={(event) =>
-                          setWorking.mutate({ holiday, working: event.target.checked })}
-                      />
-                    }
-                    label="Pracujeme v tento den"
-                  />
-                  {working ? (
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={online !== 'open'}
-                          disabled={busy || !exceptionsKnown}
-                          onChange={(event) =>
-                            setOnline.mutate({ holiday, closeOnline: event.target.checked })}
-                        />
-                      }
-                      label={online === 'partly'
-                        ? 'Online objednávky vypnuty (jen v některých kalendářích)'
-                        : 'Online objednávky vypnuty'}
-                    />
-                  ) : (
-                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                      Zavřeno – nikdo se nemůže objednat.
-                    </Typography>
-                  )}
-                </Stack>
-
-                <IconButton
-                  size="small"
-                  aria-label="Upravit"
-                  onClick={() => {
-                    save.reset();
-                    setEditing({
-                      date: holiday.date,
-                      name: holiday.name,
-                      isHoliday: holiday.isHoliday,
-                      existing: true,
-                    });
-                  }}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-
-                {/* Only an amended day can be put back; a statutory one is already
-                    where the law left it. */}
-                {holiday.isAmended && (
-                  <Tooltip title="Zpět na státní kalendář">
-                    <IconButton
-                      size="small"
-                      aria-label="Vrátit"
-                      disabled={busy || (!holiday.isHoliday && !exceptionsKnown)}
-                      onClick={() => reset.mutate(holiday)}
-                    >
-                      <UndoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </Stack>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/*
+          A year with nothing in it cannot happen — the law gives thirteen days —
+          so an empty list means the request answered with nothing, which is worth
+          saying rather than showing a blank page.
+        */}
+        <Shelf
+          id="holidays-upcoming"
+          title="Nadcházející"
+          count={yearReady ? upcoming.length : undefined}
+          layout="grid"
+          minCardWidth={340}
+          cardHeight={150}
+          loading={holidays.isPending}
+          error={holidays.isError ? errorText(holidays.error, t) : false}
+          onRetry={() => { void holidays.refetch(); }}
+          empty={yearReady && upcoming.length === 0}
+          emptyState={{
+            text: rows.length === 0
+              ? 'Pro tento rok jsme nedostali žádné dny. To by nemělo nastat — státní svátky přidává systém sám. Zkuste stránku načíst znovu.'
+              : 'V tomto roce už žádný další den nezbývá.',
+            action: { label: 'Přidat vlastní volno', onClick: openAdd },
+          }}
+        >
+          {upcoming.map(dayCard)}
+        </Shelf>
+        {yearReady && past.length > 0 ? (
+          <Shelf id="holidays-past" title="Proběhlé" count={past.length} layout="grid" minCardWidth={340} cardHeight={150}>
+            {past.map(dayCard)}
+          </Shelf>
+        ) : null}
+      </Box>
 
       <Dialog open={editing !== null} onClose={() => { save.reset(); setEditing(null); }} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>

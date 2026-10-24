@@ -9,11 +9,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControlLabel,
   Link,
   MenuItem,
-  Paper,
   Stack,
   Switch,
   Table,
@@ -30,7 +28,9 @@ import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { workingHoursApi } from "../../api/workingHours";
 import type { SchedulePeriod, WorkingHour } from "../../api/bookingContracts";
-import { AsyncSection } from "../../components/booking/AsyncSection";
+import { Shelf, TARGET_SX } from "../../ui/shelf";
+import { INLINE_LINK_SX } from "./SettingsItemCard";
+import { shelfState } from "./shelfState";
 import { DayActivityGrid } from "../../components/booking/DayActivityGrid";
 import { QuickPlanDialog } from "../../components/booking/plan/QuickPlanDialog";
 import { errorText } from "../../components/booking/errorText";
@@ -69,6 +69,9 @@ import {
  */
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000;
+
+/** A small field is 40 px; under 1280 a finger needs 44. */
+const FIELD_44 = { "@media (max-width: 1279.95px)": { "& .MuiInputBase-root": { minHeight: 44 } } } as const;
 
 /** `21. 9.` - enough to recognise a week. */
 const shortDate = (date: string): string => {
@@ -159,6 +162,22 @@ export default function WorkingHoursPage() {
   const rows = main === null ? [] : (hoursQuery.data ?? []);
   const rowsReady = main === null || hoursQuery.isSuccess;
 
+  const calState = shelfState(calendarsQuery, t);
+  const calReady = !calState.loading && calState.error === false;
+  /* The periods and the rows are one answer: the week is drawn only when both have settled. */
+  const weekState = shelfState(
+    {
+      isLoading: periodsQuery.isLoading || (main !== null && hoursQuery.isLoading),
+      isSuccess: periodsQuery.isSuccess && rowsReady,
+      error: periodsQuery.error ?? hoursQuery.error,
+      refetch: invalidate,
+    },
+    t,
+  );
+  const weekReady = !weekState.loading && weekState.error === false;
+  const hasPeriodNotes =
+    weekReady && main !== null && (main.validFrom > today || main.validTo !== null || stillInForce.length > 0);
+
   return (
     <SettingsScreen
       title="Otevírací doba"
@@ -166,11 +185,11 @@ export default function WorkingHoursPage() {
         <>
           Kdy se v kalendáři pracuje, po dnech v týdnu, včetně obědové pauzy. Jednotlivé dny jinak
           (dovolená, jiný čas) nastavíte ve{" "}
-          <Link component={RouterLink} to="/exceptions">
+          <Link component={RouterLink} to="/exceptions" sx={INLINE_LINK_SX}>
             výjimkách
           </Link>
           , státní svátky ve{" "}
-          <Link component={RouterLink} to="/svatky">
+          <Link component={RouterLink} to="/svatky" sx={INLINE_LINK_SX}>
             svátcích a dovolených
           </Link>
           .
@@ -195,15 +214,17 @@ export default function WorkingHoursPage() {
         </Alert>
       ) : null}
 
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.workingHours.noCalendars")}
-        onRetry={() => void calendarsQuery.refetch()}
-        skeletonRows={2}
+      <Shelf
+        id="hours-calendar"
+        title={t("booking.workingHours.calendar")}
+        layout="board"
+        loading={calState.loading}
+        error={calState.error}
+        onRetry={calState.onRetry}
+        empty={calReady && calendars.length === 0}
+        emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
+        <Box sx={{ p: 2 }}>
         <TextField
           select
           label={t("booking.workingHours.calendar")}
@@ -213,7 +234,7 @@ export default function WorkingHoursPage() {
             setJustSaved(false);
             setPlanMessage(null);
           }}
-          sx={{ minWidth: 260, mb: 3 }}
+          sx={{ minWidth: 260, maxWidth: "100%" }}
         >
           {calendars.map((calendar) => (
             <MenuItem key={calendar.id} value={calendar.id}>
@@ -221,109 +242,119 @@ export default function WorkingHoursPage() {
             </MenuItem>
           ))}
         </TextField>
+        </Box>
+      </Shelf>
 
-        <AsyncSection
-          isLoading={periodsQuery.isLoading || (main !== null && hoursQuery.isLoading)}
-          isSettled={periodsQuery.isSuccess && rowsReady}
-          error={periodsQuery.error ?? hoursQuery.error}
-          isEmpty={false}
-          emptyText=""
-          onRetry={() => void invalidate()}
-          skeletonRows={7}
-        >
-          {main !== null && main.validFrom > today ? (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Tato pracovní doba začne platit {formatDateOnly(main.validFrom)}. Do té doby se do
-              kalendáře objednat nedá.
-            </Alert>
-          ) : null}
+      {calReady && calendars.length > 0 ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
+          {hasPeriodNotes ? (
+            <Shelf id="hours-periods" title="Období a cyklus" layout="board">
+              <Box sx={{ p: 2 }}>
+              {main !== null && main.validFrom > today ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Tato pracovní doba začne platit {formatDateOnly(main.validFrom)}. Do té doby se do
+                  kalendáře objednat nedá.
+                </Alert>
+              ) : null}
 
-          {main !== null && main.validTo !== null ? (
-            <Alert
-              severity="warning"
-              sx={{ mb: 2 }}
-              action={
-                <Button
-                  color="inherit"
-                  size="small"
-                  disabled={makeOpenEnded.isPending}
-                  onClick={() => makeOpenEnded.mutate(main)}
-                >
-                  Platit bez konce
-                </Button>
-              }
-            >
-              Tato pracovní doba platí jen do {formatDateOnly(main.validTo)}. Potom se do kalendáře
-              nedá objednat.
-            </Alert>
-          ) : null}
-          {makeOpenEnded.error ? (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {errorText(makeOpenEnded.error, t)}
-            </Alert>
-          ) : null}
-
-          {stillInForce.length > 0 ? (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                Kromě pracovní doby níže platí v tomto kalendáři i další plány a období - každé jen ve svých
-                datech (třeba plány z Rychlého plánu):
-              </Typography>
-              <Stack spacing={0.5}>
-                {stillInForce.map((period) => (
-                  <Box key={period.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {period.name} · {formatDateOnly(period.validFrom)}
-                      {period.validTo ? ` – ${formatDateOnly(period.validTo)}` : " – bez konce"}
-                    </Typography>
-                    <Button size="small" color="inherit" onClick={() => setRemoving(period)}>
-                      {t("booking.common.delete")}
+              {main !== null && main.validTo !== null ? (
+                <Alert
+                  severity="warning"
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button
+                      color="inherit"
+                      size="small"
+                      sx={TARGET_SX}
+                      disabled={makeOpenEnded.isPending}
+                      onClick={() => makeOpenEnded.mutate(main)}
+                    >
+                      Platit bez konce
                     </Button>
-                  </Box>
-                ))}
-              </Stack>
-            </Alert>
+                  }
+                >
+                  Tato pracovní doba platí jen do {formatDateOnly(main.validTo)}. Potom se do kalendáře
+                  nedá objednat.
+                </Alert>
+              ) : null}
+              {makeOpenEnded.error ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {errorText(makeOpenEnded.error, t)}
+                </Alert>
+              ) : null}
+
+              {stillInForce.length > 0 ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    Kromě pracovní doby níže platí v tomto kalendáři i další plány a období - každé jen ve svých
+                    datech (třeba plány z Rychlého plánu):
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {stillInForce.map((period) => (
+                      <Box key={period.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {period.name} · {formatDateOnly(period.validFrom)}
+                          {period.validTo ? ` – ${formatDateOnly(period.validTo)}` : " – bez konce"}
+                        </Typography>
+                        <Button size="small" color="inherit" sx={TARGET_SX} onClick={() => setRemoving(period)}>
+                          {t("booking.common.delete")}
+                        </Button>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Alert>
+              ) : null}
+
+              {main !== null && stillInForce.length > 0 ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Upravujete: {main.name} · {formatDateOnly(main.validFrom)}
+                  {main.validTo ? ` – ${formatDateOnly(main.validTo)}` : " – bez konce"}
+                </Typography>
+              ) : null}
+              </Box>
+            </Shelf>
           ) : null}
 
-          {main !== null && stillInForce.length > 0 ? (
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
-              Upravujete: {main.name} · {formatDateOnly(main.validFrom)}
-              {main.validTo ? ` – ${formatDateOnly(main.validTo)}` : " – bez konce"}
-            </Typography>
-          ) : null}
-
-          <TimetableEditor
-            key={`${activeCalendarId}:${main?.id ?? "none"}:${hoursQuery.dataUpdatedAt}`}
-            calendarId={activeCalendarId}
-            period={main}
-            periods={periods}
-            today={today}
-            saved={rows}
-            workers={workers}
-            workersFailed={workersQuery.isError}
-            justSaved={justSaved}
-            onEdited={() => setJustSaved(false)}
-            onSaved={async () => {
-              setJustSaved(true);
-              await invalidate();
-            }}
-            onFailed={invalidate}
-          />
+          <Shelf
+            id="hours-week"
+            title="Týdenní rozvrh"
+            layout="board"
+            loading={weekState.loading}
+            error={weekState.error}
+            onRetry={() => { void invalidate(); }}
+          >
+            <Box sx={{ p: 2 }}>
+            <TimetableEditor
+              key={`${activeCalendarId}:${main?.id ?? "none"}:${hoursQuery.dataUpdatedAt}`}
+              calendarId={activeCalendarId}
+              period={main}
+              periods={periods}
+              today={today}
+              saved={rows}
+              workers={workers}
+              workersFailed={workersQuery.isError}
+              justSaved={justSaved}
+              onEdited={() => setJustSaved(false)}
+              onSaved={async () => {
+                setJustSaved(true);
+                await invalidate();
+              }}
+              onFailed={invalidate}
+            />
+            </Box>
+          </Shelf>
 
           {/* 5.7 hangs off the period; the period is simply not named. */}
-          {main !== null ? (
-            <>
-              <Divider sx={{ my: 3 }} />
-              <DayActivityGrid
-                calendarId={activeCalendarId}
-                periodId={main.id}
-                workingDays={new Set(rows.map((row) => row.dayOfWeek))}
-                clinicServiceId={activeCalendar?.clinicServiceId ?? null}
-              />
-            </>
+          {weekReady && main !== null ? (
+            <DayActivityGrid
+              calendarId={activeCalendarId}
+              periodId={main.id}
+              workingDays={new Set(rows.map((row) => row.dayOfWeek))}
+              clinicServiceId={activeCalendar?.clinicServiceId ?? null}
+            />
           ) : null}
-        </AsyncSection>
-      </AsyncSection>
+        </Box>
+      ) : null}
 
       <QuickPlanDialog
         open={planOpen}
@@ -462,7 +493,7 @@ function TimetableEditor({
         : "";
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
+    <Box>
       <FormControlLabel
         control={
           <Switch
@@ -549,7 +580,7 @@ function TimetableEditor({
           {errorText(save.error, t)} Zobrazeno je to, co je teď opravdu uložené.
         </Alert>
       ) : null}
-    </Paper>
+    </Box>
   );
 }
 
@@ -611,11 +642,13 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
   return (
     <>
       <TableCell sx={{ verticalAlign: "top", pt: 1.5 }}>
-        <Switch
-          checked={shift.working}
-          onChange={(e) => onChange({ ...shift, working: e.target.checked })}
-          slotProps={{ input: { "aria-label": `${label}: pracuje` } }}
-        />
+        <Box sx={{ ...TARGET_SX, display: "flex", alignItems: "center" }}>
+          <Switch
+            checked={shift.working}
+            onChange={(e) => onChange({ ...shift, working: e.target.checked })}
+            slotProps={{ input: { "aria-label": `${label}: pracuje` } }}
+          />
+        </Box>
       </TableCell>
       <TableCell sx={{ verticalAlign: "top", pt: 2 }}>
         <Stack direction="row" spacing={1}>
@@ -627,7 +660,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, start: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 104 }}
+            sx={{ width: 104, ...FIELD_44 }}
           />
           <TextField
             type="time"
@@ -637,7 +670,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, end: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 104 }}
+            sx={{ width: 104, ...FIELD_44 }}
           />
         </Stack>
         {problem ? (
@@ -656,7 +689,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, breakStart: e.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 104 }}
+            sx={{ width: 104, ...FIELD_44 }}
           />
           <TextField
             type="time"
@@ -666,7 +699,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, breakEnd: e.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 104 }}
+            sx={{ width: 104, ...FIELD_44 }}
           />
         </Stack>
       </TableCell>
@@ -681,6 +714,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
           value={shift.workerUserId ?? ""}
           disabled={off}
           onChange={(e) => onChange({ ...shift, workerUserId: e.target.value || null })}
+          sx={FIELD_44}
         >
           <MenuItem value="">{t("booking.workingHours.noWorker")}</MenuItem>
           {shift.workerUserId && !workers.some((w) => w.id === shift.workerUserId) ? (

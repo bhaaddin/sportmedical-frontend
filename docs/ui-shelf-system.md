@@ -382,15 +382,15 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 34 | `/prehled-sluzeb` | Přehled podle služeb | **Done (S-1)** | Filtr (board), Volná kapacita (metrics), one shelf per služba (činnosti: booked / when / who / free, terms on request) | služba, činnost, appointment | A1 | done |
 | 35 | `/availability` | Dostupnost sportovců | **Done (S-1)** | Sportovci (grow table, counts in the filter) - the screen is about athletes, not workers | patient | A1 | done |
 | 36 | `/kalendar/:calendarId/termin/:appointmentId` | Termín | **Done (S-1)** the appointment's page behind its detail dialog | Termín (board), Související (patient, činnost), Historie | appointment is an entity: this IS its page | A1 | done |
-| 37 | `/blokovany-cas` | Blokovaný čas (387) | FitPage + StackTable | Aktivní bloky (cards), Končí brzy | calendar, worker | A5 | P2 |
-| 38 | `/nastaveni/sluzby` | Služby (613) | SettingsFrame | Služby (cards: činností, kalendářů), Bez činnosti (attention) | činnosti, calendars, required documents | A5 | P2 |
-| 39 | `/nastaveni/sluzby/:serviceId` | Služba (same screen, open) | SettingsFrame | Služba (board), Činnosti (cards), Kalendáře, Potřebné dokumenty | činnost, calendar, document template | A5 | P2 |
+| 37 | `/blokovany-cas` | Blokovaný čas (387) | **Done (S-5)**: PageFrame; Kalendář (board), Aktivní bloky (cards, 'Právě' chip), Minulé | Aktivní bloky (cards), Končí brzy | calendar, worker | A5 | done |
+| 38 | `/nastaveni/sluzby` | Služby (613) | **Done (S-5)**: Vyžaduje pozornost (`servicesAttention`), Služby (free: the list with its search, archive, delete) | Služby (cards: činností, kalendářů), Bez činnosti (attention) | činnosti, calendars, required documents | A5 | done |
+| 39 | `/nastaveni/sluzby/:serviceId` | Služba (same screen, open) | **Done (S-5)**: Služba (board: colour, state, edit, delete), Části služby (free: the five tabs Činnosti, Ceník, Kalendáře, Pravidla, Použití) | Služba (board), Činnosti (cards), Kalendáře, Potřebné dokumenty | činnost, calendar, document template | A5 | done |
 | 40 | `/calendars` | Kalendáře (800) | **Done (S-5)** | Kalendáře (cards), Kdo vidí (board) | worker, služba, hours | A5 | done |
-| 41 | `/activities` | Činnosti (930) | SettingsFrame + StackTable | Činnosti (grouped by služba), Bez ceny / bez kalendáře (attention) | služba, price item, documents, calendar | A5 | P2 |
-| 42 | `/working-hours` | Otevírací doba (694) | SettingsFrame | Týdenní rozvrh (board), Období a cyklus | calendar, exceptions | A5 | P3 |
-| 43 | `/exceptions` | Výjimky (446) | SettingsFrame | Nadcházející (cards), Minulé | calendar, holiday | A5 | P3 |
-| 44 | `/nepritomnosti` | Nepřítomnosti (347) | SettingsFrame | Právě nepřítomní, Plánované | worker, availability | A5 | P3 |
-| 45 | `/svatky` | Svátky a volno (414) | SettingsFrame | Nadcházející, Rok | calendar, exceptions | A5 | P3 |
+| 41 | `/activities` | Činnosti (930) | **Done (S-5)**: Vyžaduje pozornost (`activitiesAttention`, opens Ceník), one shelf of cards per služba (viewAll opens the služba); Archivované stays a collapse | Činnosti (grouped by služba), Bez ceny / bez kalendáře (attention) | služba, price item, documents, calendar | A5 | done |
+| 42 | `/working-hours` | Otevírací doba (694) | **Done (S-5)**: Kalendář (board), Období a cyklus (board, only when a period note exists), Týdenní rozvrh (board: the editor); the two purpose-line links are 44 px under 1280 | Týdenní rozvrh (board), Období a cyklus | calendar, exceptions | A5 | done |
+| 43 | `/exceptions` | Výjimky (446) | **Done (S-5)**: Kalendář (board), Nadcházející (cards; stand-in = worker chip), Minulé | Nadcházející (cards), Minulé | calendar, holiday | A5 | done |
+| 44 | `/nepritomnosti` | Nepřítomnosti (347) | **Done (S-5)**: Právě nepřítomní, Plánované, Minulé (cards, worker chip) | Právě nepřítomní, Plánované | worker, availability | A5 | done |
+| 45 | `/svatky` | Svátky a volno (414) | **Done (S-5)**: Rok (board: explanation + year), Nadcházející, Proběhlé (cards with the two switches) | Nadcházející, Rok | calendar, exceptions | A5 | done |
 | 46 | `/nastaveni/barvy-sluzeb` | Barvy služeb (240) | SettingsFrame | Služby s barvou (cards), Kontrast (attention) | služba, činnost | A5 | P3 |
 | 47 | `/settings` | Nastavení - hub (473) | FitPage + SettingsFrame | one shelf per group (cards = settings screens with their current value), Naposledy změněno, Vyžaduje nastavení (attention: missing company data...) | every settings screen, change history | A6 | P1 |
 | 48 | `/settings/:group` | Nastavení - skupina | same | the group's shelf | - | A6 | P1 |

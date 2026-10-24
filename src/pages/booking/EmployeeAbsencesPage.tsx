@@ -1,4 +1,3 @@
-import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -11,11 +10,6 @@ import {
   IconButton,
   MenuItem,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -32,7 +26,9 @@ import {
   type EmployeeAbsence,
   type EmployeeAbsenceInput,
 } from "../../api/employeeAbsences";
-import { AsyncSection } from "../../components/booking/AsyncSection";
+import { EntityChip, Shelf, TARGET_SX } from "../../ui/shelf";
+import { SettingsItemCard } from "./SettingsItemCard";
+import { shelfState } from "./shelfState";
 import { errorText } from "../../components/booking/errorText";
 import { formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
@@ -183,52 +179,76 @@ export default function EmployeeAbsencesPage() {
         ) : null}
       </TextField>
 
-      <AsyncSection
-        isLoading={absencesQuery.isLoading}
-        isSettled={absencesQuery.isSuccess}
-        error={absencesQuery.error}
-        isEmpty={absences.length === 0}
-        emptyText={t("booking.absences.empty")}
-        emptyAction={{ label: t("booking.absences.new"), onClick: openCreate }}
-        onRetry={() => void absencesQuery.refetch()}
-      >
-        <StackTable>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t("booking.absences.worker")}</TableCell>
-                <TableCell>{t("booking.absences.from")}</TableCell>
-                <TableCell>{t("booking.absences.to")}</TableCell>
-                <TableCell>{t("booking.absences.reason")}</TableCell>
-                <TableCell align="right">{t("booking.common.actions")}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {absences.map((absence) => (
-                <TableRow key={absence.id} hover>
-                  <TableCell>{nameOf(absence)}</TableCell>
-                  <TableCell>{formatDateOnly(absence.fromDate)}</TableCell>
-                  <TableCell>{formatDateOnly(absence.toDate)}</TableCell>
-                  <TableCell>{absence.reason || "-"}</TableCell>
-                  <TableCell align="right">
-                    <Tooltip title={t("booking.absences.remove")}>
-                      <IconButton
-                        aria-label={t("booking.absences.removeFor", { name: nameOf(absence) })}
-                        onClick={() => {
-                          remove.reset();
-                          setConfirmDelete(absence);
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </StackTable>
-      </AsyncSection>
+      {(() => {
+        const list = shelfState(absencesQuery, t);
+        const ready = !list.loading && list.error === false;
+        const now = absences.filter((a) => a.fromDate <= today && a.toDate >= today);
+        const planned = absences.filter((a) => a.fromDate > today);
+        const past = absences.filter((a) => a.toDate < today);
+        const card = (absence: EmployeeAbsence) => (
+          <SettingsItemCard
+            key={absence.id}
+            kind="absence"
+            id={absence.id}
+            title={absence.userId !== "" ? (
+              <EntityChip entity={{ kind: "worker", id: absence.userId, label: nameOf(absence) }} size="sm" />
+            ) : nameOf(absence)}
+            actions={
+              <>
+                <Box sx={{ flex: 1 }} />
+                <Tooltip title={t("booking.absences.remove")}>
+                  <IconButton
+                    aria-label={t("booking.absences.removeFor", { name: nameOf(absence) })}
+                    sx={TARGET_SX}
+                    onClick={() => {
+                      remove.reset();
+                      setConfirmDelete(absence);
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            }
+          >
+            <span>{formatDateOnly(absence.fromDate)} – {formatDateOnly(absence.toDate)}</span>
+            <span>{absence.reason || "-"}</span>
+          </SettingsItemCard>
+        );
+        const nothing = ready && absences.length === 0;
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <Shelf
+              id="absences-now"
+              title="Právě nepřítomní"
+              count={ready ? now.length : undefined}
+              countTone="red"
+              layout="grid"
+              minCardWidth={300}
+              cardHeight={110}
+              loading={list.loading}
+              error={list.error}
+              onRetry={list.onRetry}
+              empty={ready && now.length === 0}
+              emptyState={nothing
+                ? { text: t("booking.absences.empty"), action: { label: t("booking.absences.new"), onClick: openCreate } }
+                : { text: "Dnes nikdo nechybí." }}
+            >
+              {now.map(card)}
+            </Shelf>
+            {ready && planned.length > 0 ? (
+              <Shelf id="absences-planned" title="Plánované" count={planned.length} layout="grid" minCardWidth={300} cardHeight={110}>
+                {planned.map(card)}
+              </Shelf>
+            ) : null}
+            {ready && past.length > 0 ? (
+              <Shelf id="absences-past" title="Minulé" count={past.length} layout="grid" minCardWidth={300} cardHeight={110}>
+                {past.map(card)}
+              </Shelf>
+            ) : null}
+          </Box>
+        );
+      })()}
 
       <Dialog open={draft !== null} onClose={() => setDraft(null)} fullWidth maxWidth="sm">
         <DialogTitle>{t("booking.absences.newTitle")}</DialogTitle>

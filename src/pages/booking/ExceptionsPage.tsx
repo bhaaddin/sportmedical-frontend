@@ -1,4 +1,3 @@
-import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -13,11 +12,6 @@ import {
   Link,
   MenuItem,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -30,7 +24,9 @@ import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { workingHoursApi } from "../../api/workingHours";
 import type { ScheduleExceptionInput } from "../../api/bookingContracts";
-import { AsyncSection } from "../../components/booking/AsyncSection";
+import { EntityChip, Shelf, TARGET_SX } from "../../ui/shelf";
+import { INLINE_LINK_SX, SettingsItemCard } from "./SettingsItemCard";
+import { shelfState } from "./shelfState";
 import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
@@ -161,6 +157,65 @@ export default function ExceptionsPage() {
 
   const kindLabel = (value: ExceptionKind) => t(`booking.exceptions.kind.${value}`);
 
+  const calState = shelfState(calendarsQuery, t);
+  const calReady = !calState.loading && calState.error === false;
+  const listState = shelfState(exceptionsQuery, t);
+  const listReady = !listState.loading && listState.error === false;
+  const upcoming = exceptions.filter((e) => e.date >= today);
+  const past = exceptions.filter((e) => e.date < today).reverse();
+
+  const card = (exception: (typeof exceptions)[number]) => {
+    const worker = exception.workerUserId ? workers.find((w) => w.id === exception.workerUserId) : undefined;
+    const hours = exception.startTime && exception.endTime ? `${exception.startTime.slice(0, 5)}–${exception.endTime.slice(0, 5)}` : null;
+    return (
+      <SettingsItemCard
+        key={exception.id}
+        kind="exception"
+        id={exception.id}
+        title={formatDateOnly(exception.date)}
+        dim={exception.date < today}
+        status={
+          <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 0.5 }}>
+            {/* Text, not colour: 7.1 forbids colour as the only carrier. */}
+            <Chip
+              size="small"
+              label={kindLabel(kindOf(exception))}
+              color={exception.isClosed ? "error" : exception.isClosedToPublic ? "warning" : "default"}
+            />
+            {/* Different hours or a stand-in AND off the web: the second chip says so, because the first cannot. */}
+            {exception.isClosedToPublic && !exception.isClosed && kindOf(exception) !== "onlineOff" ? (
+              <Chip size="small" color="warning" variant="outlined" label={kindLabel("onlineOff")} />
+            ) : null}
+          </Box>
+        }
+        actions={
+          <>
+            <Box sx={{ flex: 1 }} />
+            <Tooltip title={t("booking.common.delete")}>
+              <IconButton aria-label={t("booking.common.delete")} onClick={() => remove.mutate(exception.id)} sx={TARGET_SX}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </>
+        }
+      >
+        {exception.isClosed ? null : (
+          <>
+            {hours === null ? null : <span>{hours}</span>}
+            {exception.workerUserId ? (
+              worker !== undefined ? (
+                <span><EntityChip entity={{ kind: "worker", id: worker.id, label: worker.name }} size="sm" /></span>
+              ) : (
+                <span>{t("booking.workingHours.workerUnknown")}</span>
+              )
+            ) : null}
+          </>
+        )}
+        {exception.reason ? <span>{exception.reason}</span> : null}
+      </SettingsItemCard>
+    );
+  };
+
   return (
     <SettingsScreen
       title={t("booking.exceptions.title")}
@@ -172,7 +227,7 @@ export default function ExceptionsPage() {
             to: formatDateOnly(windowTo),
           })}{" "}
           Celý týden nebo měsíc najednou nastavíte v{" "}
-          <Link component={RouterLink} to="/working-hours">
+          <Link component={RouterLink} to="/working-hours" sx={INLINE_LINK_SX}>
             Rychlém plánu
           </Link>
           .
@@ -190,21 +245,23 @@ export default function ExceptionsPage() {
       }
     >
 
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.workingHours.noCalendars")}
-        onRetry={() => void calendarsQuery.refetch()}
-        skeletonRows={2}
+      <Shelf
+        id="exceptions-calendar"
+        title={t("booking.workingHours.calendar")}
+        layout="board"
+        loading={calState.loading}
+        error={calState.error}
+        onRetry={calState.onRetry}
+        empty={calReady && calendars.length === 0}
+        emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
+        <Box sx={{ p: 2 }}>
         <TextField
           select
           label={t("booking.workingHours.calendar")}
           value={activeCalendarId}
           onChange={(e) => setCalendarId(e.target.value)}
-          sx={{ minWidth: 260, mb: 3 }}
+          sx={{ minWidth: 260, maxWidth: "100%" }}
         >
           {calendars.map((calendar) => (
             <MenuItem key={calendar.id} value={calendar.id}>
@@ -212,103 +269,37 @@ export default function ExceptionsPage() {
             </MenuItem>
           ))}
         </TextField>
+        </Box>
+      </Shelf>
 
-        <AsyncSection
-          isLoading={exceptionsQuery.isLoading}
-          isSettled={exceptionsQuery.isSuccess}
-          error={exceptionsQuery.error}
-          isEmpty={exceptions.length === 0}
-          emptyText={t("booking.exceptions.empty")}
-          emptyAction={{
-            label: t("booking.exceptions.new"),
-            onClick: openCreate,
-          }}
-          onRetry={() => void exceptionsQuery.refetch()}
-        >
-          <StackTable>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t("booking.exceptions.date")}</TableCell>
-                  <TableCell>{t("booking.exceptions.kindColumn")}</TableCell>
-                  <TableCell>{t("booking.exceptions.detail")}</TableCell>
-                  <TableCell>{t("booking.exceptions.reason")}</TableCell>
-                  <TableCell align="right">
-                    {t("booking.common.actions")}
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {exceptions.map((exception) => (
-                  <TableRow key={exception.id} hover>
-                    <TableCell>{formatDateOnly(exception.date)}</TableCell>
-                    <TableCell>
-                      {/* Text, not colour: 7.1 forbids colour as the only carrier. */}
-                      <Chip
-                        size="small"
-                        label={kindLabel(kindOf(exception))}
-                        color={
-                          exception.isClosed
-                            ? "error"
-                            : exception.isClosedToPublic
-                              ? "warning"
-                              : "default"
-                        }
-                      />
-                      {/* Different hours or a stand-in AND off the web: the
-                          second chip says so, because the first cannot. */}
-                      {exception.isClosedToPublic &&
-                      !exception.isClosed &&
-                      kindOf(exception) !== "onlineOff" ? (
-                        <Chip
-                          size="small"
-                          color="warning"
-                          variant="outlined"
-                          label={kindLabel("onlineOff")}
-                          sx={{ ml: 0.5 }}
-                        />
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      {exception.isClosed
-                        ? "-"
-                        : [
-                            exception.startTime && exception.endTime
-                              ? `${exception.startTime.slice(0, 5)}–${exception.endTime.slice(0, 5)}`
-                              : null,
-                            exception.workerUserId
-                              ? (workers.find((w) => w.id === exception.workerUserId)
-                                  ?.name ??
-                                t("booking.workingHours.workerUnknown"))
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "-"}
-                    </TableCell>
-                    <TableCell>{exception.reason || "-"}</TableCell>
-                    <TableCell align="right">
-                      <Tooltip title={t("booking.common.delete")}>
-                        <IconButton
-                          aria-label={t("booking.common.delete")}
-                          onClick={() => remove.mutate(exception.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </StackTable>
-        </AsyncSection>
-
-        {remove.error ? (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {errorText(remove.error, t)}
-          </Alert>
-        ) : null}
-      </AsyncSection>
+      {calReady && calendars.length > 0 ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
+          {remove.error ? <Alert severity="error">{errorText(remove.error, t)}</Alert> : null}
+          <Shelf
+            id="exceptions-upcoming"
+            title="Nadcházející"
+            count={listReady ? upcoming.length : undefined}
+            layout="grid"
+            minCardWidth={300}
+            cardHeight={130}
+            loading={listState.loading}
+            error={listState.error}
+            onRetry={listState.onRetry}
+            empty={listReady && upcoming.length === 0}
+            emptyState={{
+              text: past.length === 0 ? t("booking.exceptions.empty") : "Žádná nadcházející výjimka.",
+              action: { label: t("booking.exceptions.new"), onClick: openCreate },
+            }}
+          >
+            {upcoming.map(card)}
+          </Shelf>
+          {listReady && past.length > 0 ? (
+            <Shelf id="exceptions-past" title="Minulé" count={past.length} layout="grid" minCardWidth={300} cardHeight={130}>
+              {past.map(card)}
+            </Shelf>
+          ) : null}
+        </Box>
+      ) : null}
 
       <Dialog
         open={draft !== null}

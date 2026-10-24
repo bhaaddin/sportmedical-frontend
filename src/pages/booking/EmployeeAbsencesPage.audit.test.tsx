@@ -71,11 +71,13 @@ describe('the list', () => {
   it('shows the worker, the Czech dates and the reason; "-" for none', async () => {
     list.mockResolvedValue([absence(), absence({ id: 'a2', reason: '', fromDate: '2027-03-01', toDate: '2027-03-01' })]);
     renderScreen(<EmployeeAbsencesPage />, '/nepritomnosti');
-    const rows = (await screen.findAllByRole('row')).slice(1);
-    expect(within(rows[0]).getByText('MUDr. Jan Novák')).toBeInTheDocument();
-    expect(within(rows[0]).getByText(/1\. ?2\. ?2027/)).toBeInTheDocument();
-    expect(within(rows[0]).getByText('Dovolená')).toBeInTheDocument();
-    expect(within(rows[1]).getAllByRole('cell')[3]).toHaveTextContent('-');
+    await screen.findByText('Dovolená');
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-card="absence"]'));
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByText('MUDr. Jan Novák')).toBeInTheDocument();
+    expect(within(cards[0]).getByText(/1\. ?2\. ?2027/)).toBeInTheDocument();
+    expect(within(cards[0]).getByText('Dovolená')).toBeInTheDocument();
+    expect(within(cards[1]).getByText('-')).toBeInTheDocument();
   });
 
   it('asks for everybody by default and for one person when opened with ?userId=', async () => {

@@ -1,6 +1,3 @@
-import { StackTable } from "../../components/ui/StackTable";
-import { FitPage, fitCardSx, fitTableSx } from "../../components/ui/fit";
-import { useIsPhone } from "../../layout/useDevice";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -12,12 +9,6 @@ import {
   DialogTitle,
   MenuItem,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -26,10 +17,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
-import { AsyncSection } from "../../components/booking/AsyncSection";
+import { PageFrame, Shelf, TARGET_SX } from "../../ui/shelf";
+import { StatusChip } from "../../components/ui/StatusChip";
+import { SettingsItemCard } from "./SettingsItemCard";
+import { shelfState } from "./shelfState";
 import { errorText } from "../../components/booking/errorText";
 import { FIELD_LIMITS } from "../../api/fieldLimits";
-import { PageHeader, SectionLabel, SoftCard } from "../../components/ui";
+import { SectionLabel } from "../../components/ui";
 import {
   addDaysToDateOnly,
   formatDateOnly,
@@ -185,121 +179,110 @@ export default function BlockedTimePage() {
   };
 
   const problem = draft ? draftProblem(draft) : null;
-  const phone = useIsPhone();
-
-  return (
-    <FitPage>
-      <PageHeader
-        title={t("booking.blocks.title")}
-        subtitle={
+  const calState = shelfState(calendarsQuery, t);
+  const listState = shelfState(blocksQuery, t);
+  const nowIso = new Date().toISOString();
+  const activeBlocks = blocks.filter((block) => block.endUtc >= nowIso);
+  const pastBlocks = blocks.filter((block) => block.endUtc < nowIso).reverse();
+  const card = (block: (typeof blocks)[number]) => {
+    const running = block.startUtc <= nowIso && block.endUtc >= nowIso;
+    return (
+      <SettingsItemCard
+        key={block.id}
+        kind="block"
+        id={block.id}
+        title={`${formatDateOnly(pragueDateKey(block.startUtc))} · ${formatPragueTime(block.startUtc)}–${formatPragueTime(block.endUtc)}`}
+        status={running ? <StatusChip tone="blue" size="sm">Právě</StatusChip> : undefined}
+        dim={block.endUtc < nowIso}
+        actions={
           <>
-            {t("booking.blocks.subtitle")}{" "}
-            {t("booking.blocks.window", {
-              from: formatDateOnly(windowFrom),
-              to: formatDateOnly(windowTo),
-            })}
+            <Box sx={{ flex: 1 }} />
+            <Button
+              size="small"
+              color="error"
+              aria-label={t("booking.blocks.release")}
+              onClick={() => remove.mutate(block.id)}
+              disabled={remove.isPending}
+              sx={TARGET_SX}
+            >
+              {t("booking.blocks.release")}
+            </Button>
           </>
         }
-        actions={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreate}
-            disabled={activeCalendarId === ""}
-          >
-            {t("booking.blocks.new")}
-          </Button>
-        }
-      />
+      >
+        {/* The reason is required on the way in, so this is never blank. */}
+        <span>{block.reason}</span>
+      </SettingsItemCard>
+    );
+  };
+  const calendarReady = !calState.loading && calState.error === false;
+  const blocksReady = !listState.loading && listState.error === false;
 
+  return (
+    <PageFrame
+      title={t("booking.blocks.title")}
+      purpose={`${t("booking.blocks.subtitle")} ${t("booking.blocks.window", { from: formatDateOnly(windowFrom), to: formatDateOnly(windowTo) })}`}
+      primaryAction={activeCalendarId === "" ? undefined : { label: t("booking.blocks.new"), icon: <AddIcon />, onClick: openCreate }}
+    >
       {/* The warning that a blocked time still showed among the free slots is gone: measured on the dev API
           on 20. 10. 2026 (a block took the 07:00 slot off /availability, 17 -> 15 slots), which is the condition the
           note at the top of this file set for removing it. */}
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.workingHours.noCalendars")}
-        onRetry={() => void calendarsQuery.refetch()}
-        skeletonRows={2}
+      <Shelf
+        id="blocks-calendar"
+        title={t("booking.workingHours.calendar")}
+        layout="board"
+        loading={calState.loading}
+        error={calState.error}
+        onRetry={calState.onRetry}
+        empty={calendarReady && calendars.length === 0}
+        emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
-        <SoftCard sx={{ mb: 2.5, flexShrink: 0 }}>
-          <SectionLabel>{t("booking.workingHours.calendar")}</SectionLabel>
-          <TextField
-            select
-            value={activeCalendarId}
-            onChange={(e) => setCalendarId(e.target.value)}
-            slotProps={{ htmlInput: { "aria-label": t("booking.workingHours.calendar") } }}
-            sx={{ minWidth: 280 }}
-          >
-            {calendars.map((calendar) => (
-              <MenuItem key={calendar.id} value={calendar.id}>
-                {calendar.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        </SoftCard>
-
-        {remove.isError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {errorText(remove.error, t)}
-          </Alert>
-        )}
-
-        <AsyncSection
-          isLoading={blocksQuery.isLoading}
-          isSettled={blocksQuery.isSuccess}
-          error={blocksQuery.error}
-          isEmpty={blocks.length === 0}
-          emptyText={t("booking.blocks.empty")}
-          emptyAction={{ label: t("booking.blocks.new"), onClick: openCreate }}
-          onRetry={() => void blocksQuery.refetch()}
+        <Box sx={{ p: 2 }}>
+        <TextField
+          select
+          value={activeCalendarId}
+          onChange={(e) => setCalendarId(e.target.value)}
+          slotProps={{ htmlInput: { "aria-label": t("booking.workingHours.calendar") } }}
+          sx={{ minWidth: 280, maxWidth: "100%" }}
         >
-          <SoftCard sx={{ p: 0, overflow: "hidden", ...fitCardSx(phone) }}>
-            <StackTable sx={{ borderRadius: 0, ...fitTableSx(phone) }}>
-            <Table size="small" stickyHeader={!phone}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t("booking.blocks.date")}</TableCell>
-                  <TableCell>{t("booking.blocks.time")}</TableCell>
-                  <TableCell>{t("booking.blocks.reason")}</TableCell>
-                  <TableCell align="right">
-                    {t("booking.common.actions")}
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {blocks.map((block) => (
-                  <TableRow key={block.id} hover>
-                    <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {formatDateOnly(pragueDateKey(block.startUtc))}
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {formatPragueTime(block.startUtc)}–
-                      {formatPragueTime(block.endUtc)}
-                    </TableCell>
-                    {/* The reason is required on the way in, so this is never blank. */}
-                    <TableCell>{block.reason}</TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        color="error"
-                        aria-label={t("booking.blocks.release")}
-                        onClick={() => remove.mutate(block.id)}
-                        disabled={remove.isPending}
-                      >
-                        {t("booking.blocks.release")}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            </StackTable>
-          </SoftCard>
-        </AsyncSection>
-      </AsyncSection>
+          {calendars.map((calendar) => (
+            <MenuItem key={calendar.id} value={calendar.id}>
+              {calendar.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        </Box>
+      </Shelf>
+
+      {calendarReady && calendars.length > 0 ? (
+        <>
+          {remove.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorText(remove.error, t)}
+            </Alert>
+          )}
+          <Shelf
+            id="blocks-active"
+            title="Aktivní bloky"
+            count={blocksReady ? activeBlocks.length : undefined}
+            layout="grid"
+            minCardWidth={300}
+            cardHeight={110}
+            loading={listState.loading}
+            error={listState.error}
+            onRetry={listState.onRetry}
+            empty={blocksReady && activeBlocks.length === 0}
+            emptyState={{ text: t("booking.blocks.empty"), action: { label: t("booking.blocks.new"), onClick: openCreate } }}
+          >
+            {activeBlocks.map(card)}
+          </Shelf>
+          {blocksReady && pastBlocks.length > 0 ? (
+            <Shelf id="blocks-past" title="Minulé" count={pastBlocks.length} layout="grid" minCardWidth={300} cardHeight={110}>
+              {pastBlocks.map(card)}
+            </Shelf>
+          ) : null}
+        </>
+      ) : null}
 
       <Dialog
         open={draft !== null}
@@ -382,6 +365,6 @@ export default function BlockedTimePage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </FitPage>
+    </PageFrame>
   );
 }
