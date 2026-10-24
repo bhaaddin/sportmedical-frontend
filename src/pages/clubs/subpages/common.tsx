@@ -2,8 +2,10 @@
  * Small pieces the four club sub-pages share: the date-range chips, the club colour dot, the seats bar and the
  * "could not load" panel with its retry. Nothing here knows a club, a price or a clinic.
  */
+import { useId } from 'react';
 import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from '@mui/material';
-import { FilterChips, SectionLabel } from '../../../components/ui';
+import { FilterChips } from '../../../components/ui';
+import { CARD_RADIUS, TARGET_SX, toneOf } from '../../../ui/shelf/shelfStyle';
 import { FIT_FILL_SX, FIT_SCROLL_SX } from '../../../components/ui/fit';
 import { useIsPhone } from '../../../layout/useDevice';
 import { RANGE_OPTIONS, type DateRange, type RangeKey } from './range';
@@ -32,7 +34,7 @@ export function SeatsBar({ registered, seats, label }: { registered: number; sea
 
 export function LoadError({ message = 'Data se nepodařilo načíst.', onRetry }: { message?: string; onRetry: () => void }) {
   return (
-    <Alert severity="error" action={<Button color="inherit" size="small" onClick={onRetry}>Zkusit znovu</Button>}>
+    <Alert severity="error" role="alert" action={<Button color="inherit" size="small" onClick={onRetry} sx={TARGET_SX}>Zkusit znovu</Button>}>
       {message}
     </Alert>
   );
@@ -107,12 +109,17 @@ export function SelectFilter({
 }
 
 /**
- * A titled section of a fitted page. On a tablet and a desktop it takes the room its cell gives it and its content fills
- * that room (a `ResponsiveDataList fill` scrolls its rows inside; `scroll` makes the section's own body scroll, for a
- * stack of cards); a phone's section just flows and the page region scrolls it.
+ * A titled section of a fitted page, drawn as a shelf (the same heading, count pill and `data-shelf` as `ui/shelf` Shelf),
+ * for a cell of a CSS grid where a Shelf's own `grow` cannot reach. On a tablet and a desktop it takes the room its cell
+ * gives it and its content fills that room (a `ResponsiveDataList fill` scrolls its rows inside; `scroll` makes the
+ * section's own body scroll, for a stack of cards); a phone's section just flows and the page region scrolls it.
  */
-export function FitSection({ title, area, scroll = false, children, sx }: {
+export function FitSection({ title, id, count, area, scroll = false, children, sx }: {
   title: string;
+  /** `data-shelf`: tests and the browser check call the section by it (defaults to the title). */
+  id?: string;
+  /** The count pill; undefined draws none. */
+  count?: number;
   /** The `grid-area` of the cell it sits in. */
   area?: string;
   scroll?: boolean;
@@ -120,14 +127,31 @@ export function FitSection({ title, area, scroll = false, children, sx }: {
   sx?: object;
 }) {
   const phone = useIsPhone();
+  const headingId = useId();
   return (
     <Box
       component="section"
-      aria-label={title}
+      aria-labelledby={headingId}
+      data-shelf={id ?? title}
+      data-state="ready"
       sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, ...(phone ? {} : { minHeight: 0 }), ...(area !== undefined ? { gridArea: area } : {}), ...sx }}
     >
-      <SectionLabel component="h2" sx={{ mb: 1, flexShrink: 0 }}>{title}</SectionLabel>
-      <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, ...(phone ? {} : { ...FIT_FILL_SX, ...(scroll ? FIT_SCROLL_SX : {}) }) }}>{children}</Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, minHeight: { xs: 44, md: 32 }, flexShrink: 0 }}>
+        <Typography id={headingId} component="h2" sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.01em', lineHeight: 1.3 }}>{title}</Typography>
+        {count !== undefined && (
+          <Box
+            component="span"
+            aria-label={`Počet: ${count}`}
+            sx={(t) => {
+              const c = toneOf(t, count > 0 ? 'primary' : 'grey');
+              return { fontSize: 12, fontWeight: 700, lineHeight: 1, px: 0.9, py: 0.45, borderRadius: 999, fontVariantNumeric: 'tabular-nums', color: c.fg, bgcolor: c.bg };
+            }}
+          >
+            {count}
+          </Box>
+        )}
+      </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, '& > .MuiPaper-root': { borderRadius: `${CARD_RADIUS}px` }, ...(phone ? {} : { ...FIT_FILL_SX, ...(scroll ? FIT_SCROLL_SX : {}) }) }}>{children}</Box>
     </Box>
   );
 }
