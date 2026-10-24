@@ -319,7 +319,7 @@ export default function Billing() {
       hint={monthYear(now)}
       layout={phone ? 'row' : 'grid'}
       minCardWidth={besideAttention ? 160 : 180}
-      phoneWidth="min(42vw, 170px)"
+      phoneWidth="min(56vw, 210px)"
       cardHeight={104}
       skeletons={canApprove ? 5 : 4}
       loading={loading}
