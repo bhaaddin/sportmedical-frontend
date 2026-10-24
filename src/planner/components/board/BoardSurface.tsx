@@ -41,6 +41,7 @@ import type { ClubOrderView } from '../../../api/clubOrders';
 import { DESIGN, accentLiteral } from '../../../theme';
 import { addDaysToDateOnly, pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
+import { BookingApiError } from '../../../api/apiError';
 import { addDays, monthCells, normalizeFilter, usesServiceFilter, weekHeadModel, type IsoDate } from '../../model';
 import { blockableRanges } from '../../model/daySelect';
 import { PLANNER_TEXT } from '../../text';
@@ -295,9 +296,25 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const [openId, setOpenId] = useState<string | null>(null);
 
   /* ---- moving a booking ---- */
+  /* A stale card must not overwrite another desk's move: read the booking, refuse if its time changed, else send its token (If-Match). */
+  const seenToken = useCallback(async (m: GridMoveRequest) => {
+    let now: Awaited<ReturnType<typeof appointmentsApi.get>> | null = null;
+    try {
+      now = await appointmentsApi.get(m.calendarId, m.appointment.id);
+    } catch {
+      /* the read failed: the move goes on as before, without the guard */
+    }
+    if (!now) return null;
+    if (new Date(now.startUtc).getTime() !== new Date(m.appointment.startUtc).getTime()) {
+      await refreshCalendar();
+      throw new BookingApiError('conflict', 412, 'Rezervace se mezitím změnila. Zkontrolujte ji a přesuňte znovu.');
+    }
+    return now.concurrencyToken ?? null;
+  }, [refreshCalendar]);
   const commitMove = useCallback(
     async (move: GridMoveRequest) => {
-      const notice = await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient });
+      const ifMatch = await seenToken(move);
+      const notice = await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient, ...(ifMatch ? { ifMatch } : {}) });
       armUndo({ kind: 'move', calendarId: move.calendarId, appointmentId: move.appointment.id, fromStartUtc: move.appointment.startUtc, notifyPatient: move.notifyPatient });
       await refreshCalendar();
       return notice;
@@ -333,7 +350,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       if (!current) return;
       setBusyMove({ ...current, working: true });
       try {
-        await appointmentsApi.reschedule(current.request.calendarId, current.request.appointment.id, current.request.startUtc, reason, { notifyPatient: current.request.notifyPatient });
+        await appointmentsApi.reschedule(current.request.calendarId, current.request.appointment.id, current.request.startUtc, reason, { notifyPatient: current.request.notifyPatient, ifMatch: await seenToken(current.request) });
         armUndo({ kind: 'move', calendarId: current.request.calendarId, appointmentId: current.request.appointment.id, fromStartUtc: current.request.appointment.startUtc, notifyPatient: current.request.notifyPatient });
         await refreshCalendar();
         setBusyMove(null);

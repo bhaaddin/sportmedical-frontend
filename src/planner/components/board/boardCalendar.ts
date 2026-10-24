@@ -195,6 +195,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     enabled: holdsOn,
     retry: false,
     staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const clubOrders = holdsOn && Array.isArray(ordersQuery.data) ? ordersQuery.data : NO_ORDERS;
   const daysKey = days.join(',');
