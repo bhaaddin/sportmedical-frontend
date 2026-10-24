@@ -20,7 +20,6 @@ const LITERAL = /(#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|'white'|'black'|"white
 /** file (relative to src, forward slashes) -> number of literals allowed, with the reason. */
 const ALLOW: Record<string, { count: number; why: string }> = {
   'components/booking/ClubScheduleReport.tsx': { count: 6, why: 'the CSS of a printed report window: paper is white by definition' },
-  'pages/StaffManagement.tsx': { count: 4, why: 'role category colours (data) and their avatar fallback' },
   'planner/components/board/BoardSurface.tsx': { count: 3, why: 'the lunch default colour (data a person can change) and the prototype ghost tone passed through accentLiteral' },
 };
 
