@@ -17,6 +17,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import type { ClinicService } from '../../../api/clinicServices';
 import { SERVICE_GAP_TEXT, serviceGap } from '../../booking/clinicServiceState';
 import { SoftCard } from '../../../components/ui';
+import { TARGET_SX } from '../../../ui/shelf/shelfStyle';
 import { usePermission } from '../../../auth/usePermission';
 import { TYPE, settingsHover, settingsSelected } from '../../../components/settings/settingsStyle';
 
@@ -124,12 +125,12 @@ export default function ServiceList({
               </ButtonBase>
               <Stack direction="row" sx={{ alignItems: 'center', pr: 0.5, pl: 1.5, pb: 0.5, ml: 'auto' }}>
                 <Tooltip title="Upravit">
-                  <IconButton aria-label={`Upravit službu ${service.name}`} onClick={() => onEdit(service)}>
+                  <IconButton aria-label={`Upravit službu ${service.name}`} onClick={() => onEdit(service)} sx={TARGET_SX}>
                     <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title={SERVICE_LIST_TEXT.archive}>
-                  <IconButton aria-label={`${SERVICE_LIST_TEXT.archive} službu ${service.name}`} onClick={() => onArchive(service)}>
+                  <IconButton aria-label={`${SERVICE_LIST_TEXT.archive} službu ${service.name}`} onClick={() => onArchive(service)} sx={TARGET_SX}>
                     <ArchiveOutlinedIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -139,6 +140,7 @@ export default function ServiceList({
                       aria-label={`${SERVICE_LIST_TEXT.delete} službu ${service.name}`}
                       disabled={!canEdit}
                       onClick={() => onDelete(service)}
+                      sx={TARGET_SX}
                     >
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
@@ -151,7 +153,7 @@ export default function ServiceList({
               <Alert
                 severity="warning"
                 sx={{ borderRadius: 0 }}
-                action={<Button color="inherit" size="small" onClick={() => onEdit(service)}>Přiřadit</Button>}
+                action={<Button color="inherit" size="small" sx={TARGET_SX} onClick={() => onEdit(service)}>Přiřadit</Button>}
               >
                 {SERVICE_GAP_TEXT[gap]}
               </Alert>
@@ -191,7 +193,7 @@ export default function ServiceList({
                       aria-label={`${SERVICE_LIST_TEXT.restore} službu ${service.name}`}
                       disabled={restoring}
                       onClick={() => onRestore(service)}
-                      sx={{ minHeight: 40 }}
+                      sx={TARGET_SX}
                     >
                       {SERVICE_LIST_TEXT.restore}
                     </Button>
@@ -204,7 +206,7 @@ export default function ServiceList({
                       disabled={!canEdit}
                       title={canEdit ? undefined : SERVICE_LIST_TEXT.noPermission}
                       onClick={() => onDelete(service)}
-                      sx={{ minHeight: 40 }}
+                      sx={TARGET_SX}
                     >
                       {SERVICE_LIST_TEXT.delete}
                     </Button>

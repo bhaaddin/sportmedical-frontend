@@ -1,4 +1,3 @@
-import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -14,11 +13,6 @@ import {
   IconButton,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -50,7 +44,10 @@ import type {
   ActivityInput,
   ActivityWarning,
 } from "../../api/bookingContracts";
-import { AsyncSection } from "../../components/booking/AsyncSection";
+import { AttentionCard, Shelf, TARGET_SX } from "../../ui/shelf";
+import { SettingsItemCard } from "./SettingsItemCard";
+import { shelfState } from "./shelfState";
+import { activitiesAttention } from "./activityAttention";
 import { errorText } from "../../components/booking/errorText";
 import { ColorSelect } from "../../components/booking/ColorSelect";
 import { SettingsScreen } from "../settings/SettingsFrame";
@@ -329,6 +326,21 @@ export default function ActivitiesPage() {
   /* The server refuses a negative order (as `scheduling.sort_order_negative`). */
   const orderIsValid = (draft?.sortOrder ?? 0) >= 0;
 
+  const listState = shelfState(activitiesQuery, t);
+  const attention = activitiesQuery.isSuccess ? activitiesAttention(activeActivities) : null;
+  /* One shelf per služba, in the order of the služby; a činnost whose služba is retired or unknown keeps its own shelf. */
+  const groups = (() => {
+    const known = clinicServicesQuery.data ?? [];
+    const out: { key: string; serviceId: string; title: string; items: Activity[] }[] = [];
+    for (const service of [...known].sort((x, y) => x.sortOrder - y.sortOrder)) {
+      const items = activeActivities.filter((a) => a.clinicServiceId === service.id);
+      if (items.length > 0) out.push({ key: service.id, serviceId: service.id, title: service.name, items });
+    }
+    const rest = activeActivities.filter((a) => !known.some((service) => service.id === a.clinicServiceId));
+    if (rest.length > 0) out.push({ key: "other", serviceId: "", title: "Bez aktivní služby", items: rest });
+    return out;
+  })();
+
   return (
     <SettingsScreen
       title={t("booking.activities.title")}
@@ -387,101 +399,68 @@ export default function ActivitiesPage() {
         </Alert>
       ))}
 
-      <AsyncSection
-        isLoading={activitiesQuery.isLoading}
-        isSettled={activitiesQuery.isSuccess}
-        error={activitiesQuery.error}
-        isEmpty={activities.length === 0}
-        emptyText={t("booking.activities.empty")}
-        emptyAction={{
-          label: t("booking.activities.new"),
-          onClick: openCreate,
-        }}
-        onRetry={() => void activitiesQuery.refetch()}
-      >
-        <StackTable>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t("booking.activities.column.name")}</TableCell>
-                <TableCell>{t("booking.activities.column.duration")}</TableCell>
-                <TableCell>
-                  {t("booking.activities.column.publicNote")}
-                </TableCell>
-                <TableCell>{t("booking.activities.column.price")}</TableCell>
-                <TableCell>{t("booking.activities.column.public")}</TableCell>
-                <TableCell align="right">
-                  {t("booking.common.actions")}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {activeActivities.map((activity) => (
-                <TableRow
-                  key={activity.id}
-                  hover
-                >
-                  <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
-                        aria-hidden
-                        sx={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: "3px",
-                          backgroundColor: activity.color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {activity.name}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={t("booking.activities.durationValue", {
-                        minutes: activity.durationMinutes,
-                      })}
-                      sx={{
-                        backgroundColor: activity.color,
-                        color: readableTextOn(activity.color),
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 320 }}>
-                    {activity.publicNote || "-"}
-                  </TableCell>
-                  {/*
-                    4.3 (v25): read through the link, never stored here. No link
-                    means no price - written as such, because "0 Kč" would read
-                    as free rather than as unpriced.
-                  */}
-                  <TableCell>
-                    {activity.priceCzk === null
-                      ? t("booking.activities.noPrice")
-                      : t("booking.activities.priceValue", {
-                          price: activity.priceCzk,
-                        })}
-                  </TableCell>
-                  <TableCell>
-                    {/* Icon plus text: colour and icon alone would not carry it (7.1). */}
-                    {activity.isPubliclyBookable ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                      >
-                        <PublicIcon fontSize="small" />
-                        {t("booking.activities.publicYes")}
-                      </Box>
-                    ) : (
-                      t("booking.activities.publicNo")
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
+      {attention !== null && (
+        <Box sx={{ mb: 3 }}>
+          <Shelf id="activities-attention" title="Vyžaduje pozornost" count={attention.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+            <AttentionCard group={attention} />
+          </Shelf>
+        </Box>
+      )}
+
+      {listState.loading || listState.error !== false || activities.length === 0 ? (
+        <Shelf
+          id="activities"
+          title="Činnosti"
+          layout="grid"
+          minCardWidth={300}
+          cardHeight={150}
+          loading={listState.loading}
+          error={listState.error}
+          onRetry={listState.onRetry}
+          empty={activities.length === 0}
+          emptyState={{ text: t("booking.activities.empty"), action: { label: t("booking.activities.new"), onClick: openCreate } }}
+        />
+      ) : null}
+
+      {listState.loading || listState.error !== false ? null : (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {groups.map((group) => (
+          <Shelf
+            key={group.key}
+            id={`activities-${group.key}`}
+            title={group.title}
+            count={group.items.length}
+            layout="grid"
+            minCardWidth={300}
+            cardHeight={150}
+            viewAll={group.serviceId === "" ? undefined : { to: `/nastaveni/sluzby/${encodeURIComponent(group.serviceId)}`, label: "Otevřít službu" }}
+          >
+            {group.items.map((activity) => (
+              <SettingsItemCard
+                key={activity.id}
+                kind="activity"
+                id={activity.id}
+                edge={activity.color}
+                title={activity.name}
+                status={
+                  <Chip
+                    size="small"
+                    label={t("booking.activities.durationValue", {
+                      minutes: activity.durationMinutes,
+                    })}
+                    sx={{
+                      backgroundColor: activity.color,
+                      color: readableTextOn(activity.color),
+                    }}
+                  />
+                }
+                actions={
+                  <>
+                    <Box sx={{ flex: 1 }} />
                     <Tooltip title={t("booking.common.edit")}>
                       <IconButton
                         aria-label={t("booking.common.edit")}
+                        sx={TARGET_SX}
                         onClick={() => openEdit(activity)}
                       >
                         <EditIcon fontSize="small" />
@@ -490,6 +469,7 @@ export default function ActivitiesPage() {
                     <Tooltip title={TEXT.archive}>
                       <IconButton
                         aria-label={`${TEXT.archive} — ${activity.name}`}
+                        sx={TARGET_SX}
                         onClick={() => { remove.reset(); setConfirmDelete(activity); }}
                       >
                         <ArchiveOutlinedIcon fontSize="small" />
@@ -499,6 +479,7 @@ export default function ActivitiesPage() {
                       <span>
                         <IconButton
                           aria-label={`Smazat — ${activity.name}`}
+                          sx={TARGET_SX}
                           disabled={!canEdit}
                           onClick={() => setDeleteTarget({ id: activity.id, name: activity.name })}
                         >
@@ -506,12 +487,35 @@ export default function ActivitiesPage() {
                         </IconButton>
                       </span>
                     </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </StackTable>
+                  </>
+                }
+              >
+                {activity.publicNote ? <span>{activity.publicNote}</span> : null}
+                {/*
+                  4.3 (v25): read through the link, never stored here. No link
+                  means no price - written as such, because "0 Kč" would read
+                  as free rather than as unpriced.
+                */}
+                <span>
+                  {activity.priceCzk === null
+                    ? t("booking.activities.noPrice")
+                    : t("booking.activities.priceValue", {
+                        price: activity.priceCzk,
+                      })}
+                </span>
+                {/* Icon plus text: colour and icon alone would not carry it (7.1). */}
+                {activity.isPubliclyBookable ? (
+                  <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <PublicIcon fontSize="small" />
+                    {t("booking.activities.publicYes")}
+                  </Box>
+                ) : (
+                  <span>{t("booking.activities.publicNo")}</span>
+                )}
+              </SettingsItemCard>
+            ))}
+          </Shelf>
+        ))}
 
         {archivedActivities.length > 0 && (
           <Box sx={{ mt: 2 }}>
@@ -521,7 +525,7 @@ export default function ActivitiesPage() {
               aria-controls="archived-activities"
               endIcon={<ExpandMoreIcon sx={{ transform: showArchived ? "rotate(180deg)" : "none" }} />}
               onClick={() => setShowArchived((v) => !v)}
-              sx={{ color: "text.secondary", fontWeight: 600 }}
+              sx={{ color: "text.secondary", fontWeight: 600, ...TARGET_SX }}
             >
               {TEXT.archivedHeading(archivedActivities.length)}
             </Button>
@@ -545,6 +549,7 @@ export default function ActivitiesPage() {
                       aria-label={`${TEXT.restore} — ${activity.name}`}
                       disabled={restore.isPending}
                       onClick={() => restore.mutate(activity.id)}
+                      sx={TARGET_SX}
                     >
                       {TEXT.restore}
                     </Button>
@@ -557,6 +562,7 @@ export default function ActivitiesPage() {
                       disabled={!canEdit}
                       title={canEdit ? undefined : "Mazat může jen ten, kdo smí upravovat nastavení ordinace."}
                       onClick={() => setDeleteTarget({ id: activity.id, name: activity.name })}
+                      sx={TARGET_SX}
                     >
                       Smazat
                     </Button>
@@ -566,7 +572,8 @@ export default function ActivitiesPage() {
             </Collapse>
           </Box>
         )}
-      </AsyncSection>
+      </Box>
+      )}
 
       <Dialog
         open={draft !== null}

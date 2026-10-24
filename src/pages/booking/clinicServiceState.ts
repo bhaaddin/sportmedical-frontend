@@ -15,6 +15,8 @@
  * spent its time removing, so the list says it here.
  */
 
+import type { AttentionGroup } from '../../ui/shelf/attention';
+
 export interface ClinicServiceLike {
   isActive: boolean;
   activities: number;
@@ -86,4 +88,29 @@ export function countsText(service: ClinicServiceLike): string {
       : service.calendars >= 2 && service.calendars <= 4 ? `${service.calendars} kalendáře`
         : `${service.calendars} kalendářů`;
   return `${activities} · ${calendars}`;
+}
+
+/**
+ * "Vyžaduje pozornost" on Služby: an active služba that has no činnost or no calendar offers nothing. Each case opens that
+ * služba (`/nastaveni/sluzby/:id`), where the tabs fix it. `null` when nothing is wrong.
+ */
+export function servicesAttention(
+  services: readonly (ClinicServiceLike & { id: string; name: string })[],
+): AttentionGroup | null {
+  const gaps = services.filter((service) => serviceGap(service) !== 'none');
+  if (gaps.length === 0) return null;
+  return {
+    id: 'scheduleProblems',
+    severity: 'medium',
+    title: 'Služba bez činnosti nebo kalendáře',
+    count: gaps.length,
+    items: gaps.slice(0, 5).map((service) => ({
+      id: service.id,
+      title: `„${service.name}“`,
+      detail: service.activities === 0 ? 'Nemá žádnou činnost.' : 'Žádný kalendář ji neprovozuje.',
+      to: `/nastaveni/sluzby/${encodeURIComponent(service.id)}`,
+    })),
+    summary: gaps.length === 1 ? 'Jedna služba nenabídne žádný termín.' : `${gaps.length} služeb nenabídne žádný termín.`,
+    action: { label: 'Otevřít službu', to: `/nastaveni/sluzby/${encodeURIComponent(gaps[0].id)}` },
+  };
 }

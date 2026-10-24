@@ -11,7 +11,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import type { ClinicService } from '../../../api/clinicServices';
 import { usePermission } from '../../../auth/usePermission';
-import { SoftCard } from '../../../components/ui';
+import { Shelf, TARGET_SX } from '../../../ui/shelf';
 import { TYPE } from '../../../components/settings/settingsStyle';
 import { useDevice } from '../../../layout/useDevice';
 import ActivitiesSection from './ActivitiesSection';
@@ -50,11 +50,11 @@ export default function ServiceDetail({
     <Stack spacing={2} data-testid="service-detail" sx={{ minWidth: 0, maxWidth: "100%" }}>
       {onBack !== undefined && (
         <Box>
-          <Button startIcon={<ArrowBackIcon />} onClick={onBack} sx={{ minHeight: 44 }}>Všechny služby</Button>
+          <Button startIcon={<ArrowBackIcon />} onClick={onBack} sx={TARGET_SX}>Všechny služby</Button>
         </Box>
       )}
 
-      <SoftCard>
+      <Shelf id="service" title="Služba" layout="board">
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1.5 }}>
           <Box sx={{ width: 10, alignSelf: 'stretch', minHeight: 44, borderRadius: 3, bgcolor: service.colorHex ?? 'primary.main' }} />
           <Box sx={{ flex: 1, minWidth: 200 }}>
@@ -82,7 +82,7 @@ export default function ServiceDetail({
               }
               label="Aktivní"
             />
-            <Button variant="outlined" startIcon={<EditIcon />} onClick={onEdit} disabled={!canEdit} sx={{ minHeight: 44 }}>
+            <Button variant="outlined" startIcon={<EditIcon />} onClick={onEdit} disabled={!canEdit} sx={TARGET_SX}>
               Upravit službu
             </Button>
             <Button
@@ -92,14 +92,15 @@ export default function ServiceDetail({
               onClick={onDelete}
               disabled={!canEdit || busy}
               title={canEdit ? undefined : 'Mazat může jen ten, kdo smí upravovat nastavení ordinace.'}
-              sx={{ minHeight: 44 }}
+              sx={TARGET_SX}
             >
               Smazat službu
             </Button>
           </Stack>
         </Stack>
-      </SoftCard>
+      </Shelf>
 
+      <Shelf id="service-parts" title="Části služby" layout="free">
       <Tabs
         value={tab}
         onChange={(_, v: TabId) => setTab(v)}
@@ -120,6 +121,7 @@ export default function ServiceDetail({
         {tab === 'pravidla' && <RulesSection service={service} />}
         {tab === 'pouziti' && <UsageSection service={service} />}
       </Box>
+      </Shelf>
     </Stack>
   );
 }
