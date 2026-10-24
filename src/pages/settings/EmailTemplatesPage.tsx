@@ -23,9 +23,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { emailTemplatesApi } from '../../api/emailTemplates';
 import type { EmailPlaceholder, EmailTemplate, RenderedEmail } from '../../api/emailTemplates';
-import { AsyncSection } from '../../components/booking/AsyncSection';
+import { Shelf } from '../../ui/shelf';
 import { errorText } from '../../components/booking/errorText';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { placeholderToken, singleBraceWarning } from './emailTemplateText';
 
 export default function EmailTemplatesPage() {
@@ -110,13 +111,16 @@ export default function EmailTemplatesPage() {
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* Left: the templates */}
         <Box sx={{ flex: '1 1 280px', minWidth: 260, maxWidth: 380 }}>
-          <AsyncSection
-            isLoading={listQuery.isLoading}
-            error={listQuery.error}
-            isEmpty={templates.length === 0}
-            isSettled={!listQuery.isLoading}
-            emptyText="Zatím tu nejsou žádné šablony e-mailů."
-            onRetry={() => listQuery.refetch()}
+          <Shelf
+            id="email-templates"
+            title="Šablony"
+            count={listQuery.isLoading || listQuery.error ? undefined : templates.length}
+            layout="free"
+            loading={listQuery.isLoading}
+            error={listQuery.error ? errorText(listQuery.error, t) : false}
+            onRetry={() => { void listQuery.refetch(); }}
+            empty={templates.length === 0}
+            emptyState={{ text: 'Zatím tu nejsou žádné šablony e-mailů.' }}
           >
             <Stack spacing={1}>
               {templates.map((template) => (
@@ -144,22 +148,19 @@ export default function EmailTemplatesPage() {
                 </Card>
               ))}
             </Stack>
-          </AsyncSection>
+          </Shelf>
         </Box>
 
         {/* Right: the editor */}
         <Box sx={{ flex: '2 1 420px', minWidth: 300 }}>
           {selected === null ? (
-            <Card variant="outlined">
-              <CardContent>
-                <Typography sx={{ color: 'text.secondary' }}>
-                  Vyberte vlevo šablonu, kterou chcete upravit.
-                </Typography>
-              </CardContent>
-            </Card>
+            <SettingsBoard id="email-editor" title="Úprava" hint="Předmět a text zprávy">
+              <Typography sx={{ color: 'text.secondary' }}>
+                Vyberte vlevo šablonu, kterou chcete upravit.
+              </Typography>
+            </SettingsBoard>
           ) : (
-            <Card variant="outlined">
-              <CardContent>
+            <SettingsBoard id="email-editor" title="Úprava šablony" hint="Předmět a text zprávy">
                 <Stack spacing={2}>
                   {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
                   {reset.error ? <Alert severity="error">{errorText(reset.error, t)}</Alert> : null}
@@ -255,8 +256,7 @@ export default function EmailTemplatesPage() {
                     </Tooltip>
                   </Stack>
                 </Stack>
-              </CardContent>
-            </Card>
+            </SettingsBoard>
           )}
         </Box>
       </Box>

@@ -31,7 +31,7 @@ import { documentRequirementsApi } from '../../api/documentRequirements';
 import type { RequirementRule, RequirementSettings } from '../../api/documentRequirements';
 import { clinicServicesApi } from '../../api/clinicServices';
 import { documentsApi } from '../../api/documents';
-import { AsyncSection } from '../../components/booking/AsyncSection';
+import { Shelf } from '../../ui/shelf';
 import { errorText } from '../../components/booking/errorText';
 import {
   RULE_HEALTH_TEXT, alreadyRequired, canAddRule, ruleHealth, summaryText,
@@ -43,6 +43,7 @@ import {
   settingsProblems, settingsSummary,
 } from './requirementSettings';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 
 /**
  * An emptied number field is "not a number yet", not 0: 0 means "never expires" / "no warning",
@@ -179,12 +180,8 @@ export default function DocumentRequirementsPage() {
       subtitle="Co musí pacient doložit a ke které službě — každá činnost pod tou službou pravidlo zdědí"
     >
 
-      <Card sx={{ borderRadius: 3, mb: 3 }}>
-        <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-            Nové pravidlo
-          </Typography>
-
+      <Box sx={{ mb: 3 }}>
+      <SettingsBoard id="rule-new" title="Nové pravidlo">
           {offerableServices.length === 0 && servicesQuery.isSuccess ? (
             <Alert severity="info">
               Zatím tu není žádná služba, ke které by šlo pravidlo připsat.
@@ -240,8 +237,8 @@ export default function DocumentRequirementsPage() {
           )}
 
           {add.error ? <Alert severity="error" sx={{ mt: 1 }}>{errorText(add.error, t)}</Alert> : null}
-        </CardContent>
-      </Card>
+      </SettingsBoard>
+      </Box>
 
       {/* A broken row is worth saying once at the top as well: the list can be
           long enough that it scrolls out of sight. */}
@@ -253,14 +250,16 @@ export default function DocumentRequirementsPage() {
         <Alert severity="error" sx={{ mb: 2 }}>{errorText(remove.error, t)}</Alert>
       ) : null}
 
-      <AsyncSection
-        isLoading={rulesQuery.isLoading}
-        isSettled={rulesQuery.isSuccess || rulesQuery.isError}
-        error={rulesQuery.error}
-        isEmpty={rules.length === 0}
-        emptyText={summaryText([])}
+      <Shelf
+        id="rules"
+        title="Pravidla"
+        count={rulesQuery.isLoading || rulesQuery.error ? undefined : rules.length}
+        layout="free"
+        loading={rulesQuery.isLoading || !(rulesQuery.isSuccess || rulesQuery.isError)}
+        error={rulesQuery.error ? errorText(rulesQuery.error, t) : false}
         onRetry={() => void rulesQuery.refetch()}
-        skeletonRows={3}
+        empty={rules.length === 0}
+        emptyState={{ text: summaryText([]) }}
       >
         <Stack spacing={1.5}>
           {rules.map((rule) => {
@@ -335,7 +334,7 @@ export default function DocumentRequirementsPage() {
             );
           })}
         </Stack>
-      </AsyncSection>
+      </Shelf>
 
       <Dialog
         open={draft !== null}

@@ -11,7 +11,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Stack,
   TextField,
   Typography,
@@ -22,8 +21,8 @@ import {
   readReminderSettings,
   saveReminderSettings,
 } from '../../api/reminderSettings';
-import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 /** "24 hodin" as "1 den", "30 hodin" as "1 den a 6 hodin" - how far ahead a reminder is, said plainly. */
@@ -62,16 +61,18 @@ export default function RemindersPage() {
     onError: () => setSaved(false),
   });
 
-  if (query.isPending) {
+  if (query.isPending || query.isError || !query.data) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <SettingsScreen
+        title="Připomínky"
+        subtitle="Kolik hodin před termínem pacientovi odejde připomínka"
+        loading={query.isPending}
+        error={query.isPending ? undefined : 'Nastavení připomínek se nepodařilo načíst.'}
+        onRetry={() => void query.refetch()}
+      >
+        {null}
+      </SettingsScreen>
     );
-  }
-
-  if (query.isError || !query.data) {
-    return <Alert severity="error">Nastavení připomínek se nepodařilo načíst.</Alert>;
   }
 
   const { settings, defaults, minHours, maxHours } = query.data;
@@ -103,9 +104,8 @@ export default function RemindersPage() {
         </Typography>
       }
     >
-      <SoftCard>
+      <SettingsBoard id="reminder-lead" title="Předstih" hint="Pravidlo připomínky">
         <Stack spacing={2}>
-          <SectionLabel sx={{ mb: 0 }}>Předstih</SectionLabel>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Připomínka se připraví jednou, jen pacientům z registru a jen u termínů, které stále platí. Odesílání zpráv zatím není zapnuté.
           </Typography>
@@ -150,7 +150,7 @@ export default function RemindersPage() {
             </Button>
           </Box>
         </Stack>
-      </SoftCard>
+      </SettingsBoard>
     </SettingsScreen>
   );
 }

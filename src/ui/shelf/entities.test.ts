@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENTITY_KINDS, entityTarget, looksLikeIdentifier, mayOpen, readRef, safeLabel } from './entities';
+import { ENTITY_KINDS, ENTITY_LABEL, entityListPath, entityTarget, looksLikeIdentifier, mayOpen, readRef, safeLabel } from './entities';
 
 describe('entityTarget: the one place that knows an address', () => {
   it('opens each kind where it lives', () => {
@@ -21,12 +21,42 @@ describe('entityTarget: the one place that knows an address', () => {
     expect(entityTarget({ kind: 'document', id: 'd1' })).toEqual({ to: '/patients' });
   });
 
+  it('opens a calendar on Kalendáře (the id in router state) and a worker on Uživatelé a práva (the id in ?user=)', () => {
+    expect(entityTarget({ kind: 'calendar', id: 'k1' })).toEqual({ to: '/calendars', state: { openCalendarId: 'k1' } });
+    expect(entityTarget({ kind: 'worker', id: 'u1' })).toEqual({ to: '/staff-management?user=u1' });
+    expect(entityTarget({ kind: 'worker', id: 'a b&c' }).to).toBe('/staff-management?user=a%20b%26c');
+  });
+
   it('encodes an id so it cannot add a path segment', () => {
     expect(entityTarget({ kind: 'patient', id: 'a/b?c' }).to).toBe('/patients/a%2Fb%3Fc');
   });
 
   it('knows an address for every kind', () => {
     for (const kind of ENTITY_KINDS) expect(entityTarget({ kind, id: 'x' }).to.startsWith('/')).toBe(true);
+  });
+});
+
+describe('calendar and worker kinds', () => {
+  it('are listed kinds with their own list, label and permission', () => {
+    expect(ENTITY_KINDS).toEqual(expect.arrayContaining(['calendar', 'worker']));
+    expect(entityListPath('calendar')).toBe('/calendars');
+    expect(entityListPath('worker')).toBe('/staff-management');
+    expect(ENTITY_LABEL.calendar).toBe('Kalendář');
+    expect(ENTITY_LABEL.worker).toBe('Zaměstnanec');
+  });
+
+  it('are opened only with the permission their screen asks for', () => {
+    expect(mayOpen('calendar', ['settings.clinic.manage'])).toBe(true);
+    expect(mayOpen('calendar', ['patients.view'])).toBe(false);
+    expect(mayOpen('worker', ['users.manage'])).toBe(true);
+    expect(mayOpen('worker', ['settings.clinic.manage'])).toBe(false);
+  });
+
+  it('hold a worker label to the person rules (no long digit runs) and a calendar to the plain ones', () => {
+    expect(safeLabel('Jana Nováková', 'worker')).toBe('Jana Nováková');
+    expect(safeLabel('123456789012', 'worker')).toBe('');
+    expect(safeLabel('Ordinace 2', 'calendar')).toBe('Ordinace 2');
+    expect(safeLabel('850101/1234', 'calendar')).toBe('');
   });
 });
 

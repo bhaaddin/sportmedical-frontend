@@ -11,9 +11,9 @@ import {
 import { Email, ContactPhone, LocationOn } from '@mui/icons-material';
 import CompanySettingsCard from '../components/CompanySettingsCard';
 import { OPENING_HOURS_MAX_LENGTH, PUBLIC_CLINIC_KEYS, readSettings, saveSettings } from '../api/clinicSettings';
-import { SectionLabel, SoftCard } from '../components/ui';
 import { normalizeBase, resetPublicSiteBase } from '../components/clubs/orders/absoluteLink';
 import { SettingsScreen } from './settings/SettingsFrame';
+import { SettingsBoard } from './settings/SettingsBoard';
 
 /* ─────────────────────────────────────────── */
 /*  TOGGLE COMPONENT                           */
@@ -193,8 +193,8 @@ export default function Admin() {
       )}
 
       {/* — Section: Contact — */}
-      <SoftCard sx={{ mb: 2 }}>
-        <SectionLabel>Kontaktní údaje</SectionLabel>
+      <Box sx={{ mt: 3 }}>
+      <SettingsBoard id="admin-contacts" title="Kontaktní údaje" hint="Co pacient vidí na veřejných stránkách objednání">
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
           Co pacient vidí na veřejných stránkách objednání.
         </Typography>
@@ -238,14 +238,16 @@ export default function Admin() {
               slotProps={{ htmlInput: { inputMode: 'url', autoCapitalize: 'none' } }} />
           </Grid>
         </Grid>
-      </SoftCard>
+      </SettingsBoard>
+      </Box>
 
       {/* — Section: Online booking — */}
-      <SoftCard sx={{ mb: 2 }}>
-        <SectionLabel>Online rezervace</SectionLabel>
+      <Box sx={{ mt: 3 }}>
+      <SettingsBoard id="admin-booking" title="Online rezervace">
         <Toggle checked={pub.enableBooking} onChange={v => updatePub('enableBooking', v)}
           label="Rezervace online" description="Klienti mohou rezervovat termíny online" />
-      </SoftCard>
+      </SettingsBoard>
+      </Box>
 
       {/* Snackbar */}
       <Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}

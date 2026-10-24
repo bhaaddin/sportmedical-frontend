@@ -5,7 +5,7 @@ import {
 import { Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { companySettingsApi } from '../services/companySettingsApi';
-import { SectionLabel, SoftCard } from './ui';
+import { SettingsBoard } from '../pages/settings/SettingsBoard';
 
 export default function CompanySettingsCard() {
   const [form, setForm] = useState({
@@ -75,8 +75,7 @@ export default function CompanySettingsCard() {
   );
 
   return (
-    <SoftCard sx={{ mb: 2 }}>
-      <SectionLabel>Firemní údaje</SectionLabel>
+    <SettingsBoard id="admin-company" title="Firemní údaje" hint="Jdou na faktury">
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
         Objeví se na fakturách. Zadejte IČO a načtěte zbytek z registru ARES.
       </Typography>
@@ -108,6 +107,6 @@ export default function CompanySettingsCard() {
           Uložit firemní údaje
         </Button>
       </Box>
-    </SoftCard>
+    </SettingsBoard>
   );
 }

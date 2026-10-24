@@ -4,7 +4,7 @@ import type { Appointment } from '../../api/bookingContracts';
 import type { ClubOrderView } from '../../api/clubOrders';
 import type { Club } from '../../api/clubs';
 import type { Patient } from '../../api/patients';
-import { activityPeek, appointmentPeek, clubPeek, invoicePeek, orderPeek, patientPeek, servicePeek } from './peek';
+import { activityPeek, appointmentPeek, calendarPeek, clubPeek, invoicePeek, orderPeek, patientPeek, servicePeek, workerPeek } from './peek';
 
 const NOW = new Date('2026-10-21T08:00:00Z');
 /** Czech formatting uses non-breaking spaces; compare what a person reads. */
@@ -116,5 +116,43 @@ describe('orderPeek, appointmentPeek, servicePeek, activityPeek', () => {
       { label: 'Cena', value: 'bez ceny' },
     ]);
     expect(activityPeek({ durationMinutes: 1, priceCzk: 900, isActive: false }).facts[0].value).toBe('1 minuta');
+  });
+});
+
+describe('calendarPeek', () => {
+  it('says where the calendar is and how its day is cut', () => {
+    const peek = calendarPeek({ location: 'Ordinace 1', displayStepMinutes: 15, isActive: true, clinicServiceId: 's1' });
+    expect(peek.facts).toEqual([
+      { label: 'Místo', value: 'Ordinace 1' },
+      { label: 'Krok', value: '15 min' },
+    ]);
+    expect(peek.status).toEqual({ label: 'Aktivní', tone: 'green' });
+  });
+
+  it('warns when no služba hangs on it, and leaves out an empty place', () => {
+    const peek = calendarPeek({ location: '', displayStepMinutes: 30, isActive: false, clinicServiceId: null });
+    expect(peek.facts).toEqual([
+      { label: 'Krok', value: '30 min' },
+      { label: 'Služba', value: 'žádná — nenabídne nic' },
+    ]);
+    expect(peek.status).toEqual({ label: 'Neaktivní', tone: 'grey' });
+  });
+});
+
+describe('workerPeek', () => {
+  const account = { role: 'Staff' as const, isActive: true, mustChangePassword: false, lastLoginAtUtc: '2026-10-20T08:30:00Z' };
+
+  it('shows the role and the last sign-in, never an e-mail', () => {
+    const peek = workerPeek(account);
+    expect(peek.facts.map((f) => f.label)).toEqual(['Role', 'Naposledy přihlášen']);
+    expect(peek.facts[0].value).toBe('Personál');
+    expect(peek.facts[1].value).toContain('2026');
+    expect(peek.status).toEqual({ label: 'Aktivní', tone: 'green' });
+  });
+
+  it('says "zatím nikdy" before the first sign-in, and the account state wins the status', () => {
+    expect(workerPeek({ ...account, lastLoginAtUtc: null, mustChangePassword: true }).facts[1].value).toBe('zatím nikdy');
+    expect(workerPeek({ ...account, mustChangePassword: true }).status).toEqual({ label: 'Čeká na první přihlášení', tone: 'beige' });
+    expect(workerPeek({ ...account, isActive: false, mustChangePassword: true }).status).toEqual({ label: 'Vypnutý', tone: 'grey' });
   });
 });

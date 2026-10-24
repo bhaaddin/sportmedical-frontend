@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography, useTheme } from '@mui/material';
-import { SoftCard, StatusChip, type ChipTone } from '../../../components/ui';
+import { StatusChip, type ChipTone } from '../../../components/ui';
+import { Shelf as SystemShelf } from '../../../ui/shelf';
 import { TYPE, focusRing } from '../../../components/settings/settingsStyle';
 import { signOut } from '../../../auth/signOut';
 import { securityErrorText, type Light, type SecurityCenterError } from '../../../api/securityCenter';
@@ -20,8 +21,9 @@ export function LightPill({ light, size = 'md', testId }: { light: Light; size?:
 }
 
 /**
- * One titled shelf of the screen. The title, the light and one sentence sit in its head; the body is the shelf's.
- * It is deliberately a thin local wrapper: when the shelf design system lands, this is the single place to swap.
+ * One titled shelf of the screen, drawn by the shelf system (a `board`). The title and the light sit in its head, the
+ * headline and the reason (when a light was held back) open its body. The outer box keeps the old anchor `shelf-<id>`
+ * that the summary cards scroll to.
  */
 export function Shelf({
   id,
@@ -40,29 +42,26 @@ export function Shelf({
   children: ReactNode;
   bodySx?: object;
 }) {
+  const controls = view !== undefined || actions !== undefined ? (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+      {view !== undefined && <LightPill light={view.light} testId={`shelf-${id}-light`} />}
+      {actions}
+    </Box>
+  ) : undefined;
   return (
-    <SoftCard
-      component="section"
-      id={`shelf-${id}`}
-      aria-labelledby={`shelf-${id}-title`}
-      data-shelf={id}
-      sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5, scrollMarginTop: 8 }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-        <Typography id={`shelf-${id}-title`} component="h2" sx={[TYPE.sectionTitle, { flex: '1 1 auto', minWidth: 0 }]}>
-          {title}
-        </Typography>
-        {view !== undefined && <LightPill light={view.light} testId={`shelf-${id}-light`} />}
-        {actions}
-      </Box>
-      {headline !== undefined && <Typography sx={TYPE.caption}>{headline}</Typography>}
-      {view?.why != null && (
-        <Alert severity={view.downgraded ? 'warning' : 'info'} sx={{ alignItems: 'center' }}>
-          {view.why}
-        </Alert>
-      )}
-      <Box sx={bodySx}>{children}</Box>
-    </SoftCard>
+    <Box id={`shelf-${id}`} sx={{ minWidth: 0, scrollMarginTop: 8 }}>
+      <SystemShelf id={id} title={title} layout="board" controls={controls} stagger={false}>
+        <Box sx={{ p: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {headline !== undefined && <Typography sx={TYPE.caption}>{headline}</Typography>}
+          {view?.why != null && (
+            <Alert severity={view.downgraded ? 'warning' : 'info'} sx={{ alignItems: 'center' }}>
+              {view.why}
+            </Alert>
+          )}
+          <Box sx={bodySx}>{children}</Box>
+        </Box>
+      </SystemShelf>
+    </Box>
   );
 }
 

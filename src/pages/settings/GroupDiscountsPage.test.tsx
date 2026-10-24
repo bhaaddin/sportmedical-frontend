@@ -136,7 +136,7 @@ describe('the tier editor', () => {
     renderPage();
     expect(await screen.findByText(/slevu klubu určuje administrátor na kartě klubu/)).toBeInTheDocument();
     expect(screen.getByText('Doporučené hladiny slev')).toBeInTheDocument();
-    expect(screen.getByText('Příklad')).toBeInTheDocument();
+    expect(await screen.findByText('Příklad')).toBeInTheDocument();
     expect(screen.queryByText('Náhled')).not.toBeInTheDocument();
   });
 });
