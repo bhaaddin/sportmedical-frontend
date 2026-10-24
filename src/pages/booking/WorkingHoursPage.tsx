@@ -1,6 +1,6 @@
 import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -81,7 +81,10 @@ export default function WorkingHoursPage() {
   const queryClient = useQueryClient();
   const today = pragueDateKey(new Date());
 
-  const [calendarId, setCalendarId] = useState<string>("");
+  /* "Hodiny" on a calendar card (Kalendáře) sends its id in the router state. */
+  const location = useLocation();
+  const linked = (location.state as { calendarId?: unknown } | null)?.calendarId;
+  const [calendarId, setCalendarId] = useState<string>(typeof linked === "string" ? linked : "");
   const [removing, setRemoving] = useState<SchedulePeriod | null>(null);
   /* Lives here, not in the editor: a save refetches, and the editor starts over. */
   const [justSaved, setJustSaved] = useState(false);
@@ -96,7 +99,8 @@ export default function WorkingHoursPage() {
   });
 
   const calendars = calendarsQuery.data ?? [];
-  const activeCalendarId = calendarId || calendars[0]?.id || "";
+  /* An id that is not (or no longer) a calendar here falls back to the first one. */
+  const activeCalendarId = calendars.some((calendar) => calendar.id === calendarId) ? calendarId : calendars[0]?.id || "";
   const activeCalendar = calendars.find((calendar) => calendar.id === activeCalendarId);
 
   const periodsQuery = useQuery({
