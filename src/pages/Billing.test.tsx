@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
 
 const getInvoices = vi.fn();
@@ -89,11 +90,12 @@ const activity = (id: string, name: string, priceCzk: number) => ({
   questionnaireDefinitionId: null,
 });
 
-const asApprover = () => localStorage.setItem('permissions', JSON.stringify(['billing.manage', 'billing.approve']));
+const asApprover = () => localStorage.setItem('permissions', JSON.stringify(['billing.manage', 'billing.approve', 'patients.view']));
 
 beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
   localStorage.clear();
+  localStorage.setItem('permissions', JSON.stringify(['billing.manage', 'patients.view']));
   getInvoices.mockReset().mockResolvedValue(invoices);
   recordPayment.mockReset().mockResolvedValue(invoices[0]);
   approve.mockReset().mockResolvedValue({ ...pending, status: 'Issued' });
@@ -117,7 +119,9 @@ afterEach(() => vi.restoreAllMocks());
 
 function renderPage(state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: '/billing', state }]}><Billing /></MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[{ pathname: '/billing', state }]}><Billing /></MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -306,7 +310,7 @@ describe('who an invoice is for', () => {
 
     const club = rowOf('2026-0417');
     expect(within(club).getByText('Tým')).toBeInTheDocument();
-    expect(within(club).getByRole('link', { name: 'FK Slaný' })).toHaveAttribute('href', '/clubs');
+    expect(within(club).getByRole('link', { name: 'FK Slaný' })).toHaveAttribute('href', '/clubs/c1');
   });
 
   it('finds a group by its name in the search box', async () => {
@@ -543,5 +547,73 @@ describe('the new document, entered from another screen', () => {
       recipientType: 'Person', patientId: 'p9', lines: [{ activityId: 'act1', quantity: 1 }],
     }));
     await waitFor(() => expect(getInvoices).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('shelves', () => {
+  it('draws the figures, the attention shelf and the invoices as named shelves', async () => {
+    renderPage();
+    await screen.findByText('2026-0418');
+    expect(screen.getByRole('heading', { level: 1, name: 'Fakturace' })).toBeInTheDocument();
+    for (const name of ['Přehled tržeb', 'Vyžaduje pozornost', 'Doklady']) {
+      expect(screen.getByRole('region', { name })).toBeInTheDocument();
+    }
+    const invoicesShelf = screen.getByRole('region', { name: 'Doklady' });
+    expect(within(invoicesShelf).getByLabelText('Počet: 3')).toBeInTheDocument();
+  });
+
+  it('has no attention shelf when nothing is overdue or waiting', async () => {
+    getInvoices.mockResolvedValue([invoices[0], invoices[1]]);
+    renderPage();
+    await screen.findByText('2026-0418');
+    expect(screen.queryByRole('region', { name: 'Vyžaduje pozornost' })).not.toBeInTheDocument();
+  });
+
+  it('an overdue case opens its invoice here, and "Zobrazit po splatnosti" applies the filter', async () => {
+    renderPage();
+    await screen.findByText('2026-0418');
+    const shelf = within(screen.getByRole('region', { name: 'Vyžaduje pozornost' }));
+    expect(shelf.getByText('Faktury po splatnosti')).toBeInTheDocument();
+
+    fireEvent.click(shelf.getByRole('link', { name: /Faktura 2026-0414/ }));
+    await waitFor(() => expect(screen.getByLabelText('Platby dokladu 2026-0414')).toHaveAttribute('aria-expanded', 'true'));
+
+    fireEvent.click(shelf.getByRole('link', { name: 'Zobrazit po splatnosti' }));
+    await waitFor(() => expect(screen.queryByText('2026-0418')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Po splatnosti' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('the approval card is there only for an approver', async () => {
+    getInvoices.mockResolvedValue(everything);
+    const first = renderPage();
+    await screen.findByText('2026-0418');
+    expect(screen.queryByText('Doklady ke schválení')).not.toBeInTheDocument();
+    first.unmount();
+
+    asApprover();
+    renderPage();
+    await screen.findByText('2026-0418');
+    const shelf = within(screen.getByRole('region', { name: 'Vyžaduje pozornost' }));
+    expect(shelf.getByText('Doklady ke schválení')).toBeInTheDocument();
+    fireEvent.click(shelf.getByRole('link', { name: 'Zobrazit ke schválení' }));
+    await waitFor(() => expect(screen.queryByText('2026-0418')).not.toBeInTheDocument());
+    expect(screen.getByText('2026-0420')).toBeInTheDocument();
+  });
+
+  it('entered with a filter, it opens filtered', async () => {
+    renderPage({ filter: 'overdue' });
+    await screen.findByText('2026-0414');
+    await waitFor(() => expect(screen.queryByText('2026-0418')).not.toBeInTheDocument());
+  });
+
+  it('an opened invoice shows what it is connected to: patient, termín, klub, platby', async () => {
+    getInvoices.mockResolvedValue(everything);
+    renderPage();
+    await screen.findByText('2026-0417');
+    fireEvent.click(screen.getByLabelText('Platby dokladu 2026-0417'));
+    const related = within(await screen.findByRole('region', { name: 'Související' }));
+    expect(related.getByRole('link', { name: 'Klub: FK Slaný' })).toHaveAttribute('href', '/clubs/c1');
+    expect(related.getByText('Faktura nemá pacienta.')).toBeInTheDocument();
+    expect(related.getByText('Faktura nevznikla z termínu.')).toBeInTheDocument();
   });
 });

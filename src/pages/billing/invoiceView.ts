@@ -13,6 +13,15 @@ import type { ChipTone } from '../../components/ui';
 
 export type InvoiceFilter = 'all' | 'unpaid' | 'overdue' | 'clubs' | 'approval';
 
+const INVOICE_FILTERS: readonly InvoiceFilter[] = ['all', 'unpaid', 'overdue', 'clubs', 'approval'];
+
+/** The filter another screen (or an attention card) asks Fakturace to open with: `state.filter`, or null for anything else. */
+export function filterFromState(raw: unknown): InvoiceFilter | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const value = (raw as Record<string, unknown>).filter;
+  return typeof value === 'string' && (INVOICE_FILTERS as readonly string[]).includes(value) ? (value as InvoiceFilter) : null;
+}
+
 /** How the recipient type is called on the screen. */
 export const RECIPIENT_LABEL: Record<RecipientType, string> = {
   Person: 'Osoba',

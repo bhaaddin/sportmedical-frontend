@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Invoice } from '../../api/billing';
 import {
+  filterFromState,
   customerOf, discountSuffix, doklady, isOverdue, isPendingApproval, itemsLabel, itemsWithDiscount, matchesFilter,
   matchesSearch, monthIn, recipientTypeOf, statusOf, summarize,
 } from './invoiceView';
@@ -179,5 +180,16 @@ describe('recipient types, approval and discounts (contract C3)', () => {
     expect(discountSuffix(inv)).toBe('−10 %');
     expect(itemsWithDiscount(inv)).toBe('12× Komplexní prohlídka · −10 %');
     expect(itemsWithDiscount(invoice({}))).toBe(itemsLabel(invoice({})));
+  });
+});
+
+describe('filterFromState', () => {
+  it('reads a known filter and ignores anything else', () => {
+    expect(filterFromState({ filter: 'approval' })).toBe('approval');
+    expect(filterFromState({ filter: 'overdue', invoiceId: 'x' })).toBe('overdue');
+    expect(filterFromState({ filter: 'nonsense' })).toBeNull();
+    expect(filterFromState({ filter: 3 })).toBeNull();
+    expect(filterFromState(null)).toBeNull();
+    expect(filterFromState('approval')).toBeNull();
   });
 });
