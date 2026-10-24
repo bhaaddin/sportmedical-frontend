@@ -20,6 +20,7 @@ import { orderFromLists, orderKey, orderReadState } from '../club/clubStageReads
 import { ApiDataSource, type ApiDataSourceOptions } from '../data/ApiDataSource';
 import { plannerKeys } from '../data/PlannerDataSource';
 import { defaultApiDeps, type ApiDeps } from './deps';
+import { usePlannerLive } from './usePlannerLive';
 
 export interface UseApiDataSourceOptions extends Omit<ApiDataSourceOptions, 'deps'> {
   /** Replace the application's clients (tests). */
@@ -49,6 +50,7 @@ export function useApiDataSource(options: UseApiDataSourceOptions = {}): ApiData
   useEffect(() => {
     if (revision > 0) void queryClient.invalidateQueries({ queryKey: plannerKeys.all(source.id) });
   }, [queryClient, revision, source.id]);
+  usePlannerLive(source);
   return source;
 }
 

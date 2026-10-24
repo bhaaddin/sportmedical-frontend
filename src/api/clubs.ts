@@ -253,7 +253,7 @@ export interface ClubSettings {
 
 export const CLUB_SETTINGS_QUERY_KEY = ['settings', 'clubs'] as const;
 
-function toClubSettings(data: unknown): ClubSettings {
+export function toClubSettings(data: unknown): ClubSettings {
   const r = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
   return {

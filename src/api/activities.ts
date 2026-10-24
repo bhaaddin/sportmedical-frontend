@@ -87,15 +87,20 @@ export function activityToInput(activity: Activity, patch: Partial<ActivityInput
   };
 }
 
+/** The list as a screen gets it: parsed, the default colours spread, the list prices filled in (also for the planner screen's copy). */
+export async function readActivityList(body: unknown): Promise<ActivityListResult> {
+  const parsed = parseResponse(activityListResultSchema, body);
+  /* the default činnost colours are spread over the whole list (src/colors/defaultActivityColors.ts) */
+  registerActivityIds(parsed.activities.map((a) => a.id));
+  return withListPrices(parsed);
+}
+
 export const activitiesApi = {
   /** 4.3: the read is symmetric with the write, warnings and all. */
   list: (): Promise<ActivityListResult> =>
     request(async () => {
       const res = await client.get('/api/activities');
-      const parsed = parseResponse(activityListResultSchema, res.data);
-      /* the default činnost colours are spread over the whole list (src/colors/defaultActivityColors.ts) */
-      registerActivityIds(parsed.activities.map((a) => a.id));
-      return withListPrices(parsed);
+      return readActivityList(res.data);
     }),
 
   /**

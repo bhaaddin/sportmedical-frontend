@@ -50,6 +50,21 @@ export const FIRST_BACKOFF_MS = 1_000;
 type WriteListener = (write: { method: string; url: string }) => void;
 const writeListeners = new Set<WriteListener>();
 
+/**
+ * Another person's write was announced over the hub (a calendar change): whatever this side holds as "possibly stale"
+ * after a write of its own - shared reads, covered ranges - is dropped the same way.
+ */
+export function announceRemoteWrite(): void {
+  inFlight.clear();
+  writeListeners.forEach((listener) => {
+    try {
+      listener({ method: 'remote', url: '' });
+    } catch (error) {
+      console.error('[client] write listener failed:', error);
+    }
+  });
+}
+
 /** Called after every write the server accepted (POST / PUT / PATCH / DELETE). */
 export function onWriteSucceeded(listener: WriteListener): () => void {
   writeListeners.add(listener);

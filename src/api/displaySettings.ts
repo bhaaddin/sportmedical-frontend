@@ -136,7 +136,7 @@ export const readCalendarDisplay = async (): Promise<CalendarDisplayResponse> =>
 };
 
 /** R6: the server's old beige holiday default (and a stored colour that fails the guard) is shown and drawn as the fixed red. */
-function withHolidayRed(data: CalendarDisplayResponse): CalendarDisplayResponse {
+export function withHolidayRed(data: CalendarDisplayResponse): CalendarDisplayResponse {
   return {
     ...data,
     settings: { ...data.settings, holidayColor: effectiveHolidayColor(data.settings.holidayColor) },

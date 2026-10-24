@@ -200,7 +200,7 @@ export async function loadPeek(ref: EntityRef, queryClient: QueryClient, now: Da
       const patient = await queryClient.fetchQuery({ queryKey: ['patient', ref.id], queryFn: () => patientsApi.getById(ref.id), staleTime: 5 * MINUTE });
       /* The visits are the same list the register and the card read; if it cannot be had the peek simply has no "next". */
       const appointments = await queryClient
-        .fetchQuery({ queryKey: ALL_APPOINTMENTS_KEY, queryFn: fetchAllAppointments, staleTime: MINUTE })
+        .fetchQuery({ queryKey: [...ALL_APPOINTMENTS_KEY, ref.id], queryFn: () => fetchAllAppointments(ref.id), staleTime: MINUTE })
         .catch(() => null);
       return patientPeek(patient, appointments, now);
     }

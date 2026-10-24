@@ -44,6 +44,7 @@ import { holidaysApi, type ClinicHoliday } from '../../api/holidays';
 import { workingHoursApi } from '../../api/workingHours';
 import { parsePermissions, permissionsSnapshot } from '../../auth/localSession';
 import { invalidateClubWorld } from '../../components/clubs/clubWorld';
+import { plannerScreenFor } from './plannerScreen';
 
 /** Everything the data source needs from the application. */
 export interface ApiDeps {
@@ -79,6 +80,11 @@ export interface ApiDeps {
   updateClub(id: string, data: Partial<Club>): Promise<Club>;
   /** The permissions of the signed-in user (stored by the sign-in / account refresh). */
   permissions(): readonly string[];
+  /**
+   * Optional: lets the server answer the reads of a window in one request (the planner screen) by filling the cache the
+   * reads below use. Resolves when they may go ahead; never rejects, and does nothing when the server cannot.
+   */
+  screen?(range: { from: string; to: string }, explicitCalendarIds?: readonly string[]): Promise<void>;
   /** After a write: tell every screen that shows the calendar / the club world. */
   invalidate(): Promise<void>;
 }
@@ -127,7 +133,9 @@ const FIVE_MIN = 5 * 60 * 1000;
 /** The real clients, behind the shared query keys. */
 export function defaultApiDeps(queryClient?: QueryClient | null): ApiDeps {
   const { read, clear } = makeReader(queryClient);
+  const seeder = queryClient ? plannerScreenFor(queryClient) : null;
   return {
+    ...(seeder ? { screen: (range: { from: string; to: string }, explicit?: readonly string[]) => seeder.seed(range, explicit) } : {}),
     calendars: () => read(['calendars'], calendarsApi.list, FIVE_MIN),
     activities: () => read(['activities'], () => activitiesApi.list(), FIVE_MIN),
     services: () => read(['clinic-services'], clinicServicesApi.list, FIVE_MIN),

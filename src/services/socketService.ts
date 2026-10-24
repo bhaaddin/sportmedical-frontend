@@ -58,8 +58,18 @@ interface SocketConfig {
  */
 export const SOCKET_EVENTS = {
   NOTIFICATIONS_CHANGED: 'notificationsChanged',
+  /** Only a server with the calendar groups sends it (network plan c1); an older one never does. */
+  CALENDAR_CHANGED: 'calendarChanged',
   CONNECTED: 'connected',
 } as const;
+
+/** `calendarChanged`: which calendars, which days, and what kind of thing changed. */
+export interface CalendarChanged {
+  calendarIds: string[];
+  from: string;
+  to: string;
+  kinds: string[];
+}
 
 type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
@@ -77,6 +87,20 @@ export function reconnectDelayMs(attempt: number, jitter: number = Math.random()
   return base + Math.floor(jitter * 1_000);
 }
 
+/** The message as the hub sends it (`{ calendarIds, from, to, kinds }`), or null when it is not that. */
+export function readCalendarChanged(message: unknown): CalendarChanged | null {
+  if (message === null || typeof message !== 'object') return null;
+  const m = message as Record<string, unknown>;
+  if (!Array.isArray(m.calendarIds)) return null;
+  const calendarIds = m.calendarIds.filter((id): id is string => typeof id === 'string');
+  return {
+    calendarIds,
+    from: typeof m.from === 'string' ? m.from : '',
+    to: typeof m.to === 'string' ? m.to : '',
+    kinds: Array.isArray(m.kinds) ? m.kinds.filter((k): k is string => typeof k === 'string') : [],
+  };
+}
+
 /** `HubConnectionState`'s values, spelled out so the library need not be loaded just to compare them. */
 const STATE_CONNECTED = 'Connected';
 const STATE_RECONNECTING = 'Reconnecting';
@@ -92,6 +116,8 @@ class SocketService {
   private stopped = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private startAttempt = 0;
+  /* The calendars screens want to hear about, with how many screens want each. Groups do not survive a reconnect. */
+  private watched = new Map<string, number>();
 
   private config: SocketConfig = { url: '' };
 
@@ -163,7 +189,14 @@ class SocketService {
     /* Rule 2: a reconnect means there is a gap, and whoever listens has to go
        and look rather than assume nothing happened inside it. */
     connection.onreconnected(() => {
+      this.joinCalendars([...this.watched.keys()]);
       this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now(), afterGap: true });
+    });
+
+    /* Like the notification nudge this is only "look again" for those calendars; the data itself is read from the API. */
+    connection.on(SOCKET_EVENTS.CALENDAR_CHANGED, (message: unknown) => {
+      const changed = readCalendarChanged(message);
+      if (changed) this.emit(SOCKET_EVENTS.CALENDAR_CHANGED, changed);
     });
 
     /*
@@ -203,6 +236,7 @@ class SocketService {
       .start()
       .then(() => {
         this.startAttempt = 0;
+        this.joinCalendars([...this.watched.keys()]);
         this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now() });
       })
       .catch((err: unknown) => {
@@ -215,6 +249,49 @@ class SocketService {
          */
         console.warn('[SocketService] hub unavailable, falling back to polling:', err);
       });
+  }
+
+  /**
+   * Asks to hear `calendarChanged` for these calendars for as long as the returned function has not been called. Several
+   * screens may ask for the same calendar. The hub may be down, still connecting, or an older one without the method:
+   * all of that is silent - nothing is lost, the screen's own reads stay the truth.
+   */
+  watchCalendars(ids: readonly string[]): () => void {
+    const fresh: string[] = [];
+    for (const id of new Set(ids)) {
+      const count = this.watched.get(id) ?? 0;
+      this.watched.set(id, count + 1);
+      if (count === 0) fresh.push(id);
+    }
+    this.joinCalendars(fresh);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const gone: string[] = [];
+      for (const id of new Set(ids)) {
+        const count = (this.watched.get(id) ?? 1) - 1;
+        if (count <= 0) {
+          this.watched.delete(id);
+          gone.push(id);
+        } else {
+          this.watched.set(id, count);
+        }
+      }
+      this.invokeCalendars('LeaveCalendars', gone);
+    };
+  }
+
+  private joinCalendars(ids: string[]) {
+    this.invokeCalendars('JoinCalendars', ids);
+  }
+
+  private invokeCalendars(method: 'JoinCalendars' | 'LeaveCalendars', ids: string[]) {
+    const connection = this.connection;
+    if (ids.length === 0 || connection === null || connection.state !== STATE_CONNECTED) return;
+    connection.invoke(method, ids).catch(() => {
+      /* No such method on this server, or the hub went away: the planner still reads on its own. */
+    });
   }
 
   private scheduleRestart() {

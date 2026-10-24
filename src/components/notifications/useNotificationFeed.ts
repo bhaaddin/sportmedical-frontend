@@ -52,6 +52,21 @@ const announceChange = (except: () => void) => {
 
 const POLL_MS = 60_000;
 
+/** The newest row's instant as an ISO string with an offset (what `?since=` takes), or null when there is none to go by. */
+export function newestInstant(list: readonly FeedNotification[]): string | null {
+  const times = list.map((n) => Date.parse(n.timestamp)).filter(Number.isFinite);
+  return times.length > 0 ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+/**
+ * The answer to `?since=`: a server that has the parameter sends only rows after it, which are put in front of what is
+ * held; an older one ignores it and sends the whole list (it includes rows at or before `since`), which replaces it.
+ */
+export function mergeSince(held: readonly FeedNotification[], answer: readonly FeedNotification[], since: string): FeedNotification[] {
+  if (answer.some((n) => Date.parse(n.timestamp) <= Date.parse(since))) return [...answer];
+  return [...answer, ...held.filter((n) => !answer.some((a) => a.id === n.id))];
+}
+
 /*
  * What the last bell to ask was told, kept for a moment. Every page draws its own bell, so each navigation used to
  * download the whole list (the largest answer on most screens) again, and the sidebar's bell and the planner's bell,
@@ -104,13 +119,15 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
   notificationsRef.current = notifications;
   const selfRef = useRef<() => void>(() => undefined);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (options: { incremental?: boolean } = {}) => {
     try {
-      const res = await client.get('/api/notifications');
+      const since = options.incremental ? newestInstant(notificationsRef.current) : null;
+      const res = since === null ? await client.get('/api/notifications') : await client.get('/api/notifications', { params: { since } });
       const data = res.data?.value ?? res.data;
       const list: FeedNotification[] = Array.isArray(data) ? data : data?.items ?? [];
-      setNotifications(list);
-      seedList = { at: Date.now(), list };
+      const next = since === null ? list : mergeSince(notificationsRef.current, list, since);
+      setNotifications(next);
+      seedList = { at: Date.now(), list: next };
     } catch {
       /* Keep what is on screen; the next poll asks again. */
     } finally {
@@ -158,7 +175,8 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
 
   useRealtimeSync({
     onReconnected: () => void fetchNotifications(),
-    onNotificationsChanged: () => void fetchNotifications(),
+    /* A nudge means something new arrived: ask only for what came after the newest row held (the poll reads it all). */
+    onNotificationsChanged: () => void fetchNotifications({ incremental: true }),
   });
 
   const markRead = useCallback(async (id: string) => {
@@ -213,7 +231,7 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
     loading,
     lastSeenAt,
     unreadCount: notifications.filter((n) => !n.read).length,
-    refresh: fetchNotifications,
+    refresh: () => fetchNotifications(),
     markRead,
     markAllRead,
     remove,
