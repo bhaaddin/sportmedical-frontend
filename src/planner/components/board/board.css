@@ -839,5 +839,5 @@
 .gap-choice p { margin: 6px 0 10px; font-size: 13px; line-height: 1.35; }
 .gap-choice-actions { display: flex; flex-direction: column; gap: 6px; }
 .gap-choice-btn { min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: center; }
-.gap-choice-btn.is-primary { background: var(--gap-accent, var(--cyan)); color: #00222b; border-color: transparent; }
+.gap-choice-btn.is-primary { background: hsl(from #23f2e7 var(--sm-hsl, h s l)); color: #00222b; border-color: transparent; }
 .gap-choice-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

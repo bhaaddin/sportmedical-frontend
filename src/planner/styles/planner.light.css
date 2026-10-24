@@ -1203,7 +1203,7 @@ html[data-sm-mode="light"] .sm-planner .board-undo button.undo-dismiss{border-co
 html[data-sm-mode="light"] .sm-planner .month-tile .tile-club.is-held[data-hold='requested']{border-top:1px dashed var(--club, #959DA7);border-right:1px dashed var(--club, #959DA7);border-bottom:1px dashed var(--club, #959DA7);background-image:repeating-linear-gradient(135deg, color-mix(in srgb, var(--club, #A6ACB5) 15%, transparent) 0 6px, color-mix(in srgb, var(--club, #A6ACB5) 4%, transparent) 6px 12px)}
 html[data-sm-mode="light"] .sm-planner .month-tile .tile-club.is-held[data-hold='offered']{border-top:1px dotted var(--club, #959DA7);border-right:1px dotted var(--club, #959DA7);border-bottom:1px dotted var(--club, #959DA7);background-image:repeating-linear-gradient(135deg, color-mix(in srgb, var(--club, #A6ACB5) 9%, transparent) 0 6px, color-mix(in srgb, var(--club, #A6ACB5) 3%, transparent) 6px 12px)}
 html[data-sm-mode="light"] .gap-choice-btn{border:1px solid currentColor;background:transparent;color:inherit}
-html[data-sm-mode="light"] .gap-choice-btn.is-primary{background:var(--gap-accent, var(--cyan));color:#00222b;border-color:transparent}
+html[data-sm-mode="light"] .gap-choice-btn.is-primary{background:var(--sm-planner-accent, #0D5C52);color:var(--sm-planner-on-accent, #FFFFFF);border-color:transparent}
 html[data-sm-mode="light"] .gap-choice-btn:focus-visible{outline:2px solid currentColor}
 html[data-sm-mode="light"] .sm-planner .phone-strip-day{border:1px solid #D0D4D8;background:rgba(249, 249, 250, 0.941);color:#1A1D21;box-shadow:inset 0 1px rgba(20, 24, 28, 0.04)}
 html[data-sm-mode="light"] .sm-planner .phone-strip-day b{color:inherit}
