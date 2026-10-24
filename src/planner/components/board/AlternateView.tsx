@@ -12,6 +12,7 @@ import { Icon } from '../Icons';
 import { clubItemText } from './clubHold';
 import { groupDayRows, type DayListModel, type DayRowGroup, type DayRowModel, type MonthListModel } from './boardModel';
 import { agendaSlotLabel } from '../../model';
+import type { PhoneEntry } from './phoneModel';
 import './month/month.css';
 import { DayTray, MonthTools } from './month/MonthSelectionUi';
 import type { DaySelectApi } from './month/useDaySelect';
@@ -91,16 +92,43 @@ function DayGroupRow({ group, onOpen }: { group: DayRowGroup; onOpen: (row: DayR
   );
 }
 
+/** A club's held time on the day's list: hatched in the club's colour, name + order code + hold state in words (R13). */
+function DayHold({ entry, onOpen }: { entry: PhoneEntry; onOpen: (entry: PhoneEntry, point: { x: number; y: number }) => void }) {
+  return (
+    <button
+      type="button"
+      className="alt-row is-hold"
+      data-kind="club"
+      data-testid={`day-hold-${entry.id}`}
+      style={entry.colour ? ({ '--club-tone': entry.colour } as CSSProperties) : undefined}
+      onClick={(event) => onOpen(entry, { x: event.clientX, y: event.clientY })}
+    >
+      <span>{entry.timeLabel}</span>
+      <strong>
+        <Icon name="lock" />
+        {entry.title}
+        {entry.sub ? <span className="alt-sub" data-testid="day-hold-sub">{entry.sub}</span> : null}
+      </strong>
+      <span />
+    </button>
+  );
+}
+
 export function DayList({
   model,
   onOpen,
   onCreate,
   inquiries = [],
   onOpenInquiry,
+  holds = [],
+  onOpenHold,
 }: {
   model: DayListModel;
   onOpen: (row: DayListModel['rows'][number]) => void;
   onCreate: () => void;
+  /** The club windows of the day (the club's time is drawn even before its players are in). */
+  holds?: readonly PhoneEntry[];
+  onOpenHold?: (entry: PhoneEntry, point: { x: number; y: number }) => void;
   /** The club inquiries asking for this day: dashed chips above the rows. */
   inquiries?: readonly InquiryRef[];
   onOpenInquiry?: (orderId: string) => void;
@@ -113,11 +141,12 @@ export function DayList({
           {inquiries.map((inquiry) => <InquiryChip key={inquiry.orderId} inquiry={inquiry} {...(onOpenInquiry ? { onOpen: onOpenInquiry } : {})} />)}
         </div>
       ) : null}
+      {holds.map((h) => <DayHold key={h.key} entry={h} onOpen={onOpenHold ?? (() => {})} />)}
       {model.rows.length ? (
         groupDayRows(model.rows).map((item) =>
           item.type === 'group' ? <DayGroupRow key={item.group.key} group={item.group} onOpen={onOpen} /> : <DayRow key={item.row.key} row={item.row} onOpen={onOpen} />,
         )
-      ) : (
+      ) : holds.length > 0 ? null : (
         <div className="empty-info">
           {model.empty}
           <div style={{ marginTop: 18 }}>

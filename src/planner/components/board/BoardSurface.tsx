@@ -901,6 +901,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 
+  /* R13: the club's held time is on the desktop "Den" list too, not only in the week and on the phone */
+  const dayHolds = useMemo(
+    () => (view === 'day' && !phone ? phoneEntries([], model.windows, selectedDate).filter((e) => e.kind === 'club') : []),
+    [view, phone, model.windows, selectedDate],
+  );
+
   /* ---- the phone's list: the day as an agenda with the week's strip, the month as a list of days ---- */
   const phoneAgenda = useMemo(() => {
     if (!phone || view !== 'day') return null;
@@ -1329,6 +1335,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             onCreate={createTerm}
             inquiries={inquiries.get(selectedDate) ?? []}
             onOpenInquiry={goOrder}
+            holds={dayHolds}
+            onOpenHold={(entry, point) => { if (entry.window) openWindow(entry.window, point); }}
           />
         ) : null}
         {view === 'month' && phoneMonth ? (
