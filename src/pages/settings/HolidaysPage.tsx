@@ -309,6 +309,7 @@ export default function HolidaysPage() {
       }
     >
       <Shelf id="holidays-year" title="Rok" layout="board">
+        <Box sx={{ p: 2 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Pokud v některý svátek pracujete, zapněte u něj <strong>Pracujeme v tento den</strong> – pak
           ten den platí vaše běžná pracovní doba a dá se objednat.
@@ -320,6 +321,7 @@ export default function HolidaysPage() {
           <Typography sx={{ fontWeight: 700, fontSize: 20, px: 1 }}>{year}</Typography>
           <Button variant="outlined" size="small" sx={TARGET_SX} disabled={year >= HOLIDAY_YEAR_MAX} onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
         </Stack>
+        </Box>
       </Shelf>
 
       <Box sx={{ mt: 2 }}>

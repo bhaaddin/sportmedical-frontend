@@ -255,6 +255,7 @@ export default function ExceptionsPage() {
         empty={calReady && calendars.length === 0}
         emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
+        <Box sx={{ p: 2 }}>
         <TextField
           select
           label={t("booking.workingHours.calendar")}
@@ -268,6 +269,7 @@ export default function ExceptionsPage() {
             </MenuItem>
           ))}
         </TextField>
+        </Box>
       </Shelf>
 
       {calReady && calendars.length > 0 ? (

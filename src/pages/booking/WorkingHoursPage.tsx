@@ -224,6 +224,7 @@ export default function WorkingHoursPage() {
         empty={calReady && calendars.length === 0}
         emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
+        <Box sx={{ p: 2 }}>
         <TextField
           select
           label={t("booking.workingHours.calendar")}
@@ -241,12 +242,14 @@ export default function WorkingHoursPage() {
             </MenuItem>
           ))}
         </TextField>
+        </Box>
       </Shelf>
 
       {calReady && calendars.length > 0 ? (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
           {hasPeriodNotes ? (
             <Shelf id="hours-periods" title="Období a cyklus" layout="board">
+              <Box sx={{ p: 2 }}>
               {main !== null && main.validFrom > today ? (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   Tato pracovní doba začne platit {formatDateOnly(main.validFrom)}. Do té doby se do
@@ -308,6 +311,7 @@ export default function WorkingHoursPage() {
                   {main.validTo ? ` – ${formatDateOnly(main.validTo)}` : " – bez konce"}
                 </Typography>
               ) : null}
+              </Box>
             </Shelf>
           ) : null}
 
@@ -319,6 +323,7 @@ export default function WorkingHoursPage() {
             error={weekState.error}
             onRetry={() => { void invalidate(); }}
           >
+            <Box sx={{ p: 2 }}>
             <TimetableEditor
               key={`${activeCalendarId}:${main?.id ?? "none"}:${hoursQuery.dataUpdatedAt}`}
               calendarId={activeCalendarId}
@@ -336,6 +341,7 @@ export default function WorkingHoursPage() {
               }}
               onFailed={invalidate}
             />
+            </Box>
           </Shelf>
 
           {/* 5.7 hangs off the period; the period is simply not named. */}

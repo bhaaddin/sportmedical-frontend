@@ -55,6 +55,7 @@ export default function ServiceDetail({
       )}
 
       <Shelf id="service" title="Služba" layout="board">
+        <Box sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1.5 }}>
           <Box sx={{ width: 10, alignSelf: 'stretch', minHeight: 44, borderRadius: 3, bgcolor: service.colorHex ?? 'primary.main' }} />
           <Box sx={{ flex: 1, minWidth: 200 }}>
@@ -98,6 +99,7 @@ export default function ServiceDetail({
             </Button>
           </Stack>
         </Stack>
+        </Box>
       </Shelf>
 
       <Shelf id="service-parts" title="Části služby" layout="free">

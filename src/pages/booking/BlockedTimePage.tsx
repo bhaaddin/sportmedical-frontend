@@ -237,6 +237,7 @@ export default function BlockedTimePage() {
         empty={calendarReady && calendars.length === 0}
         emptyState={{ text: t("booking.workingHours.noCalendars"), action: { label: "Kalendáře", to: "/calendars" } }}
       >
+        <Box sx={{ p: 2 }}>
         <TextField
           select
           value={activeCalendarId}
@@ -250,6 +251,7 @@ export default function BlockedTimePage() {
             </MenuItem>
           ))}
         </TextField>
+        </Box>
       </Shelf>
 
       {calendarReady && calendars.length > 0 ? (
