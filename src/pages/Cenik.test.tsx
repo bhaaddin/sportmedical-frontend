@@ -8,6 +8,7 @@
  * tested in `cenik/Cenik.activities.test.tsx`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -47,7 +48,7 @@ const item = {
 const renderCenik = () =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <Cenik />
+      <MemoryRouter initialEntries={['/nastaveni/cenik']}><Cenik /></MemoryRouter>
     </QueryClientProvider>,
   );
 
