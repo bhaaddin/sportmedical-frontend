@@ -68,6 +68,7 @@ const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage
 const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTemplatesPage'));
 const EmailTemplatesPage = lazy(() => import('./pages/settings/EmailTemplatesPage'));
+const EmailSettingsPage = lazy(() => import('./pages/settings/EmailSettingsPage'));
 const TwoFactorPage = lazy(() => import('./pages/settings/TwoFactorPage'));
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
@@ -500,6 +501,7 @@ export default function StaffApp() {
           <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
           <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
           <Route path="/nastaveni/sablony-emailu" element={<RequirePermission of="communication.manage"><EmailTemplatesPage /></RequirePermission>} />
+          <Route path="/nastaveni/email" element={<RequirePermission of="settings.clinic.manage"><EmailSettingsPage /></RequirePermission>} />
           <Route path="/nastaveni/zabezpeceni" element={<TwoFactorPage />} />
           <Route path="/calendars" element={<RequirePermission of="settings.clinic.manage"><BookingCalendarsPage /></RequirePermission>} />
           <Route path="/activities" element={<RequirePermission of="settings.clinic.manage"><BookingActivitiesPage /></RequirePermission>} />

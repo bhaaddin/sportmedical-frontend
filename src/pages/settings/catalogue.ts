@@ -282,6 +282,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'communication.manage',
       },
       {
+        id: 'email-odesilani',
+        label: 'E-mail',
+        description: 'Odkud ordinace posílá e-maily, jestli odesílání funguje, zkušební e-mail a nastavení DNS',
+        to: '/nastaveni/email',
+        scope: null,
+        keywords: ['email', 'e-mail', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'testovací e-mail', 'fronta'],
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'pripominky',
         label: 'Připomínky',
         description: 'Kolik hodin před termínem se pacientovi připraví připomínka',

@@ -36,11 +36,11 @@ beforeEach(() => {
 });
 
 describe('the group pages of the second half', () => {
-  it('Komunikace for an owner lists the three screens', async () => {
+  it('Komunikace for an owner lists the four screens', async () => {
     hold(['settings.clinic.manage', 'communication.manage']);
     show('/settings/komunikace');
     await screen.findByRole('heading', { level: 1, name: 'Komunikace' });
-    expect(rows('Komunikace')).toEqual(['/nastaveni/sablony-emailu', '/nastaveni/pripominky', '/hodnoceni-pacientu']);
+    expect(rows('Komunikace')).toEqual(['/nastaveni/sablony-emailu', '/nastaveni/email', '/nastaveni/pripominky', '/hodnoceni-pacientu']);
   });
 
   it('Komunikace for somebody with only communication.manage lists the templates and the reviews, not the reminders', async () => {
