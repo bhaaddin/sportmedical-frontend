@@ -2,7 +2,7 @@
  * Souhlasy a GDPR and Údaje pacienta: what the form shows, what is saved and what is read back.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -159,6 +159,10 @@ const FIELDS = [
 ] as const;
 const VISIBILITY = { fields: FIELDS, visible: ['recordId', 'phone', 'birthNumber', 'notes'] };
 
+/* The count pill of a shelf of this page: "Zobrazené" / "Skryté" with the number the person sees. */
+const countOf = (shelf: 'Zobrazené' | 'Skryté', n: number) => within(screen.getByRole('region', { name: shelf })).getByLabelText(`Počet: ${n}`);
+const findCount = (shelf: 'Zobrazené' | 'Skryté', n: number) => waitFor(() => countOf(shelf, n));
+
 describe('Údaje pacienta', () => {
   beforeEach(() => {
     setViewport(VIEWPORTS.desktop);
@@ -171,7 +175,7 @@ describe('Údaje pacienta', () => {
 
   it('lists the fields in the stored order, numbered, with the chips that matter', async () => {
     render_();
-    expect(await screen.findByText('Zobrazené (4)')).toBeInTheDocument();
+    expect(await findCount('Zobrazené', 4)).toBeInTheDocument();
     expect(order()).toEqual(['Číslo karty', 'Telefon', 'Rodné číslo', 'Poznámky']);
     expect(screen.getByText('i v seznamu pacientů')).toBeInTheDocument();
     expect(screen.getByText('jen s oprávněním k rodnému číslu')).toBeInTheDocument();
@@ -180,7 +184,7 @@ describe('Údaje pacienta', () => {
   it('moving a field down changes the order and enables Uložit; the first cannot go up and the last cannot go down', async () => {
     const user = userEvent.setup();
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     expect(screen.getByRole('button', { name: 'Posunout Číslo karty výš' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Posunout Poznámky níž' })).toBeDisabled();
     expect(save()).toBeDisabled();
@@ -192,7 +196,7 @@ describe('Údaje pacienta', () => {
   it('moving a field and moving it back leaves nothing to save', async () => {
     const user = userEvent.setup();
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     await user.click(screen.getByRole('button', { name: 'Posunout Telefon výš' }));
     await user.click(screen.getByRole('button', { name: 'Posunout Telefon níž' }));
     expect(save()).toBeDisabled();
@@ -201,19 +205,19 @@ describe('Údaje pacienta', () => {
   it('hides a field into the "Skryté" list, and shows it again at the end', async () => {
     const user = userEvent.setup();
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     await user.click(screen.getByRole('button', { name: 'Skrýt Telefon' }));
-    expect(screen.getByText('Zobrazené (3)')).toBeInTheDocument();
-    expect(screen.getByText('Skryté (1)')).toBeInTheDocument();
+    expect(countOf('Zobrazené', 3)).toBeInTheDocument();
+    expect(countOf('Skryté', 1)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zobrazit' }));
-    expect(screen.getByText('Zobrazené (4)')).toBeInTheDocument();
+    expect(countOf('Zobrazené', 4)).toBeInTheDocument();
     expect(order()).toEqual(['Číslo karty', 'Rodné číslo', 'Poznámky', 'Telefon']);
   });
 
   it('saves the visible keys in the order on screen', async () => {
     const user = userEvent.setup();
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     await user.click(screen.getByRole('button', { name: 'Skrýt Poznámky' }));
     await user.click(screen.getByRole('button', { name: 'Posunout Telefon výš' }));
     await user.click(save());
@@ -224,7 +228,7 @@ describe('Údaje pacienta', () => {
   it('can hide everything and says the card then shows only the name', async () => {
     const user = userEvent.setup();
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     for (const label of ['Číslo karty', 'Telefon', 'Rodné číslo', 'Poznámky']) {
       await user.click(screen.getByRole('button', { name: `Skrýt ${label}` }));
     }
@@ -237,17 +241,17 @@ describe('Údaje pacienta', () => {
     const user = userEvent.setup();
     readFields.mockResolvedValue({ fields: FIELDS, visible: ['notes'] });
     render_();
-    await screen.findByText('Zobrazené (1)');
+    await findCount('Zobrazené', 1);
     await user.click(screen.getByRole('button', { name: 'Zobrazit vše v původním pořadí' }));
     expect(order()).toEqual(['Číslo karty', 'Telefon', 'Rodné číslo', 'Poznámky']);
-    expect(screen.queryByText(/Skryté/)).toBeNull();
+    expect(countOf('Skryté', 0)).toBeInTheDocument();
   });
 
   it('never sends a key the server\'s catalogue no longer lists', async () => {
     const user = userEvent.setup();
     readFields.mockResolvedValue({ fields: FIELDS, visible: ['phone', 'removedLongAgo', 'notes'] });
     render_();
-    await screen.findByText('Zobrazené (2)');
+    await findCount('Zobrazené', 2);
     await user.click(screen.getByRole('button', { name: 'Skrýt Poznámky' }));
     await user.click(save());
     await waitFor(() => expect(saveFields).toHaveBeenCalledTimes(1));
@@ -258,11 +262,11 @@ describe('Údaje pacienta', () => {
     const user = userEvent.setup();
     saveFields.mockRejectedValue(refused({ message: 'Tyto údaje systém nezná: x.' }));
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     await user.click(screen.getByRole('button', { name: 'Skrýt Telefon' }));
     await user.click(save());
     expect(await screen.findByText('Tyto údaje systém nezná: x.')).toBeInTheDocument();
-    expect(screen.getByText('Zobrazené (3)')).toBeInTheDocument();
+    expect(countOf('Zobrazené', 3)).toBeInTheDocument();
   });
 
   it('explains that the birth number is withheld from anybody without the right, whatever is chosen here', async () => {
@@ -279,7 +283,7 @@ describe('Údaje pacienta', () => {
   it.each(Object.entries(VIEWPORTS))('draws at %s (%i px)', async (_name, width) => {
     setViewport(width);
     render_();
-    await screen.findByText('Zobrazené (4)');
+    await findCount('Zobrazené', 4);
     expect(screen.getByRole('button', { name: 'Skrýt Telefon' })).toBeInTheDocument();
     expect(save()).toBeInTheDocument();
   });

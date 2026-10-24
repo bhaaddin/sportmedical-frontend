@@ -8,7 +8,7 @@
  * in the application already hides an inactive template.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -90,6 +90,27 @@ describe('the list', () => {
     show();
 
     expect(await screen.findByText(/1 pravidlo ho vyžaduje/)).toBeInTheDocument();
+  });
+});
+
+describe('the Nepoužité shelf', () => {
+  it('lists a template no rule asks for apart from the used ones', async () => {
+    getTemplates.mockResolvedValue([tpl(), tpl({ id: 't2', name: 'Souhlas s fotografováním', description: '' })]);
+    listRules.mockResolvedValue([rule()]);
+    show();
+
+    const unused = await screen.findByRole('region', { name: 'Nepoužité' });
+    expect(within(unused).getByText('Souhlas s fotografováním')).toBeInTheDocument();
+    expect(within(unused).queryByText('Výpis ze zdravotní dokumentace')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Šablony' })).getByText('Výpis ze zdravotní dokumentace')).toBeInTheDocument();
+  });
+
+  it('is not drawn while the rules did not load (nothing is called unused on a guess)', async () => {
+    listRules.mockRejectedValue(new Error('x'));
+    show();
+
+    await screen.findByText('Výpis ze zdravotní dokumentace');
+    expect(screen.queryByRole('region', { name: 'Nepoužité' })).not.toBeInTheDocument();
   });
 });
 

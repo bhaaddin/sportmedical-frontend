@@ -37,7 +37,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
 import { WhereSomebodyWorksDialog } from '../components/admin/WhereSomebodyWorksDialog';
 import {
-  userAccountsApi, accountRefusal, ROLE_LABELS, USER_ACCOUNT_ROLES,
+  userAccountsApi, accountRefusal, visiblePassword, ROLE_LABELS, USER_ACCOUNT_ROLES,
 } from '../api/userAccounts';
 import type { UserAccount, UserAccountRole } from '../api/userAccounts';
 import { usePermission } from '../auth/usePermission';
@@ -104,7 +104,7 @@ export default function StaffManagement() {
     document.querySelector(`[data-user-id="${CSS.escape(highlighted)}"]`)?.scrollIntoView?.({ block: 'center' });
   }, [highlighted, loading, accounts]);
 
-  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [credentials, setCredentials] = useState<{ email: string; password: string | null } | null>(null);
 
   const say = (message: string, severity: 'success' | 'error' = 'success') =>
     setSnackbar({ open: true, message, severity });
@@ -135,7 +135,7 @@ export default function StaffManagement() {
         role: newAccount.role,
       });
       setAdding(false);
-      setCredentials({ email: issued.account.email, password: issued.temporaryPassword });
+      setCredentials({ email: issued.account.email, password: visiblePassword(issued) });
       load();
     } catch (error) {
       setDialogError(accountRefusal(error));
@@ -181,7 +181,7 @@ export default function StaffManagement() {
     try {
       const issued = await userAccountsApi.resetPassword(account.userId);
       setResetting(null);
-      setCredentials({ email: account.email, password: issued.temporaryPassword });
+      setCredentials({ email: account.email, password: visiblePassword(issued) });
       load();
     } catch (error) {
       setResetting(null);
@@ -571,22 +571,28 @@ export default function StaffManagement() {
         <DialogTitle sx={{ fontWeight: 700 }}>Přihlašovací údaje</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Předejte je zaměstnanci. Po prvním přihlášení si nastaví vlastní heslo.
+            {credentials?.password == null ? 'Po prvním přihlášení si zaměstnanec nastaví vlastní heslo.' : 'Předejte je zaměstnanci. Po prvním přihlášení si nastaví vlastní heslo.'}
           </Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
             E-mail: <strong>{credentials?.email}</strong>
           </Typography>
-          <Alert severity="success" sx={{ wordBreak: 'break-all' }}>
-            Heslo: <strong>{credentials?.password}</strong>
-          </Alert>
+          {credentials?.password == null ? (
+            <Alert severity="success">Dočasné heslo bylo odesláno e-mailem uživateli.</Alert>
+          ) : (
+            <Alert severity="success" sx={{ wordBreak: 'break-all' }}>
+              Heslo: <strong>{credentials.password}</strong>
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => { navigator.clipboard?.writeText(credentials?.password ?? '').catch(() => {}); }}
-            variant="outlined" sx={{ borderRadius: 2 }}
-          >
-            Kopírovat
-          </Button>
+          {credentials?.password != null && (
+            <Button
+              onClick={() => { navigator.clipboard?.writeText(credentials.password ?? '').catch(() => {}); }}
+              variant="outlined" sx={{ borderRadius: 2 }}
+            >
+              Kopírovat
+            </Button>
+          )}
           <Button onClick={() => setCredentials(null)} variant="contained">
             Hotovo
           </Button>

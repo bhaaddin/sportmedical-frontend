@@ -86,7 +86,7 @@ export function readClubManagement(data: unknown): ClubManager[] {
 }
 
 /** A club as the screens expect it: `management` is always a list. */
-const withManagement = (club: Club): Club => ({ ...club, management: readClubManagement(club.management) });
+export const withManagement = (club: Club): Club => ({ ...club, management: readClubManagement(club.management) });
 
 async function request<T>(run: () => Promise<T>): Promise<T> {
   try {

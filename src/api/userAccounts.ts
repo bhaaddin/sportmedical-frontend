@@ -34,7 +34,16 @@ export const ROLE_LABELS: Record<UserAccountRole, string> = {
 /** A new account, or a reset one, with the one-time password to hand over. */
 export interface IssuedCredentials {
   account: UserAccount;
-  temporaryPassword: string;
+  /** Absent (or empty) when the server e-mailed it to the user instead of handing it over. */
+  temporaryPassword?: string | null;
+  /** True when the server sent the temporary password by e-mail. An older server does not send the field. */
+  temporaryPasswordEmailed?: boolean;
+}
+
+/** The password to show on screen, or null when the server e-mailed it (nothing to hand over). */
+export function visiblePassword(issued: IssuedCredentials): string | null {
+  const password = issued.temporaryPassword;
+  return typeof password === 'string' && password !== '' ? password : null;
 }
 
 export const userAccountsApi = {

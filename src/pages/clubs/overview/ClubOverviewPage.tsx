@@ -22,6 +22,7 @@ import { billingApi } from '../../../api/billing';
 import { clubBlocksApi } from '../../../api/clubBlocks';
 import { clubOrdersApi } from '../../../api/clubOrders';
 import { clubsApi } from '../../../api/clubs';
+import { CLUB_SCREEN_FRESH_MS, clubScreenKeys } from '../../../api/clubScreen';
 import { usePermission } from '../../../auth/usePermission';
 import { ClubAvatar } from '../../../components/clubs/ClubAvatar';
 import { formatCzk } from '../../../components/clubs/order/orderFormat';
@@ -34,6 +35,7 @@ import { useDevice } from '../../../layout/useDevice';
 import { pragueDateKey } from '../../../utils/time';
 import { EntityCard, MetricCard, PageFrame, PinButton, Shelf, TARGET_SX, MUTED_SX, rememberOpened } from '../../../ui/shelf';
 import { canBeInvoiced } from '../payerForm';
+import { useClubScreenReady } from './useClubScreenReady';
 import {
   clubMetrics, contactLine, focusOrder, historyPath, newestOrderIds, nextTerms, orderCards, recentChanges, type InvoiceSource, type Source,
 } from './clubOverviewModel';
@@ -65,14 +67,18 @@ export default function ClubOverviewPage() {
   const mayBill = usePermission('billing.manage');
   const today = useMemo(() => pragueDateKey(new Date()), []);
 
-  const clubQuery = useQuery({ queryKey: ['clubs', 'one', clubId], queryFn: () => clubsApi.getById(clubId), retry: false });
+  /* One request for the club, its orders, windows and summary when the server has the club screen; otherwise each read below goes as it always did. */
+  const screenReady = useClubScreenReady(clubId);
+  const clubQuery = useQuery({ queryKey: clubScreenKeys.club(clubId), queryFn: () => clubsApi.getById(clubId), retry: false, staleTime: CLUB_SCREEN_FRESH_MS, enabled: screenReady });
   const ordersQuery = useQuery({
-    queryKey: ['club-orders', clubId, '', ''],
+    queryKey: clubScreenKeys.orders(clubId),
     queryFn: () => clubOrdersApi.list({ clubId }),
     retry: false,
+    staleTime: CLUB_SCREEN_FRESH_MS,
+    enabled: screenReady,
   });
-  const blocksQuery = useQuery({ queryKey: ['club-blocks', 'list'], queryFn: () => clubBlocksApi.list(), retry: false });
-  const summaryQuery = useClubSummary(clubId);
+  const blocksQuery = useQuery({ queryKey: clubScreenKeys.blocks(clubId), queryFn: () => clubBlocksApi.list({ clubId }), retry: false, staleTime: CLUB_SCREEN_FRESH_MS, enabled: screenReady });
+  const summaryQuery = useClubSummary(clubId, screenReady);
   const invoicesQuery = useQuery({
     queryKey: ['club-billing', 'club', clubId],
     queryFn: () => billingApi.getInvoices({ clubId }),

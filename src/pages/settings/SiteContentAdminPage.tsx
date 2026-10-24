@@ -36,7 +36,9 @@ import {
   ADMIN_SITE_CONTENT_KEY, siteContentAdminApi, type AdminSiteContent, type AdminSlot, type SlotUpdate,
 } from '../../api/siteContentAdmin';
 import type { MediaAsset } from '../../api/media';
+import { Shelf } from '../../ui/shelf';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { SlotCard } from './siteContent/SlotCard';
 import { PartnersSection } from './siteContent/PartnersSection';
 import { FaqSection } from './siteContent/FaqSection';
@@ -318,23 +320,21 @@ export default function SiteContentAdminPage() {
     const counter = countSlots(page.slots, slots);
     const keep = (def: SlotDef) => kindFilter === 'all' || (kindFilter === 'media') === isMediaSlot(def);
     return (
-      <Stack spacing={2.5} component="section" aria-label={page.label}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between' }}>
-          <Box>
-            <Typography component="h2" sx={TYPE.sectionTitle}>{page.label}</Typography>
-            <Typography sx={TYPE.caption}>
-              Fotky a videa: {counter.mediaFilled} z {counter.mediaTotal} · Vlastní texty: {counter.textFilled} z {counter.textTotal}
-            </Typography>
-          </Box>
-          {page.path !== undefined && (
-            <Link
-              href={page.path} target="_blank" rel="noopener" aria-label={`Zobrazit stránku „${page.label}“ na webu`}
-              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, minHeight: 44, fontWeight: 600 }}
-            >
-              Zobrazit na webu <OpenIcon sx={{ fontSize: 16 }} />
-            </Link>
-          )}
-        </Stack>
+      <Shelf
+        id="site-page"
+        title={page.label}
+        hint={`Fotky a videa: ${counter.mediaFilled} z ${counter.mediaTotal} · Vlastní texty: ${counter.textFilled} z ${counter.textTotal}`}
+        layout="free"
+        controls={page.path !== undefined ? (
+          <Link
+            href={page.path} target="_blank" rel="noopener" aria-label={`Zobrazit stránku „${page.label}“ na webu`}
+            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, minHeight: 44, fontWeight: 600 }}
+          >
+            Zobrazit na webu <OpenIcon sx={{ fontSize: 16 }} />
+          </Link>
+        ) : undefined}
+      >
+      <Stack spacing={2.5}>
         <FilterChips<KindFilter>
           ariaLabel="Co zobrazit"
           value={kindFilter}
@@ -356,17 +356,19 @@ export default function SiteContentAdminPage() {
           );
         })}
       </Stack>
+      </Shelf>
     );
   };
 
   const body = content === undefined ? null : searching ? (
-    <Stack spacing={2} component="section" aria-label="Výsledky hledání">
-      <Typography component="h2" sx={TYPE.sectionTitle}>Výsledky hledání</Typography>
-      <Typography sx={TYPE.caption} role="status">
-        {results.length === 0 ? `Nic neodpovídá „${searchText.trim()}“.` : `Nalezeno míst: ${results.length}`}
-      </Typography>
-      <Box sx={grid} data-columns={columns}>{results.map(({ def, page }) => card(def, page.label, page.path))}</Box>
-    </Stack>
+    <Shelf id="site-search" title="Výsledky hledání" count={results.length} layout="free">
+      <Stack spacing={2}>
+        <Typography sx={TYPE.caption} role="status">
+          {results.length === 0 ? `Nic neodpovídá „${searchText.trim()}“.` : `Nalezeno míst: ${results.length}`}
+        </Typography>
+        <Box sx={grid} data-columns={columns}>{results.map(({ def, page }) => card(def, page.label, page.path))}</Box>
+      </Stack>
+    </Shelf>
   ) : selected.type === 'slots' ? renderSlotPage(selected)
     : selected.id === PARTNERS_ID ? <PartnersSection partners={content.partners} onConfirm={setConfirm} />
     : selected.id === FAQ_ID ? <FaqSection items={content.faq} onConfirm={setConfirm} />
@@ -423,10 +425,14 @@ export default function SiteContentAdminPage() {
     >
       {content === undefined ? null : (
         <Box data-layout={device} sx={phone ? { display: 'flex', flexDirection: 'column', gap: 2 } : { display: 'grid', gap: 3, gridTemplateColumns: '260px minmax(0, 1fr)', alignItems: 'start' }}>
-          <Stack spacing={1.5} sx={phone ? undefined : { position: 'sticky', top: 16, minWidth: 0 }}>
-            {searchField}
-            {nav}
-          </Stack>
+          <Box sx={phone ? undefined : { position: 'sticky', top: 16, minWidth: 0 }}>
+            <SettingsBoard id="site-pages" title="Stránky webu" count={pages.length}>
+              <Stack spacing={1.5}>
+                {searchField}
+                {nav}
+              </Stack>
+            </SettingsBoard>
+          </Box>
           <Box sx={{ minWidth: 0 }}>{body}</Box>
         </Box>
       )}

@@ -24,6 +24,7 @@
    ══════════════════════════════════════════════════════════════ */
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { pragueDateKey } from '../utils/time';
+import { parsePermissions, permissionsSnapshot } from '../auth/localSession';
 import { activitiesApi } from './activities';
 import { calendarsApi } from './calendars';
 import { readPublicClinic } from './clinicSettings';
@@ -134,12 +135,53 @@ const clubSummaryKey = (clubId: string) => ['club-summary', clubId] as const;
  * reads start when the pointer rests on the page's "Kalendář" button (`prefetchClubScreen`).
  */
 export function prefetchClubPage(queryClient: QueryClient, clubId: string): void {
-  const { orders } = warmClubCore(queryClient, clubId);
+  warm(clubPageRoute.load());
+  /* An account without patients.view, or a tab that learned the server has no club screen: today's reads, started at once
+     (from the club list's answers when they are here). */
+  if (!clubScreenMayAnswer()) {
+    warmClubPageReads(queryClient, clubId);
+    return;
+  }
+  /* The screen's module is loaded on demand: the planner shares this file and must not carry it. */
+  warm(
+    import('./clubScreen').then(({ clubScreenFor }) => {
+      const screen = clubScreenFor(queryClient);
+      if (!screen.willAsk(clubId)) {
+        warmClubPageReads(queryClient, clubId);
+        return undefined;
+      }
+      /* The server may answer the club page in one request (network plan b5); when it did not, today's reads go. */
+      return screen.seed(clubId).then((seeded) => {
+        if (!seeded) {
+          warmClubPageReads(queryClient, clubId);
+          return undefined;
+        }
+        const orders = queryClient.getQueryData<ClubOrderView[]>(['club-orders', clubId, '', '']) ?? [];
+        return Promise.all(newestOrderIds(orders).map((id) => queryClient.prefetchQuery({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000 })));
+      });
+    }),
+  );
+}
+
+/** Cheap and synchronous: could the club screen be worth asking (the permission it needs, and not remembered as missing)? */
+function clubScreenMayAnswer(): boolean {
+  if (!parsePermissions(permissionsSnapshot()).includes('patients.view')) return false;
+  try {
+    return Date.now() >= Number(window.sessionStorage.getItem('sm.clubScreen.unsupportedUntil') ?? 0);
+  } catch {
+    return true;
+  }
+}
+
+/** The club page's reads one by one: what an older server (or a failed screen) leaves to do. */
+function warmClubPageReads(queryClient: QueryClient, clubId: string): void {
+  const { orders, blocks } = warmClubCore(queryClient, clubId);
   /* "Poslední změny": the list answers carry no history, so the few orders touched last are read one by one - started the
      moment the orders are known, not after the page has drawn (the same key and read as the page's own). */
   warm(orders.then((list) => Promise.all(newestOrderIds(list).map((id) => queryClient.prefetchQuery({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000 })))));
   warm(queryClient.prefetchQuery({ queryKey: clubSummaryKey(clubId), queryFn: async () => normalizeSummary(await clubOrdersApi.clubSummary(clubId)), staleTime: 60_000 }));
-  warm(clubPageRoute.load());
+  /* The page reads the club's own windows (the screen's `clubBlocks` section): they are the club's rows of the list just asked for. */
+  warm(blocks.then((all) => queryClient.setQueryData(['club-blocks', 'of-club', clubId], all.filter((b) => b.clubId === clubId))));
 }
 
 /**

@@ -18,7 +18,6 @@ import {
   Button,
   Checkbox,
   CircularProgress,
-  Divider,
   FormControlLabel,
   MenuItem,
   Stack,
@@ -26,8 +25,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import {
   CALENDAR_DISPLAY_QUERY_KEY,
   hoverChoices,
@@ -118,9 +117,13 @@ export default function CalendarDisplayPage() {
         onDiscard: () => { setSaved(false); setLunchTried(false); setDraft(null); },
       }}
     >
-      <SoftCard>
+      {save.isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>{problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}</Alert>
+      )}
+      {saved && !save.isPending && <Alert severity="success" sx={{ mb: 2 }}>Uloženo. Kalendář se tak kreslí všem.</Alert>}
+
+      <SettingsBoard id="calendar-grid" title="Pohled a mřížka" hint="Čím se kalendář otevře a kolik dne ukáže">
           <Stack spacing={2.5}>
-            <SectionLabel sx={{ mb: 0 }}>Pohled a mřížka</SectionLabel>
             <TextField
               select
               label="Výchozí pohled"
@@ -205,9 +208,11 @@ export default function CalendarDisplayPage() {
               {(lunchTried ? lunchProblem : null) ?? errors.lunch ?? 'Pauza, kterou má každý pracovní den, dokud mu řádek pracovní doby nepřidělí vlastní. Obě pole prázdná = žádný výchozí oběd.'}
             </Typography>
 
-            <Divider />
-            <SectionLabel sx={{ mb: 0 }}>Barvy</SectionLabel>
+          </Stack>
+      </SettingsBoard>
 
+      <SettingsBoard id="calendar-colours" title="Barvy" hint="Čára „teď“, svátky a obědová pauza">
+          <Stack spacing={2.5}>
             <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
               <TextField
                 label="Barva čáry „teď“"
@@ -268,15 +273,16 @@ export default function CalendarDisplayPage() {
               />
             </Stack>
 
-            <Divider />
+          </Stack>
+      </SettingsBoard>
 
+      <SettingsBoard id="calendar-hover" title="Bublina nad objednávkou" hint="Platí pro celou ordinaci">
             <Box>
-              <SectionLabel sx={{ mb: 0.5 }}>Bublina nad objednávkou</SectionLabel>
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>
                 Co ukázat po najetí myší na objednávku
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Vyberte, které údaje se zobrazí v bublině nad termínem. Platí pro celou ordinaci.
+                Vyberte, které údaje se zobrazí v bublině nad termínem.
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.5 }}>
                 {hoverChoices(query.data.hoverFieldCatalogue).map(({ key, label, help }) => {
@@ -313,12 +319,7 @@ export default function CalendarDisplayPage() {
               )}
             </Box>
 
-            {save.isError && (
-              <Alert severity="error">{problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}</Alert>
-            )}
-            {saved && !save.isPending && <Alert severity="success">Uloženo. Kalendář se tak kreslí všem.</Alert>}
-
-            <Box>
+            <Box sx={{ mt: 2 }}>
               <Button
                 size="small"
                 sx={{ color: 'text.secondary' }}
@@ -328,8 +329,7 @@ export default function CalendarDisplayPage() {
                 Vrátit výchozí hodnoty
               </Button>
             </Box>
-          </Stack>
-      </SoftCard>
+      </SettingsBoard>
       <BookingSlotsCard />
       <SingleWorkerCard />
     </SettingsScreen>

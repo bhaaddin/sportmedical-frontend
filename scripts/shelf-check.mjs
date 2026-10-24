@@ -197,6 +197,7 @@ const PAGE_PATH = {
   'set-skupinove': '/nastaveni/skupinove-slevy', 'set-kluby': '/nastaveni/kluby', 'set-email': '/nastaveni/sablony-emailu',
   'set-pripominky': '/nastaveni/pripominky', 'set-souhlasy': '/nastaveni/souhlasy', 'set-pravidla': '/pravidla-dokumentu',
   'set-dotaznik': '/dotaznik-nastaveni', 'set-sablony': '/dokumenty-sablony',
+  'set-udaje': '/nastaveni/udaje-pacienta', 'set-rychla': '/nastaveni/rychla-registrace', 'set-odkaz': '/nastaveni/odkaz-registrace', 'set-vzhled': '/nastaveni/vzhled-kalendare', 'set-texty': '/nastaveni/media-a-texty',
   /* Phase 2, S-2 */
   /* Phase 2, S-3 */
   clubs: '/clubs', 'clubs-orders': '/clubs/objednavky', 'clubs-hraci': '/clubs/hraci', 'clubs-fakturace': '/clubs/fakturace', 'clubs-stats': '/clubs/statistiky', vyhrazeni: '/vyhrazeni',

@@ -24,9 +24,9 @@ import {
   QUICK_REGISTRATION_QUERY_KEY, quickRegistrationSettingsApi, type QuickRegistrationSettings,
 } from '../../api/quickRegistrationSettings';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
-import { SoftCard } from '../../components/ui';
 import { TYPE } from '../../components/settings/settingsStyle';
 import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 const NBSP = ' ';
@@ -177,9 +177,7 @@ export default function QuickRegistrationSettingsPage() {
         <Stack spacing={2.5}>
           {failure !== null && <Alert severity="error">{failure}</Alert>}
 
-          <SoftCard component="section" aria-labelledby="qr-lhuta">
-            <Typography id="qr-lhuta" component="h2" sx={TYPE.sectionTitle}>Lhůta na dokončení</Typography>
-            <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2 }]}>Od objednání u přepážky běží hodiny. Pacient musí registraci dokončit včas.</Typography>
+          <SettingsBoard id="qr-lhuta" title="Lhůta na dokončení" hint="Od objednání u přepážky běží hodiny">
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: phone ? '1fr' : 'repeat(2, minmax(0, 1fr))', alignItems: 'start' }}>
               <TextField
                 label="Platnost odkazu"
@@ -202,11 +200,10 @@ export default function QuickRegistrationSettingsPage() {
                 slotProps={{ htmlInput: { inputMode: 'numeric' }, input: { endAdornment: <InputAdornment position="end">hodin</InputAdornment> } }}
               />
             </Box>
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard component="section" aria-labelledby="qr-datum">
-            <Typography id="qr-datum" component="h2" sx={TYPE.sectionTitle}>Datum narození</Typography>
-            <Typography sx={[TYPE.caption, { mt: 0.5, mb: 1 }]}>
+          <SettingsBoard id="qr-datum" title="Datum narození" hint="Při dokončení přes odkaz">
+            <Typography sx={[TYPE.caption, { mb: 1 }]}>
               Rychlá registrace u přepážky datum narození nikdy nežádá. Tady rozhodnete, zda ho pacient musí vyplnit při dokončení přes odkaz.
             </Typography>
             <FormControlLabel
@@ -214,7 +211,7 @@ export default function QuickRegistrationSettingsPage() {
               control={<Switch checked={draft.requireDateOfBirthOnCompletion} onChange={(e) => edit('requireDateOfBirthOnCompletion', e.target.checked)} />}
               label="Při dokončení vyžadovat datum narození"
             />
-          </SoftCard>
+          </SettingsBoard>
 
           {device !== 'desktop' && explainer !== null && (
             <SettingsAsideCard title="Co se stane">{explainer}</SettingsAsideCard>

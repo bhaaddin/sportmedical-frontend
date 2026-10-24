@@ -100,42 +100,12 @@ export default function DocumentTemplatesPage() {
     draft !== null && editing !== null
     && templateIsValid(draft) && templateChanged(editing, draft) && !save.isPending;
 
-  return (
-    <SettingsScreen
-      title="Dokumenty, šablony a hlavičky"
-      subtitle="Druhy dokumentů, které ordinace vede — jak se jmenují a jestli se používají; kdo který musí doložit, říkají Pravidla dokumentů"
-    >
+  /* Sorted by whether a rule asks for it; while the rules are unknown (loading, failed) nothing is called unused. */
+  const rulesKnown = rulesQuery.isSuccess;
+  const unused = rulesKnown ? templates.filter((template) => rulesFor(template.id) === 0) : [];
+  const inUse = rulesKnown ? templates.filter((template) => rulesFor(template.id) > 0) : templates;
 
-      {/*
-        * Off, never deleted: a filed document keeps its `templateId` forever,
-        * so deleting the kind would leave years of paperwork nameless.
-        *
-        * The second sentence used to promise it could be switched back on
-        * whenever. That was false and it was mine: the list endpoint answers
-        * with the ACTIVE templates only, so one switched off leaves this
-        * screen and takes its own row with it. It is not lost - `PUT` and
-        * `GET /{id}` both still reach it - but nothing here can list it. A way
-        * to has been asked for; until then this says what really happens.
-        */}
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Dokument se nemaže, jen vypíná. Vypnutý zmizí ze všech nabídek a nepůjde
-        ho nahrát, ale dřív nahrané dokumenty si podrží jméno — a tady zůstane
-        vidět, takže ho lze kdykoli zapnout zpátky.
-      </Alert>
-
-      <Shelf
-        id="document-templates"
-        title="Šablony"
-        count={templatesQuery.isLoading || templatesQuery.error ? undefined : templates.length}
-        layout="free"
-        loading={templatesQuery.isLoading || !(templatesQuery.isSuccess || templatesQuery.isError)}
-        error={templatesQuery.error ? errorText(templatesQuery.error, t) : false}
-        onRetry={() => void templatesQuery.refetch()}
-        empty={templates.length === 0}
-        emptyState={{ text: 'Ordinace nemá založený žádný druh dokumentu.' }}
-      >
-        <Stack spacing={1.5}>
-          {templates.map((template) => (
+  const renderTemplate = (template: DocumentTemplate) => (
             <Card key={template.id} sx={{ borderRadius: 3 }}>
               <CardContent sx={{ py: 2 }}>
                 <Stack
@@ -185,9 +155,72 @@ export default function DocumentTemplatesPage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+  );
+
+  return (
+    <SettingsScreen
+      title="Dokumenty, šablony a hlavičky"
+      subtitle="Druhy dokumentů, které ordinace vede — jak se jmenují a jestli se používají; kdo který musí doložit, říkají Pravidla dokumentů"
+    >
+
+      {/*
+        * Off, never deleted: a filed document keeps its `templateId` forever,
+        * so deleting the kind would leave years of paperwork nameless.
+        *
+        * The second sentence used to promise it could be switched back on
+        * whenever. That was false and it was mine: the list endpoint answers
+        * with the ACTIVE templates only, so one switched off leaves this
+        * screen and takes its own row with it. It is not lost - `PUT` and
+        * `GET /{id}` both still reach it - but nothing here can list it. A way
+        * to has been asked for; until then this says what really happens.
+        */}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Dokument se nemaže, jen vypíná. Vypnutý zmizí ze všech nabídek a nepůjde
+        ho nahrát, ale dřív nahrané dokumenty si podrží jméno — a tady zůstane
+        vidět, takže ho lze kdykoli zapnout zpátky.
+      </Alert>
+
+      <Stack spacing={2.5}>
+      {/* When no rule asks for any template, the one list that matters is "Nepoužité"; an empty first shelf above it would only be noise. */}
+      {!(rulesKnown && inUse.length === 0 && unused.length > 0) && (
+      <Shelf
+        id="document-templates"
+        title="Šablony"
+        hint={unused.length > 0 ? 'Vyžadované některým pravidlem' : undefined}
+        count={templatesQuery.isLoading || templatesQuery.error ? undefined : inUse.length}
+        layout="free"
+        loading={templatesQuery.isLoading || !(templatesQuery.isSuccess || templatesQuery.isError)}
+        error={templatesQuery.error ? errorText(templatesQuery.error, t) : false}
+        onRetry={() => void templatesQuery.refetch()}
+        empty={inUse.length === 0}
+        emptyState={{
+          text: templates.length === 0
+            ? 'Ordinace nemá založený žádný druh dokumentu.'
+            : 'Žádné pravidlo zatím nevyžaduje žádnou šablonu.',
+        }}
+      >
+        <Stack spacing={1.5}>
+          {inUse.map(renderTemplate)}
         </Stack>
       </Shelf>
+      )}
+
+      {/* Templates no rule asks for: the read the screen already does, sorted the other way. Only when the rules did load. */}
+      {unused.length > 0 && (
+        <Shelf
+          id="document-templates-unused"
+          title="Nepoužité"
+          hint="Žádné pravidlo je nevyžaduje"
+          count={unused.length}
+          countTone="grey"
+          layout="free"
+        >
+          <Stack spacing={1.5}>
+            {unused.map(renderTemplate)}
+          </Stack>
+        </Shelf>
+      )}
+      </Stack>
 
       <Dialog
         open={draft !== null}

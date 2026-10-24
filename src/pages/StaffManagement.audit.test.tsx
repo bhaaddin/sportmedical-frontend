@@ -70,6 +70,27 @@ describe('resetting a password', () => {
     expect(screen.getByText('jana@ordinace.cz', { selector: 'strong' })).toBeInTheDocument();
   });
 
+  it('says the temporary password was e-mailed when the server shows none, and offers no copy button', async () => {
+    resetPassword.mockResolvedValue({ account: account(), temporaryPasswordEmailed: true });
+    const user = userEvent.setup();
+    show();
+    await user.click((await row('Jana Nová')).getByRole('button', { name: 'Resetovat heslo pro jana@ordinace.cz' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Resetovat heslo' }));
+    expect(await screen.findByText('Dočasné heslo bylo odesláno e-mailem uživateli.')).toBeInTheDocument();
+    expect(screen.queryByText(/^Heslo:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Kopírovat' })).toBeNull();
+  });
+
+  it('still shows the password when the server returns one (e-mail not configured), flag absent or false', async () => {
+    resetPassword.mockResolvedValue({ account: account(), temporaryPassword: 'Nove-Docasne-3', temporaryPasswordEmailed: false });
+    const user = userEvent.setup();
+    show();
+    await user.click((await row('Jana Nová')).getByRole('button', { name: 'Resetovat heslo pro jana@ordinace.cz' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Resetovat heslo' }));
+    expect(await screen.findByText('Nove-Docasne-3')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kopírovat' })).toBeInTheDocument();
+  });
+
   it('a double click on the confirmation resets once (a second reset would invalidate the first password)', async () => {
     const user = userEvent.setup();
     let release: (value: unknown) => void = () => undefined;

@@ -25,9 +25,9 @@ import {
   INTAKE_LINK_QUERY_KEY, intakeLinkSettingsApi, type IntakeLinkSettings, type IntakeLinkSettingsResponse,
 } from '../../api/intakeLinkSettings';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
-import { SoftCard } from '../../components/ui';
 import { TYPE } from '../../components/settings/settingsStyle';
 import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 interface Draft {
@@ -225,9 +225,7 @@ export default function IntakeLinkSettingsPage() {
         <Stack spacing={2.5}>
           {failure !== null && <Alert severity="error">{failure}</Alert>}
 
-          <SoftCard component="section" aria-labelledby="il-lhuta">
-            <Typography id="il-lhuta" component="h2" sx={TYPE.sectionTitle}>Platnost a adresa</Typography>
-            <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2 }]}>Po vypršení pacient odkaz nepoužije a recepce vytvoří nový.</Typography>
+          <SettingsBoard id="il-lhuta" title="Platnost a adresa" hint="Po vypršení recepce vytvoří nový odkaz">
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: phone ? '1fr' : 'repeat(2, minmax(0, 1fr))', alignItems: 'start' }}>
               <TextField
                 label="Platnost odkazu"
@@ -250,11 +248,9 @@ export default function IntakeLinkSettingsPage() {
                 slotProps={{ htmlInput: { inputMode: 'url', autoComplete: 'off', maxLength: SITE_URL_MAX } }}
               />
             </Box>
-          </SoftCard>
+          </SettingsBoard>
 
-          <SoftCard component="section" aria-labelledby="il-email">
-            <Typography id="il-email" component="h2" sx={TYPE.sectionTitle}>E-mail s odkazem</Typography>
-            <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2 }]}>Zástupné údaje se při odeslání nahradí údaji pacienta.</Typography>
+          <SettingsBoard id="il-email" title="E-mail s odkazem" hint="Zástupné údaje se nahradí údaji pacienta">
             <Stack spacing={2}>
               <TextField
                 label="Předmět e-mailu"
@@ -294,7 +290,7 @@ export default function IntakeLinkSettingsPage() {
                 </Button>
               </Box>
             </Stack>
-          </SoftCard>
+          </SettingsBoard>
 
           {device !== 'desktop' && explainer !== null && (
             <SettingsAsideCard title="Co se stane">{explainer}</SettingsAsideCard>

@@ -25,8 +25,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
+import { SettingsBoard } from './SettingsBoard';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -117,8 +117,16 @@ export default function PatientFieldsPage() {
         i když jsou tady zapnuté.
       </Alert>
 
-      <SoftCard>
-          <SectionLabel>Zobrazené ({shown.length})</SectionLabel>
+      {save.isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}
+        </Alert>
+      )}
+      {saved && !save.isPending && (
+        <Alert severity="success" sx={{ mb: 2 }}>Uloženo. Karta a seznam pacientů to ukazují všem.</Alert>
+      )}
+
+      <SettingsBoard id="patient-fields-shown" title="Zobrazené" count={shown.length} hint="V pořadí, v jakém je karta ukáže">
           {shown.length === 0 && (
             <Typography color="text.secondary" sx={{ py: 1 }}>
               Nic — karta ukáže jen jméno pacienta.
@@ -169,9 +177,24 @@ export default function PatientFieldsPage() {
             ))}
           </Stack>
 
+          <Box sx={{ mt: 2 }}>
+            <Button
+              size="small"
+              sx={{ color: 'text.secondary' }}
+              disabled={save.isPending}
+              onClick={() => change(query.data.fields.map((field) => field.key))}
+            >
+              Zobrazit vše v původním pořadí
+            </Button>
+          </Box>
+      </SettingsBoard>
+
+      <SettingsBoard id="patient-fields-hidden" title="Skryté" count={hidden.length} hint="Karta je neukazuje">
+          {hidden.length === 0 && (
+            <Typography color="text.secondary" sx={{ py: 1 }}>Žádný údaj není skrytý.</Typography>
+          )}
           {hidden.length > 0 && (
             <>
-              <SectionLabel sx={{ mt: 3 }}>Skryté ({hidden.length})</SectionLabel>
               <Stack divider={<Divider flexItem />}>
                 {hidden.map((field) => (
                   <Stack key={field.key} direction="row" spacing={1} sx={{ py: 1, alignItems: 'center' }}>
@@ -191,27 +214,7 @@ export default function PatientFieldsPage() {
               </Stack>
             </>
           )}
-
-          {save.isError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}
-            </Alert>
-          )}
-          {saved && !save.isPending && (
-            <Alert severity="success" sx={{ mt: 2 }}>Uloženo. Karta a seznam pacientů to ukazují všem.</Alert>
-          )}
-
-          <Box sx={{ mt: 2 }}>
-            <Button
-              size="small"
-              sx={{ color: 'text.secondary' }}
-              disabled={save.isPending}
-              onClick={() => change(query.data.fields.map((field) => field.key))}
-            >
-              Zobrazit vše v původním pořadí
-            </Button>
-          </Box>
-      </SoftCard>
+      </SettingsBoard>
     </SettingsScreen>
   );
 }
