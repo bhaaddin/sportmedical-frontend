@@ -32,7 +32,7 @@ import { createRangeCover, type CoverRules } from './dayRowsCover';
 /** What the server says about telling the patient of a move (Etapa 12 BE-N). */
 export interface MoveNotice {
   patientNotified: boolean;
-  /** null = told; otherwise why not (not_requested, no_email, no_patient, no_change, patient_initiated, queue_failed). */
+  /** null = told; otherwise why not (not_requested, no_email, no_patient, no_change, patient_initiated, queue_failed, switched_off). */
   reason: string | null;
 }
 
@@ -284,7 +284,7 @@ export const appointmentsApi = {
    *
    * `options.ifMatch` is the `concurrencyToken` of the single read the desk acted on: when the appointment has changed
    * since, the server answers 412 instead of overwriting. Absent, the move proceeds as before. The answer says whether
-   * the patient was told (`reason`: null | not_requested | no_email | no_patient | no_change | ...), or `null` from a
+   * the patient was told (`reason`: null | not_requested | no_email | no_patient | no_change | switched_off | ...), or `null` from a
    * server that sends no such body.
    */
   reschedule: (

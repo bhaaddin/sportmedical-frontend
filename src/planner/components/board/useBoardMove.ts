@@ -95,6 +95,7 @@ const NOT_TOLD: Record<string, string> = {
   no_change: 'čas se nezměnil',
   patient_initiated: 'změnu provedl pacient sám',
   queue_failed: 'oznámení se nepodařilo odeslat',
+  switched_off: 'automatické oznámení o přesunu je vypnuté v Nastavení → Zprávy',
 };
 
 /**
