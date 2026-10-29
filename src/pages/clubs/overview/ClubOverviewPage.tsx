@@ -24,6 +24,7 @@ import { clubOrdersApi } from '../../../api/clubOrders';
 import { clubsApi } from '../../../api/clubs';
 import { CLUB_SCREEN_FRESH_MS, clubScreenKeys } from '../../../api/clubScreen';
 import { usePermission } from '../../../auth/usePermission';
+import { SendMessageButton } from '../../../components/messages/SendMessage';
 import { ClubAvatar } from '../../../components/clubs/ClubAvatar';
 import { formatCzk } from '../../../components/clubs/order/orderFormat';
 import { useClubSummary } from '../../../components/clubs/orders/ClubSummaryCard';
@@ -194,6 +195,7 @@ export default function ClubOverviewPage() {
         <>
           <Button variant="outlined" startIcon={<Add />} onClick={() => setEntry(true)} data-testid="club-new-order" sx={TARGET_SX}>{OVERVIEW_PAGE_TEXT.newOrder}</Button>
           <Button variant="outlined" startIcon={<Edit />} onClick={() => setEditing(true)} data-testid="club-edit" sx={TARGET_SX}>{OVERVIEW_PAGE_TEXT.edit}</Button>
+          <SendMessageButton target={{ kind: 'club', id: club.id }} />
         </>
       }
     >

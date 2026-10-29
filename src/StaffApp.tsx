@@ -69,8 +69,7 @@ const BookingCalendarsPage = lazy(() => import('./pages/booking/CalendarsPage'))
 const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage'));
 const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTemplatesPage'));
-const EmailTemplatesPage = lazy(() => import('./pages/settings/EmailTemplatesPage'));
-const EmailSettingsPage = lazy(() => import('./pages/settings/EmailSettingsPage'));
+const MessagesPage = lazy(() => import('./pages/settings/messages/MessagesPage'));
 const TwoFactorPage = lazy(() => import('./pages/settings/TwoFactorPage'));
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
@@ -87,7 +86,6 @@ const CompanyInvoiceSettingsPage = lazy(() => import('./pages/settings/CompanyIn
 const SiteContentAdminPage = lazy(() => import('./pages/settings/SiteContentAdminPage'));
 const MediaStorageSettingsPage = lazy(() => import('./pages/settings/MediaStorageSettingsPage'));
 const ClubSettingsPage = lazy(() => import('./pages/settings/ClubSettingsPage'));
-const RemindersPage = lazy(() => import('./pages/settings/RemindersPage'));
 const ConsentSettingsPage = lazy(() => import('./pages/settings/ConsentSettingsPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
@@ -192,9 +190,12 @@ const SETTINGS_UNFRAMED = new Set<string>(['/blokovany-cas', '/nastaveni/cenik',
  * the effective list the server sent at sign-in - the role's defaults with that
  * person's own grants and revocations applied. It hides; the server refuses.
  */
-function RequirePermission({ of, children }: { of: Permission; children: React.ReactNode }) {
+const MESSAGES_PERMISSIONS = ['communication.manage', 'settings.clinic.manage'] as const;
+
+function RequirePermission({ of, children }: { of: Permission | readonly Permission[]; children: React.ReactNode }) {
   const held = usePermissions();
-  if (!held.includes(of)) {
+  const anyOf: readonly Permission[] = typeof of === 'string' ? [of] : of;
+  if (!anyOf.some((p) => held.includes(p))) {
     return <NotFound />;
   }
   return <>{children}</>;
@@ -468,7 +469,6 @@ export default function StaffApp() {
           <Route path="/nastaveni/historie-zmen" element={<RequirePermission of="settings.clinic.manage"><ChangeHistoryPage /></RequirePermission>} />
           <Route path="/nastaveni/skupinove-slevy" element={<RequirePermission of="settings.clinic.manage"><GroupDiscountsPage /></RequirePermission>} />
           <Route path="/hodnoceni-pacientu" element={<FeedbackReviewPage />} />
-          <Route path="/nastaveni/pripominky" element={<RequirePermission of="settings.clinic.manage"><RemindersPage /></RequirePermission>} />
           <Route path="/nastaveni/souhlasy" element={<RequirePermission of="settings.clinic.manage"><ConsentSettingsPage /></RequirePermission>} />
           <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
           <Route path="/clubs" element={<ClubsPage />} />
@@ -503,8 +503,11 @@ export default function StaffApp() {
           <Route path="/nastaveni/sluzby/:serviceId" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
           <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
           <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
-          <Route path="/nastaveni/sablony-emailu" element={<RequirePermission of="communication.manage"><EmailTemplatesPage /></RequirePermission>} />
-          <Route path="/nastaveni/email" element={<RequirePermission of="settings.clinic.manage"><EmailSettingsPage /></RequirePermission>} />
+          <Route path="/nastaveni/zpravy" element={<RequirePermission of={MESSAGES_PERMISSIONS}><MessagesPage /></RequirePermission>} />
+          {/* Šablony, E-mail and Připomínky became one screen, Zprávy; the old addresses keep working. */}
+          {['sablony-emailu', 'email', 'pripominky'].map((old) => (
+            <Route key={old} path={`/nastaveni/${old}`} element={<Navigate to="/nastaveni/zpravy" replace />} />
+          ))}
           <Route path="/nastaveni/zabezpeceni" element={<TwoFactorPage />} />
           <Route path="/calendars" element={<RequirePermission of="settings.clinic.manage"><BookingCalendarsPage /></RequirePermission>} />
           <Route path="/activities" element={<RequirePermission of="settings.clinic.manage"><BookingActivitiesPage /></RequirePermission>} />

@@ -23,6 +23,7 @@ import { alpha } from '@mui/material/styles';
 import { ArrowBack } from '@mui/icons-material';
 import { patientsApi } from '../../api/patients';
 import { usePermission } from '../../auth/usePermission';
+import { SendMessageButton } from '../../components/messages/SendMessage';
 import type { Patient } from '../../api/patients';
 import { documentsApi } from '../../api/documents';
 import type {
@@ -306,6 +307,7 @@ export default function PatientLayout() {
               Upravit kartu
             </Button>
           )}
+          {id && <SendMessageButton target={{ kind: 'patient', id }} />}
           {mayEdit && <PortalPasswordReset patientId={id} />}
         </>
       )}

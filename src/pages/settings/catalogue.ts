@@ -54,6 +54,8 @@ export interface SettingsItem {
    * from, blocked time.
    */
   requires?: Permission;
+  /** Shown when the person holds ANY of these; for a screen that combines areas with different owners. */
+  requiresAny?: readonly Permission[];
   /** Other addresses that are still this screen (an older route kept alive). */
   aliases?: string[];
   /**
@@ -264,8 +266,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
   {
     /*
-     * What the clinic says to people. The templates are one item whether you
-     * call them "SMS a e-maily" or "Šablony zpráv": one screen, one row.
+     * What the clinic says to people. Templates, the clinic's own messages, the calendar file, the reminder and the
+     * sending status are ONE screen, Zprávy (it replaced Šablony, E-mail and Připomínky; their addresses are aliases).
      */
     id: 'komunikace',
     label: 'Komunikace',
@@ -273,31 +275,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     icon: 'komunikace',
     items: [
       {
-        id: 'sablony-emailu',
-        label: 'SMS a e-maily',
-        description: 'Šablony zpráv: předmět a text, náhled se vzorovými hodnotami a testovací odeslání',
-        to: '/nastaveni/sablony-emailu',
-        scope: null,
-        keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace'],
-        requires: 'communication.manage',
-      },
-      {
-        id: 'email-odesilani',
-        label: 'E-mail',
-        description: 'Odkud ordinace posílá e-maily, jestli odesílání funguje, zkušební e-mail a nastavení DNS',
-        to: '/nastaveni/email',
-        scope: null,
-        keywords: ['email', 'e-mail', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'testovací e-mail', 'fronta'],
-        requires: 'settings.clinic.manage',
-      },
-      {
-        id: 'pripominky',
-        label: 'Připomínky',
-        description: 'Kolik hodin před termínem se pacientovi připraví připomínka',
-        to: '/nastaveni/pripominky',
+        id: 'zpravy',
+        label: 'Zprávy',
+        description: 'E-maily pacientům a klubům: zapnout, upravit nebo napsat vlastní, upozornění v kalendáři, připomínky a odesílání',
+        to: '/nastaveni/zpravy',
+        aliases: ['/nastaveni/sablony-emailu', '/nastaveni/email', '/nastaveni/pripominky'],
         scope: 'booking.reminderHoursBefore',
-        keywords: ['připomínka', 'připomenutí', 'upomínka', 'sms', 'email', 'hodin před termínem', 'notifikace'],
-        requires: 'settings.clinic.manage',
+        requiresAny: ['communication.manage', 'settings.clinic.manage'],
+        keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace', 'vlastní zpráva', 'hromadná zpráva', 'posun dne', 'hráči', 'kalendář', 'alarm', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'fronta', 'připomínka', 'připomenutí', 'upomínka', 'hodin před termínem'],
       },
       {
         id: 'hodnoceni-pacientu',
@@ -538,7 +523,9 @@ export function visibleSections(
   return SETTINGS_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter(
-      (item) => item.requires === undefined || permissions.has(item.requires),
+      (item) =>
+        (item.requires === undefined || permissions.has(item.requires)) &&
+        (item.requiresAny === undefined || item.requiresAny.some((p) => permissions.has(p))),
     ),
   })).filter((section) => section.items.length > 0);
 }

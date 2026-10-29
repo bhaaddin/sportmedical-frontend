@@ -399,7 +399,7 @@ describe('the smart search', () => {
     ['mrizka', 'vzhled-kalendare'],
     ['barvy', 'vzhled-kalendare'],
     ['anamneza', 'zdravotni-dotaznik'],
-    ['sms', 'sablony-emailu'],
+    ['sms', 'zpravy'],
     ['svatek', 'svatky'],
     ['opravneni', 'tym'],
     ['gdpr', 'souhlasy'],
