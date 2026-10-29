@@ -110,7 +110,8 @@ describe('the list', () => {
     ]);
     renderScreen(<ExceptionsPage />, '/exceptions');
     await screen.findByText('Servis');
-    const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-card="exception"]'));
+    const card = (id: string) => document.querySelector<HTMLElement>(`[data-card="exception"][data-item-id="${id}"]`) as HTMLElement;
+    const rows = [card('a'), card('b'), card('c')];
     expect(within(rows[0]).getByText('Zavřeno', { selector: '.MuiChip-label' })).toBeInTheDocument();
     expect(within(rows[1]).getByText('Jiný čas')).toBeInTheDocument();
     expect(within(rows[1]).getByText('10:00–14:30')).toBeInTheDocument();
