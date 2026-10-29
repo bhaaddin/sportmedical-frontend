@@ -18,6 +18,7 @@ import { TARGET_SX } from '../../../ui/shelf';
 import { SettingsScreen } from '../SettingsFrame';
 import { SettingsBoard } from '../SettingsBoard';
 import { CalendarReminders } from './CalendarReminders';
+import { LayoutEditor } from './LayoutEditor';
 import { AutoRows, CustomRows, GroupLabel, TEMPLATES_KEY } from './MessageRows';
 import { NOT_DEPLOYED_TEXT, customOnly, groupBuiltIn, isNotDeployed } from './messagesModel';
 import { SendingStatus } from './SendingStatus';
@@ -90,6 +91,12 @@ export default function MessagesPage() {
         <div role="list" aria-label="Vlastní zprávy">
           <CustomRows templates={custom} onEdit={setEditing} onToast={setToast} />
         </div>
+      </SettingsBoard>
+      )}
+
+      {notDeployed || !mayMessages ? null : (
+      <SettingsBoard id="email-layout" title="Hlavička a patička" hint="Jak vypadá začátek a konec každého e-mailu">
+        <LayoutEditor onToast={setToast} />
       </SettingsBoard>
       )}
 

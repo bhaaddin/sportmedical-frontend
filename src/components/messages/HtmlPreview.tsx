@@ -4,14 +4,14 @@
  */
 import { Box } from '@mui/material';
 
-export function HtmlPreview({ html, title = 'Náhled e-mailu', height = 360 }: { html: string; title?: string; height?: number | string }) {
+export function HtmlPreview({ html, title = 'Náhled e-mailu', height = 360, dark = false }: { html: string; title?: string; height?: number | string; dark?: boolean }) {
   return (
     <Box
       component="iframe"
       title={title}
       srcDoc={html}
       sandbox=""
-      sx={{ display: 'block', width: '100%', height, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'common.white' }}
+      sx={{ display: 'block', width: '100%', height, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: dark ? '#000C17' : 'common.white' }}
     />
   );
 }
