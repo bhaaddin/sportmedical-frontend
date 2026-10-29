@@ -72,11 +72,11 @@ describe('who sees what in the second half of Nastavení', () => {
     expect(idsFor([permission])).toEqual([...OPEN_TO_EVERYBODY, ...extra].sort());
   });
 
-  it('settings.clinic.manage opens the 14 administration screens and none of the three single-permission ones', () => {
+  it('settings.clinic.manage opens the 14 administration screens, Zprávy (reminders, sending) and neither single-permission one', () => {
     const ids = idsFor(['settings.clinic.manage']);
-    expect(ids).toHaveLength(16);
-    for (const closed of ['zpravy', 'zdravotni-dotaznik', 'tym']) expect(ids).not.toContain(closed);
-    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy']) {
+    expect(ids).toHaveLength(17);
+    for (const closed of ['zdravotni-dotaznik', 'tym']) expect(ids).not.toContain(closed);
+    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy', 'zpravy']) {
       expect(ids).toContain(open);
     }
   });

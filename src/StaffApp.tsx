@@ -190,9 +190,12 @@ const SETTINGS_UNFRAMED = new Set<string>(['/blokovany-cas', '/nastaveni/cenik',
  * the effective list the server sent at sign-in - the role's defaults with that
  * person's own grants and revocations applied. It hides; the server refuses.
  */
-function RequirePermission({ of, children }: { of: Permission; children: React.ReactNode }) {
+const MESSAGES_PERMISSIONS = ['communication.manage', 'settings.clinic.manage'] as const;
+
+function RequirePermission({ of, children }: { of: Permission | readonly Permission[]; children: React.ReactNode }) {
   const held = usePermissions();
-  if (!held.includes(of)) {
+  const anyOf: readonly Permission[] = typeof of === 'string' ? [of] : of;
+  if (!anyOf.some((p) => held.includes(p))) {
     return <NotFound />;
   }
   return <>{children}</>;
@@ -500,7 +503,7 @@ export default function StaffApp() {
           <Route path="/nastaveni/sluzby/:serviceId" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
           <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
           <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
-          <Route path="/nastaveni/zpravy" element={<RequirePermission of="communication.manage"><MessagesPage /></RequirePermission>} />
+          <Route path="/nastaveni/zpravy" element={<RequirePermission of={MESSAGES_PERMISSIONS}><MessagesPage /></RequirePermission>} />
           {/* Šablony, E-mail and Připomínky became one screen, Zprávy; the old addresses keep working. */}
           {['sablony-emailu', 'email', 'pripominky'].map((old) => (
             <Route key={old} path={`/nastaveni/${old}`} element={<Navigate to="/nastaveni/zpravy" replace />} />

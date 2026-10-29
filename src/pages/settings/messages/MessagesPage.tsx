@@ -29,10 +29,11 @@ type Editing = EmailTemplate | null | undefined;
 export default function MessagesPage() {
   const { t } = useTranslation();
   const maySettings = usePermission('settings.clinic.manage');
+  const mayMessages = usePermission('communication.manage');
   const [editing, setEditing] = useState<Editing>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
-  const listQuery = useQuery({ queryKey: TEMPLATES_KEY, queryFn: emailTemplatesApi.list, retry: false });
+  const listQuery = useQuery({ queryKey: TEMPLATES_KEY, queryFn: emailTemplatesApi.list, retry: false, enabled: mayMessages });
   const templates = useMemo(() => listQuery.data ?? [], [listQuery.data]);
   const { patients, clubs } = groupBuiltIn(templates);
   const custom = customOnly(templates);
@@ -49,7 +50,7 @@ export default function MessagesPage() {
       <Stack spacing={3}>
       {notDeployed ? <Alert severity="info">{NOT_DEPLOYED_TEXT}</Alert> : null}
 
-      {notDeployed ? null : (
+      {notDeployed || !mayMessages ? null : (
       <SettingsBoard
         id="auto-messages"
         title="Automatické zprávy"
@@ -71,7 +72,7 @@ export default function MessagesPage() {
       </SettingsBoard>
       )}
 
-      {notDeployed ? null : (
+      {notDeployed || !mayMessages ? null : (
       <SettingsBoard
         id="custom-messages"
         title="Vlastní zprávy"
@@ -93,7 +94,7 @@ export default function MessagesPage() {
       )}
 
       <SettingsBoard id="calendar-reminders" title="Kalendář a připomínky" hint="Kdy zazvoní kalendář a kdy odejde připomínka">
-        <CalendarReminders onToast={setToast} alarms={!notDeployed} />
+        <CalendarReminders onToast={setToast} alarms={mayMessages && !notDeployed} />
       </SettingsBoard>
 
       {maySettings ? (

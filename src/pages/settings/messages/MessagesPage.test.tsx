@@ -70,6 +70,18 @@ describe('Zprávy', () => {
     expect(within(screen.getByRole('list', { name: 'Vlastní zprávy' })).getByText('Posun dne')).toBeInTheDocument();
   });
 
+  it('keeps reminders and sending for someone with clinic settings only, without asking for templates', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
+    serve(LIST);
+    renderPage();
+    expect(await screen.findByText('Kalendář a připomínky')).toBeInTheDocument();
+    expect(screen.getByText('Odesílání')).toBeInTheDocument();
+    expect(screen.queryByText('Automatické zprávy')).toBeNull();
+    expect(screen.queryByText('Vlastní zprávy')).toBeNull();
+    expect(get).not.toHaveBeenCalledWith('/api/email-templates');
+    expect(get).not.toHaveBeenCalledWith('/api/email-templates/calendar');
+  });
+
   it('switches automatic sending with PUT /{code}/auto-send', async () => {
     serve(LIST);
     renderPage();

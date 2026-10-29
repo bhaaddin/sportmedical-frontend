@@ -54,6 +54,8 @@ export interface SettingsItem {
    * from, blocked time.
    */
   requires?: Permission;
+  /** Shown when the person holds ANY of these; for a screen that combines areas with different owners. */
+  requiresAny?: readonly Permission[];
   /** Other addresses that are still this screen (an older route kept alive). */
   aliases?: string[];
   /**
@@ -279,8 +281,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/nastaveni/zpravy',
         aliases: ['/nastaveni/sablony-emailu', '/nastaveni/email', '/nastaveni/pripominky'],
         scope: 'booking.reminderHoursBefore',
+        requiresAny: ['communication.manage', 'settings.clinic.manage'],
         keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace', 'vlastní zpráva', 'hromadná zpráva', 'posun dne', 'hráči', 'kalendář', 'alarm', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'fronta', 'připomínka', 'připomenutí', 'upomínka', 'hodin před termínem'],
-        requires: 'communication.manage',
       },
       {
         id: 'hodnoceni-pacientu',
@@ -521,7 +523,9 @@ export function visibleSections(
   return SETTINGS_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter(
-      (item) => item.requires === undefined || permissions.has(item.requires),
+      (item) =>
+        (item.requires === undefined || permissions.has(item.requires)) &&
+        (item.requiresAny === undefined || item.requiresAny.some((p) => permissions.has(p))),
     ),
   })).filter((section) => section.items.length > 0);
 }
