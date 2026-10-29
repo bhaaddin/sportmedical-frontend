@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { placeholderToken, singleBraceTokens, singleBraceWarning } from './emailTemplateText';
-import { wholeHours } from './RemindersPage';
+import { wholeHours } from './messages/messagesModel';
 import { averageRating } from '../FeedbackReviewPage';
 import { readState, stateAfter, stateBefore, toneOfAction, topActions } from '../auditLogModel';
 import { STATUS_TEXT, gigabytes, readHealth, waitText } from '../systemHealthModel';

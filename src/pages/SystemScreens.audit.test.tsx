@@ -53,9 +53,9 @@ describe('Historie změn: the "Oblast" filter', () => {
     }
   });
 
-  it('offers Připomínky and sends the key the history files it under', async () => {
+  it('offers Zprávy (it holds the reminder) and sends the key the history files it under', async () => {
     await open();
-    await userEvent.click(screen.getByRole('option', { name: /Připomínky/ }));
+    await userEvent.click(screen.getByRole('option', { name: /Zprávy/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Filtrovat' }));
     await waitFor(() => expect(get).toHaveBeenLastCalledWith('/api/v1/audit/changes', { params: { take: 25, skip: 0, scope: 'booking.reminderHoursBefore' } }));
   });

@@ -52,7 +52,7 @@ const ROUTES = [
   '/nastaveni/vzhled-kalendare', '/nastaveni/udaje-pacienta', '/nastaveni/slevy', '/nastaveni/barvy-sluzeb',
   '/nastaveni/rychla-registrace', '/nastaveni/firma-a-faktury', '/nastaveni/media-a-texty',
   '/nastaveni/uloziste-medii', '/nastaveni/kluby', '/nastaveni/integrace', '/nastaveni/historie-zmen',
-  '/nastaveni/skupinove-slevy', '/nastaveni/pripominky', '/nastaveni/souhlasy', '/nastaveni/sablony-emailu',
+  '/nastaveni/skupinove-slevy', '/nastaveni/souhlasy', '/nastaveni/zpravy',
   '/nastaveni/zabezpeceni', '/nepoznana-stranka-404',
 ];
 const PATIENT_TABS = ['', '/dokumenty', '/terminy', '/historie', '/vysledky', '/faktury', '/edit'];

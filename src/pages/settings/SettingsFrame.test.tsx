@@ -113,7 +113,7 @@ describe('the frame, in particular', () => {
 
   it('hides a related item the person has no permission for - never a dead link', () => {
     localStorage.setItem('permissions', JSON.stringify(['communication.manage']));
-    renderFrame({}, '/nastaveni/sablony-emailu');
+    renderFrame({}, '/nastaveni/zpravy');
     const related = screen.queryByRole('region', { name: 'Související nastavení' });
     /* Pripominky and the rest of Komunikace need settings.clinic.manage; Hodnocení needs nothing. */
     expect(related).toHaveTextContent('Hodnocení pacientů');

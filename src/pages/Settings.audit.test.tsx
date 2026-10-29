@@ -37,18 +37,18 @@ beforeEach(() => {
 });
 
 describe('the group pages of the second half', () => {
-  it('Komunikace for an owner lists the four screens', async () => {
+  it('Komunikace for an owner lists the two screens', async () => {
     hold(['settings.clinic.manage', 'communication.manage']);
     show('/settings/komunikace');
     await screen.findByRole('heading', { level: 1, name: 'Komunikace' });
-    expect(rows('Komunikace')).toEqual(['/nastaveni/sablony-emailu', '/nastaveni/email', '/nastaveni/pripominky', '/hodnoceni-pacientu']);
+    expect(rows('Komunikace')).toEqual(['/nastaveni/zpravy', '/hodnoceni-pacientu']);
   });
 
-  it('Komunikace for somebody with only communication.manage lists the templates and the reviews, not the reminders', async () => {
+  it('Komunikace for somebody with only communication.manage lists the messages and the reviews', async () => {
     hold(['communication.manage']);
     show('/settings/komunikace');
     await screen.findByRole('heading', { level: 1, name: 'Komunikace' });
-    expect(rows('Komunikace')).toEqual(['/nastaveni/sablony-emailu', '/hodnoceni-pacientu']);
+    expect(rows('Komunikace')).toEqual(['/nastaveni/zpravy', '/hodnoceni-pacientu']);
   });
 
   it('Dokumenty for somebody with only questionnaires.manage lists the questionnaire alone', async () => {
@@ -114,7 +114,7 @@ describe('search on the hub for somebody with limited rights', () => {
     hold(['communication.manage']);
     show('/settings');
     await userEvent.type(await screen.findByLabelText('Hledat v nastavení'), 'sms');
-    expect(screen.getByRole('link', { name: /SMS a e-maily/ })).toHaveAttribute('href', '/nastaveni/sablony-emailu');
+    expect(screen.getByRole('link', { name: /Zprávy/ })).toHaveAttribute('href', '/nastaveni/zpravy');
   });
 
   it('finds the two-factor screen by "heslo" for everybody', async () => {
