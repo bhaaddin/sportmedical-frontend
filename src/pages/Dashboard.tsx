@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { overviewScreenBlocked, seedOverviewScreen } from '../api/screens';
 import { usePermission } from '../auth/usePermission';
 import type { DayAppointment } from '../api/bookingContracts';
 import DayOverviewPage from './booking/DayOverviewPage';
@@ -67,9 +68,24 @@ function OwnerDashboard() {
   const today = pragueDateKey(now);
   const { from, to } = weekRange(now);
 
+  /*
+   * One request for the week, the club orders and the names of today's patients when the server has the overview screen
+   * (NET-11): it seeds the keys below, and the reads wait for that one answer. An older server, a refusal or a failure
+   * settles it at once and the reads run exactly as they always did.
+   */
+  const queryClient = useQueryClient();
+  const [screenSettled, setScreenSettled] = useState(() => overviewScreenBlocked());
+  useEffect(() => {
+    if (screenSettled) return undefined;
+    let current = true;
+    void seedOverviewScreen(queryClient, { from, to, today }, { weekKey: ['overview', 'week', from], mayViewPatients: canSeePatients })
+      .then(() => { if (current) setScreenSettled(true); });
+    return () => { current = false; };
+  }, [queryClient, screenSettled, from, to, today, canSeePatients]);
+
   /* ONE request for the Prague week: it answers Dnes (today's rows) and Tento týden (the seven bars). */
   const pollMs = useOverviewLive();
-  const weekQuery = useQuery({ ...overviewWeekQuery(from, to), refetchInterval: pollMs, retry: false });
+  const weekQuery = useQuery({ ...overviewWeekQuery(from, to), enabled: screenSettled, refetchInterval: pollMs, retry: false });
   const clubOrders = useQuery({ ...overviewClubOrdersQuery(), retry: false });
 
   const todayRows: DayAppointment[] = useMemo(() => (weekQuery.data ?? []).filter((a) => dayOf(a) === today), [weekQuery.data, today]);

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Box, Button, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Link, Stack, TextField, Typography,
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { Refresh, Send } from '@mui/icons-material';
 import { StatusChip } from '../../../components/ui';
 import { TARGET_SX } from '../../../ui/shelf';
@@ -75,6 +76,7 @@ export function SendingStatus() {
       <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
         <Button variant="outlined" startIcon={<Send />} onClick={() => { setOpen(true); setResult(null); }} sx={TARGET_SX}>Poslat zkušební e-mail</Button>
         <Button startIcon={<Refresh />} onClick={() => { void load(); }} sx={TARGET_SX}>Obnovit</Button>
+        <Button component={RouterLink} to="/nastaveni/fronta-emailu" sx={TARGET_SX}>Fronta e-mailů</Button>
         <Button color="inherit" onClick={() => setHelp((v) => !v)} aria-expanded={help} sx={TARGET_SX}>Co je potřeba nastavit</Button>
       </Stack>
       <Collapse in={help} unmountOnExit>

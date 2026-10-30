@@ -70,6 +70,7 @@ const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage
 const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTemplatesPage'));
 const MessagesPage = lazy(() => import('./pages/settings/messages/MessagesPage'));
+const OutboxPage = lazy(() => import('./pages/settings/outbox/OutboxPage'));
 const TwoFactorPage = lazy(() => import('./pages/settings/TwoFactorPage'));
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const BookingChangesPage = lazy(() => import('./pages/settings/BookingChangesPage'));
@@ -448,7 +449,7 @@ export default function StaffApp() {
             <Route path="faktury" element={<RequirePermission of="billing.manage"><PatientInvoicesPage /></RequirePermission>} />
           </Route>
           {/* Opened from the patient's card (Výsledky tab, Přehled); not a rail section any more. */}
-          <Route path="/diagnostics/new" element={<DiagnosticForm />} />
+          <Route path="/diagnostics/new" element={<RequirePermission of="patients.view"><DiagnosticForm /></RequirePermission>} />
           {/* The retired Výsledky section: its screens are gone, old links land on the overview. */}
           {RETIRED_PATHS.map((path) => <Route key={path} path={path} element={<Navigate to="/prehled" replace />} />)}
           <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
@@ -508,6 +509,7 @@ export default function StaffApp() {
           <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
           <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
           <Route path="/nastaveni/zpravy" element={<RequirePermission of={MESSAGES_PERMISSIONS}><MessagesPage /></RequirePermission>} />
+          <Route path="/nastaveni/fronta-emailu" element={<RequirePermission of="settings.clinic.manage"><OutboxPage /></RequirePermission>} />
           {/* Šablony, E-mail and Připomínky became one screen, Zprávy; the old addresses keep working. */}
           {['sablony-emailu', 'email', 'pripominky'].map((old) => (
             <Route key={old} path={`/nastaveni/${old}`} element={<Navigate to="/nastaveni/zpravy" replace />} />

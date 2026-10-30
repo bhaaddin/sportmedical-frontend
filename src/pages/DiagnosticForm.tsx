@@ -205,6 +205,8 @@ export default function DiagnosticForm() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticSession | null>(null);
   const [error, setError] = useState('');
+  /* The visit this examination is for (`?appointmentId=`, from "Zahájit vyšetření" on the appointment). Sent once, at create. */
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
 
   /* The patient this was opened for (the card's "Nové vyšetření" sends `?patientId=`): their name for the chip in the header. */
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -214,6 +216,8 @@ export default function DiagnosticForm() {
     const params = new URLSearchParams(window.location.search);
     const pid = params.get('patientId');
     if (!pid) return undefined;
+    const aid = params.get('appointmentId');
+    if (aid) setAppointmentId(aid);
     setForm(prev => ({ ...prev, patientId: pid }));
     let live = true;
     Promise.resolve().then(() => patientsApi.getById(pid))
@@ -227,8 +231,10 @@ export default function DiagnosticForm() {
   }, []);
 
   /* The chip in the header: only for the patient whose name is known, and only while the form is still about them. */
-  const patientChip = (id: string): EntityRef[] =>
-    urlPatient !== null && urlPatient.id === id ? [{ kind: 'patient', id, label: urlPatient.name }] : [];
+  const patientChip = (id: string, visit: string | null = appointmentId): EntityRef[] => [
+    ...(urlPatient !== null && urlPatient.id === id ? [{ kind: 'patient', id, label: urlPatient.name } as EntityRef] : []),
+    ...(visit !== null && visit !== '' ? [{ kind: 'appointment', id: visit, label: 'Termín vyšetření' } as EntityRef] : []),
+  ];
 
   const update = (field: 'patientId' | 'practitionerName' | 'rawPractitionerNotes', value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
@@ -236,7 +242,8 @@ export default function DiagnosticForm() {
   const updateVital = (field: VitalKey, value: number | null) =>
     setForm(prev => ({ ...prev, vitals: { ...prev.vitals, [field]: value } }));
 
-  const request = toRequest(form);
+  const baseRequest = toRequest(form);
+  const request = baseRequest !== null && appointmentId !== null ? { ...baseRequest, appointmentId } : baseRequest;
 
   const handleSubmit = async () => {
     if (request === null) return;
@@ -247,7 +254,15 @@ export default function DiagnosticForm() {
       setResult(session);
       toast.success('Diagnostická relace vytvořena!');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Nepodařilo se vytvořit relaci');
+      const code = err.response?.data?.code;
+      if (code === 'appointment_not_found' || code === 'appointment_patient_mismatch') {
+        setAppointmentId(null);
+        setError(code === 'appointment_not_found'
+          ? 'Termín, ke kterému se vyšetření vázalo, už neexistuje. Uložením vznikne vyšetření bez termínu.'
+          : 'Termín patří jinému pacientovi. Uložením vznikne vyšetření bez termínu.');
+      } else {
+        setError(err.response?.data?.message || 'Nepodařilo se vytvořit relaci');
+      }
       toast.error('Nepodařilo se vytvořit relaci');
     } finally {
       setLoading(false);
@@ -285,7 +300,7 @@ export default function DiagnosticForm() {
       <PageFrame
         title="Výsledky vyšetření"
         purpose="Diagnostika a měření · uložená relace"
-        entities={patientChip(result.patientId)}
+        entities={patientChip(result.patientId, result.appointmentId ?? null)}
         actions={
           <Button variant="outlined" onClick={() => { setResult(null); setForm({ ...emptyDraft(), patientId: form.patientId }); setActiveStep(0); }} sx={TARGET_SX}>
             Vytvořit další relaci

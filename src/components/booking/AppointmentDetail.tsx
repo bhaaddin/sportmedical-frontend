@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -57,6 +57,8 @@ import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
+/* Its own chunk: the calendar's bundle does not carry the diagnostics client (planner budget). */
+const AppointmentExamination = lazy(() => import("./AppointmentExamination").then((m) => ({ default: m.AppointmentExamination })));
 import { useCompletionLink } from "./quick/useCompletionLink";
 import { QuickPendingCard } from "./quick/QuickPendingCard";
 import { missingConsentsLine } from "./patient/consentNames";
@@ -253,6 +255,7 @@ function DetailBody({
   const queryClient = useQueryClient();
   const mayEdit = usePermission("bookings.edit");
   const mayCancel = usePermission("bookings.cancel");
+  const mayViewPatients = usePermission("patients.view");
 
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [cancelling, setCancelling] = useState(false);
@@ -964,6 +967,12 @@ function DetailBody({
               error={conflict ? null : rescheduleMutation.error}
             />
             </Box>
+          ) : null}
+
+          {hasPatient && mayViewPatients ? (
+            <Suspense fallback={null}>
+              <AppointmentExamination patientId={appointment.patientId} appointmentId={appointment.id} />
+            </Suspense>
           ) : null}
 
           {/* The patient's personal portal link, issuable straight from the booking. */}

@@ -11,6 +11,7 @@
  * is open; what the layout loaded comes in through the outlet context rather
  * than being fetched a second time here.
  */
+import PatientClubsShelf from './patients/PatientClubsShelf';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useIsPhone } from '../layout/useDevice';
@@ -404,6 +405,7 @@ export default function PatientDetails() {
               requirements={requirements}
             />
           </Shelf>
+          <PatientClubsShelf patientId={patient.id} />
         </Box>
       </Box>
     </Box>

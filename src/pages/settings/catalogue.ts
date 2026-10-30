@@ -301,6 +301,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace', 'vlastní zpráva', 'hromadná zpráva', 'posun dne', 'hráči', 'kalendář', 'alarm', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'fronta', 'připomínka', 'připomenutí', 'upomínka', 'hodin před termínem'],
       },
       {
+        id: 'fronta-emailu',
+        label: 'Fronta e-mailů',
+        description: 'Které e-maily čekají, odešly nebo selhaly; selhané jde odeslat znovu nebo zrušit',
+        to: '/nastaveni/fronta-emailu',
+        scope: null,
+        requires: 'settings.clinic.manage',
+        keywords: ['fronta', 'e-maily', 'email', 'neodešlo', 'selhalo', 'odeslat znovu', 'zrušit odeslání', 'odchozí pošta', 'outbox'],
+      },
+      {
         id: 'hodnoceni-pacientu',
         label: 'Hodnocení pacientů',
         description: 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nezveřejňuje',
