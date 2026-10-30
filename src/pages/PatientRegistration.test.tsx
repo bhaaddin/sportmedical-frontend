@@ -251,8 +251,8 @@ describe('Rychlá registrace', () => {
     expect(request.dateOfBirth).toBeNull();
     expect(request.sex).toBe('NotSpecified');
     expect(request.administrativeProfile).toBeNull();
-    /* The dialling code always travels with the number. */
-    expect(request.phone).toMatchObject({ value: '+420773539001', regionCode: 'CZ' });
+    /* The registry takes the national digits; the country travels beside them. */
+    expect(request.phone).toMatchObject({ value: '773539001', regionCode: 'CZ' });
     expect(request.email.value).toBe('filip@email.cz');
 
     await waitFor(() => expect(issueLink).toHaveBeenCalledWith('p-new'));
@@ -324,7 +324,7 @@ describe('Úplná registrace', () => {
     expect(request.mode).toBe('Standard');
     expect(request.address).toMatchObject({ municipality: 'Kladno', zip: '27201', ruianAddressPointCode: 0 });
     /* One stored string with the dialling code - the server refuses a number without one. */
-    expect(request.phone).toMatchObject({ value: '+420773539001', regionCode: 'CZ' });
+    expect(request.phone).toMatchObject({ value: '773539001', regionCode: 'CZ' });
 
     expect(await screen.findByText('karta-pacienta')).toBeInTheDocument();
     expect(issueLink).not.toHaveBeenCalled();

@@ -47,6 +47,7 @@ import { EventAvailable, InfoOutlined, PersonAdd, PersonOutlined } from '@mui/ic
 import toast from 'react-hot-toast';
 import { activitiesApi } from '../api/activities';
 import { clinicServicesApi } from '../api/clinicServices';
+import { parsePhoneValue } from '../components/ui/countryCodes';
 import type { ClinicService } from '../api/clinicServices';
 import type { Activity } from '../api/bookingContracts';
 import patientRegistryApi, {
@@ -556,8 +557,10 @@ export default function PatientRegistration() {
             ? null
             : {
                 contactPointId: ids.phoneContactPointId,
-                value: form.phone.trim(),
-                regionCode: form.phoneRegionCode,
+                /* The field keeps "+420773539001"; the registry takes the national digits and the country beside them
+                   (anything but digits is refused there). */
+                value: parsePhoneValue(form.phone).national,
+                regionCode: parsePhoneValue(form.phone).country?.code ?? form.phoneRegionCode,
               },
         address:
           form.mode === 'Quick' && addressPoint === null
