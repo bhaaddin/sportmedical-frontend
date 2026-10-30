@@ -412,7 +412,9 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 64 | `/admin` | Správa (264) | **Done (S-8)**: Firemní údaje, Kontaktní údaje, Online rezervace as boards | Správa účtu a kliniky (cards), Nebezpečné akce | staff, audit | A7 | done |
 | 65 | `/system-health` | Zdraví systému (316) | **Done (S-5)** | metrics, Vyžaduje pozornost (failed queue, storage, migrations), Relace, Chyby | the attention card "Neodeslané zprávy" links here | A7 | done |
 | 66 | `/staff-management` | Tým (608) | **Done (S-5)** | Tým (user cards: role, last sign-in), Oprávnění, Pozvánky | worker chips, audit | A7 | done |
-| 67 | `/audit-log` | Audit (255) | **Done (S-5)** | Události (grow), Filtr; each row's subject is an entity chip | patient, invoice, user | A7 | done |
+| 67 | `/audit-log` | Audit (255) | **Done (S-5)**; NET-09: the server searches and pages (`/api/audit/search`), tabs Všechny události / Přístupy k citlivým údajům, one "Filtry" button (user, action, entity, from, to; suggestions from `/catalogue` when the server has it), Export CSV (ExportGate), `?entity=Patient&entityId=ID` shows one patient (linked from the patient's history) | Události (grow, paged), Filtry; each row's subject is an entity chip | patient, invoice, user | A7 | done |
+| 68 | `/nastaveni/zmeny-rezervaci` | Lhůta pro změny pacientem | **Done (NET-10)**: one board, one number with the server's bounds and default; a server without the route gets a calm note | Lhůta (board) | reminders, booking rules | A5 | done |
+| 69 | `/nastaveni/dochazka` | Docházka | **Done (NET-10)**: one board (minutes after which a booking is flagged "asi nepřišel"); 404 -> calm note | Označení (board) | calendar display | A5 | done |
 | - | `*` | Nenalezeno | **Done (S-1)** | Kam dál (action cards), Naposledy otevřené | recents, command palette | A1 | done |
 
 Not counted: the six retired paths (`/injuries`, `/rtp`, `/concussion`, `/training-load`, `/wellness`, `/statistiky`) redirect to `/prehled`.

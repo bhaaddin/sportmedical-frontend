@@ -11,6 +11,7 @@ export interface SafeNavigation {
   pathname: string;
   /** The router state of the current entry (the hand-overs other screens leave), `null` without a router. */
   state: unknown;
+  search: string;
   /** The history entry's key: a hand-over is applied once per key. */
   key: string;
   go: (path: string, options?: NavigateOptions) => void;
@@ -29,5 +30,5 @@ export function useSafeNavigate(): SafeNavigation {
     },
     [navigate],
   );
-  return { available: inRouter, pathname: location?.pathname ?? '/', state: location?.state ?? null, key: location?.key ?? 'default', go };
+  return { available: inRouter, pathname: location?.pathname ?? '/', state: location?.state ?? null, search: location?.search ?? '', key: location?.key ?? 'default', go };
 }

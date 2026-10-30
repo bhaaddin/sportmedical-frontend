@@ -149,6 +149,22 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        id: 'zmeny-rezervaci',
+        label: 'Lhůta pro změny pacientem',
+        description: 'Do kdy před začátkem si pacient může termín přesunout nebo zrušit',
+        to: '/nastaveni/zmeny-rezervaci',
+        keywords: ['lhůta', 'změna termínu', 'zrušení', 'storno', 'přesunout', 'pacient zruší', 'hodin předem'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'dochazka',
+        label: 'Docházka',
+        description: 'Po kolika minutách se objednávka označí jako „asi nepřišel“',
+        to: '/nastaveni/dochazka',
+        keywords: ['nepřišel', 'neomluvená', 'docházka', 'no show', 'pozdní příchod', 'minut'],
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'vzhled-kalendare',
         label: 'Kalendář a mřížka',
         description: 'Výchozí pohled, krok mřížky, od kdy do kdy se den ukazuje a barvy čar a pauz',

@@ -17,6 +17,7 @@
  * answers "what else is going on with them", and a report must never be
  * counted as a document an appointment asked for.
  */
+import { DocumentReview } from '../../components/documents/DocumentReview';
 import { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
@@ -115,6 +116,7 @@ export default function PatientDocumentsPage() {
         trailing={(
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ...ROW_TARGETS }}>
             <StatusChip tone={status.tone}>{status.text}</StatusChip>
+            <DocumentReview document={doc} onChanged={reloadDocuments} />
             <DocumentActions
               document={doc}
               patientDocuments={documents}

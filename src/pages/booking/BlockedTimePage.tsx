@@ -1,3 +1,4 @@
+import { dateProblem, wallTimeProblem } from "../../utils/clinicDayRules";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -173,6 +174,11 @@ export default function BlockedTimePage() {
    * and somebody has to decide whether to clear it.
    */
   const draftProblem = (d: Draft): string | null => {
+    const dateText = dateProblem(d.date);
+    if (dateText !== null) return dateText;
+    /* A time that does not exist on a clock-change day is an error, never quietly moved an hour. */
+    const gap = wallTimeProblem(d.date, d.startTime) ?? wallTimeProblem(d.date, d.endTime);
+    if (gap !== null) return gap;
     if (d.endTime <= d.startTime) return t("booking.blocks.endBeforeStart");
     if (d.reason.trim() === "") return t("booking.blocks.reasonRequired");
     return null;

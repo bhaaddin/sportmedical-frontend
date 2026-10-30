@@ -49,6 +49,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import { SettingsScreen } from './SettingsFrame';
+import { isRealDate } from '../../utils/clinicDayRules';
 import { Shelf, TARGET_SX } from '../../ui/shelf';
 import { SettingsItemCard } from '../booking/SettingsItemCard';
 import EditIcon from '@mui/icons-material/Edit';
@@ -202,7 +203,7 @@ export default function HolidaysPage() {
   const yearReady = !holidays.isPending && !holidays.isError;
   const upcoming = rows.filter((holiday) => holiday.date >= todayKey);
   const past = rows.filter((holiday) => holiday.date < todayKey).reverse();
-  const openAdd = () => { save.reset(); setEditing({ date: `${year}-01-01`, name: '', isHoliday: true, existing: false }); };
+  const openAdd = () => { save.reset(); setEditing({ date: '', name: '', isHoliday: true, existing: false }); };
 
   const dayCard = (holiday: ClinicHoliday) => {
     const working = !holiday.isHoliday;
@@ -409,7 +410,7 @@ export default function HolidaysPage() {
           <Button onClick={() => { save.reset(); setEditing(null); }}>Zrušit</Button>
           <Button
             variant="contained"
-            disabled={editing === null || editing.name.trim() === '' || !/^\d{4}-\d{2}-\d{2}$/.test(editing.date) || save.isPending}
+            disabled={editing === null || editing.name.trim() === '' || !isRealDate(editing.date) || save.isPending}
             onClick={() => editing !== null && save.mutate({
               date: editing.date,
               isHoliday: editing.isHoliday,

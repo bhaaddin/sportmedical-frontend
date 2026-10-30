@@ -47,7 +47,7 @@ export function NextAppointmentCard({
   const inWindow = window === null ? null : nextInWindow(patientId, window);
 
   const book = () =>
-    navigate('/planovani', { state: { newAppointment: Date.now(), patientId } });
+    navigate(`/planovani?patient=${encodeURIComponent(patientId)}&new=1`);
 
   let body: React.ReactNode;
   if (window === null && fallback === null) {

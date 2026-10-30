@@ -12,6 +12,7 @@
  * The header stays put while the sections change, so the name and the missing
  * paperwork are on screen wherever you are inside the patient.
  */
+import { PatientDataExport } from '../../components/patients/PatientDataExport';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Link as RouterLink, Outlet, useLocation, useNavigate, useParams,
@@ -298,7 +299,7 @@ export default function PatientLayout() {
       )}
       entities={connected}
       /* The calendar opens its booking drawer on `newAppointment` and takes this patient as the one being booked. */
-      primaryAction={{ label: 'Objednat termín', onClick: () => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: id } }) }}
+      primaryAction={{ label: 'Objednat termín', onClick: () => navigate(`/planovani?patient=${encodeURIComponent(id ?? '')}&new=1`) }}
       titleAddon={<PinButton entity={{ kind: 'patient', id, label: fullName }} />}
       actions={(
         <>
@@ -309,6 +310,7 @@ export default function PatientLayout() {
           )}
           {id && <SendMessageButton target={{ kind: 'patient', id }} />}
           {mayEdit && <PortalPasswordReset patientId={id} />}
+          {id && <PatientDataExport patientId={id} />}
         </>
       )}
     >

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENTITY_KINDS, ENTITY_LABEL, entityListPath, entityTarget, looksLikeIdentifier, mayOpen, readRef, safeLabel } from './entities';
+import { ENTITY_KINDS, ENTITY_LABEL, entityHref, entityListPath, entityTarget, looksLikeIdentifier, mayOpen, readRef, safeLabel } from './entities';
 
 describe('entityTarget: the one place that knows an address', () => {
   it('opens each kind where it lives', () => {
@@ -115,5 +115,13 @@ describe('readRef: nothing is trusted', () => {
     [{ kind: 'patient', id: 5, label: 'A' }],
   ])('throws away junk %#', (junk) => {
     expect(readRef(junk)).toBeNull();
+  });
+});
+
+describe('entityHref (addressable entities)', () => {
+  it('puts an invoice id in the address and leaves the other kinds on their own path', () => {
+    expect(entityHref({ kind: 'invoice', id: 'i 1' })).toBe('/billing?invoice=i%201');
+    expect(entityHref({ kind: 'patient', id: 'p1' })).toBe('/patients/p1');
+    expect(entityHref({ kind: 'club', id: 'c1' })).toBe('/clubs/c1');
   });
 });

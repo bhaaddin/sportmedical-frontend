@@ -31,7 +31,9 @@ import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
 import { FIELD_LIMITS } from "../../api/fieldLimits";
-import { EXCEPTION_PROBLEM_TEXT, exceptionProblem, type ExceptionKind } from "./exceptionForm";
+import { EXCEPTION_PROBLEM_TEXT, affectedAppointments, exceptionProblem, type ExceptionKind } from "./exceptionForm";
+import { appointmentsApi } from "../../api/appointments";
+import { repeatedTimeNote } from "../../utils/clinicDayRules";
 
 /**
  * Exceptions - contract screen 5.5: closed, different hours, different worker.
@@ -48,12 +50,12 @@ const CODEBOOK_STALE_MS = 5 * 60 * 1000;
  * the web out of a day was to close it for everybody.
  */
 
-function draftFor(kind: ExceptionKind, date: string): ScheduleExceptionInput {
+function draftFor(kind: ExceptionKind | null, date: string): ScheduleExceptionInput {
   return {
     date,
     isClosed: kind === "closed",
-    startTime: kind === "differentHours" ? "08:00" : null,
-    endTime: kind === "differentHours" ? "16:00" : null,
+    startTime: null,
+    endTime: null,
     workerUserId: null,
     reason: "",
     isClosedToPublic: kind === "onlineOff",
@@ -78,7 +80,9 @@ export default function ExceptionsPage() {
   const today = pragueDateKey(new Date());
 
   const [calendarId, setCalendarId] = useState<string>("");
-  const [kind, setKind] = useState<ExceptionKind>("closed");
+  const [kind, setKind] = useState<ExceptionKind | null>(null);
+  /* The step after "Uložit": names how many bookings the day touches; only its button writes. */
+  const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState<ScheduleExceptionInput | null>(null);
 
   const calendarsQuery = useQuery({
@@ -124,6 +128,7 @@ export default function ExceptionsPage() {
         queryKey: ["exceptions", activeCalendarId],
       });
       setDraft(null);
+      setConfirming(false);
     },
   });
 
@@ -137,8 +142,10 @@ export default function ExceptionsPage() {
   });
 
   const openCreate = () => {
-    setKind("closed");
-    setDraft(draftFor("closed", today));
+    /* Nothing is chosen for the person: no date, no kind - a click on Uložit alone must not close the clinic. */
+    setKind(null);
+    setDraft(draftFor(null, ""));
+    setConfirming(false);
     save.reset();
   };
 
@@ -153,7 +160,19 @@ export default function ExceptionsPage() {
   const problem = draft === null ? null : exceptionProblem(kind, draft);
   /* Shown only once a time is typed: an untouched form should not open in red. */
   const hoursProblem =
-    problem === "hoursMissing" || problem === "hoursOrder" ? EXCEPTION_PROBLEM_TEXT[problem] : null;
+    problem === "hoursMissing" || problem === "hoursOrder" || problem === "timeGap" ? EXCEPTION_PROBLEM_TEXT[problem] : null;
+  const dateNote = draft !== null && problem === null && kind === "differentHours"
+    ? repeatedTimeNote(draft.date, draft.startTime) ?? repeatedTimeNote(draft.date, draft.endTime)
+    : null;
+
+  /* The bookings that day, read only when the confirmation is on screen (a closed day or changed hours moves people). */
+  const impactQuery = useQuery({
+    queryKey: ["exception-impact", activeCalendarId, draft?.date, kind, draft?.startTime, draft?.endTime],
+    queryFn: () => appointmentsApi.range(draft!.date, draft!.date, [activeCalendarId]),
+    enabled: confirming && draft !== null && activeCalendarId !== "" && problem === null && (kind === "closed" || kind === "differentHours"),
+    retry: false,
+  });
+  const affected = draft !== null && impactQuery.data !== undefined ? affectedAppointments(kind, draft, impactQuery.data) : null;
 
   const kindLabel = (value: ExceptionKind) => t(`booking.exceptions.kind.${value}`);
 
@@ -303,7 +322,7 @@ export default function ExceptionsPage() {
 
       <Dialog
         open={draft !== null}
-        onClose={() => setDraft(null)}
+        onClose={() => { setDraft(null); setConfirming(false); }}
         fullWidth
         maxWidth="sm"
       >
@@ -317,20 +336,26 @@ export default function ExceptionsPage() {
                 type="date"
                 label={t("booking.exceptions.date")}
                 value={draft.date}
-                onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                onChange={(e) => { setConfirming(false); setDraft({ ...draft, date: e.target.value }); }}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField
                 select
                 fullWidth
                 label={t("booking.exceptions.kindColumn")}
-                value={kind}
+                required
+                value={kind ?? ""}
                 onChange={(e) => {
                   const next = e.target.value as ExceptionKind;
                   setKind(next);
+                  setConfirming(false);
                   setDraft(draftFor(next, draft.date));
                 }}
+                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
               >
+                <MenuItem value="" disabled>
+                  Vyberte, co se ten den stane
+                </MenuItem>
                 <MenuItem value="closed">
                   {t("booking.exceptions.kind.closed")}
                 </MenuItem>
@@ -380,6 +405,11 @@ export default function ExceptionsPage() {
                   {hoursProblem}
                 </Typography>
               ) : null}
+              {dateNote !== null ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {dateNote}
+                </Typography>
+              ) : null}
 
               {kind === "differentWorker" ? (
                 <TextField
@@ -413,6 +443,21 @@ export default function ExceptionsPage() {
                 slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.reason } }}
               />
 
+              {confirming && problem === null ? (
+                <Alert severity={affected !== null && affected > 0 ? "warning" : "info"}>
+                  {kind === "closed" ? "Kalendář bude zavřený" : "Hodiny se změní"} {formatDateOnly(draft.date)}.{" "}
+                  {impactQuery.isPending && impactQuery.fetchStatus !== "idle"
+                    ? "Zjišťuji, kolik objednávek se to týká…"
+                    : impactQuery.isError
+                      ? "Počet dotčených objednávek se nepodařilo zjistit."
+                      : affected === null
+                        ? ""
+                        : affected === 0
+                          ? "Nikdo objednaný se to netýká."
+                          : `Týká se to ${affected} ${affected === 1 ? "objednávky" : "objednávek"}; pacienti se sami nepřesunou.`}
+                </Alert>
+              ) : null}
+
               {save.error ? (
                 <Alert severity="error">{errorText(save.error, t)}</Alert>
               ) : null}
@@ -420,15 +465,20 @@ export default function ExceptionsPage() {
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDraft(null)}>
-            {t("booking.common.cancel")}
+          <Button onClick={() => { if (confirming) setConfirming(false); else { setDraft(null); } }}>
+            {confirming ? "Zpět" : t("booking.common.cancel")}
           </Button>
           <Button
             variant="contained"
             disabled={save.isPending || draft === null || problem !== null}
-            onClick={() => draft && save.mutate(draft)}
+            onClick={() => {
+              if (draft === null) return;
+              /* Closing a day or changing its hours asks once more, naming how many bookings it touches. */
+              if ((kind === "closed" || kind === "differentHours") && !confirming) setConfirming(true);
+              else save.mutate(draft);
+            }}
           >
-            {t("booking.common.save")}
+            {confirming ? (kind === "closed" ? "Ano, zavřít" : "Ano, změnit") : t("booking.common.save")}
           </Button>
         </DialogActions>
       </Dialog>

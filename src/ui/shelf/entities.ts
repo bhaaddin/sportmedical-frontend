@@ -105,6 +105,16 @@ export function entityTarget(ref: Pick<EntityRef, 'kind' | 'id' | 'calendarId' |
   }
 }
 
+/**
+ * The address of an entity as a copyable, bookmarkable, new-tab-safe URL (NET-12): `entityTarget`'s path with the
+ * identifying id in the query where the destination reads it (`/billing?invoice=ID`). The router state stays as the
+ * fallback, so a link built from `entityTarget` keeps working.
+ */
+export function entityHref(ref: Pick<EntityRef, 'kind' | 'id' | 'calendarId' | 'patientId'>): string {
+  if (ref.kind === 'invoice') return `/billing?invoice=${seg(ref.id)}`;
+  return entityTarget(ref).to;
+}
+
 /** The list a kind's "zobrazit vše" opens. */
 export function entityListPath(kind: EntityKind): string {
   switch (kind) {

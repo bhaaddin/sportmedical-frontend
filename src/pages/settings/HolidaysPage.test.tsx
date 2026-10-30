@@ -183,6 +183,11 @@ describe('the clinic year', () => {
 
     await userEvent.type(screen.getByLabelText('Název'), 'Firemní volno');
 
+    /* A name alone is not enough: the date is the person's to choose (no default 1. 1.). */
+    expect(screen.getByRole('button', { name: 'Uložit' })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText('Datum'), '2026-12-23');
+
     expect(screen.getByRole('button', { name: 'Uložit' })).toBeEnabled();
   });
 });

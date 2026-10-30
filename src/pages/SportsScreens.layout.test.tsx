@@ -113,6 +113,8 @@ describe('Dostupnost sportovců as a shelf page', () => {
     availabilityGetAll.mockResolvedValue([]);
     renderAt('desktop', <Availability />);
     await userEvent.click(await screen.findByRole('button', { name: 'Přidat sportovce' }));
-    expect(await screen.findByLabelText('ID pacienta')).toBeInTheDocument();
+    /* The athlete is picked by name from the register (Q11) - never typed as a raw id. */
+    expect(await screen.findByRole('button', { name: 'Vybrat pacienta' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('ID pacienta')).toBeNull();
   });
 });

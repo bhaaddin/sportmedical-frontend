@@ -324,6 +324,17 @@ export const appointmentsApi = {
       );
     }),
 
+  /**
+   * NET-13: gives the appointment another činnost - `PUT .../appointments/{id}/activity { activityId, keepTime }`.
+   * The length (and, for a činnost of another služba, the calendar) follows the činnost. `keepTime: true` keeps the
+   * start and is refused (409, the server's sentence) when that time is not free; `false` takes the nearest free start
+   * that day. The answer says where the appointment is now, so the caller closes the detail and lets the grid reload.
+   */
+  changeActivity: (calendarId: string, id: string, activityId: string, keepTime: boolean): Promise<void> =>
+    request(async () => {
+      await client.put(`/api/calendars/${requireId(calendarId, 'calendarId')}/appointments/${id}/activity`, { activityId, keepTime });
+    }),
+
   /** The reason is optional here and goes into the history. Nothing is deleted. */
   cancel: (calendarId: string, id: string, reason?: string): Promise<void> =>
     request(async () => {

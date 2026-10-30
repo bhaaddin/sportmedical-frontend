@@ -58,12 +58,12 @@ beforeEach(() => {
 });
 
 describe('adding the clinic’s own day off', () => {
-  it('opens on 1 January of the year shown, with the name empty and the date free to change', async () => {
+  it('opens with NO date and no name (never a default 1 January), and cannot be saved', async () => {
     const user = userEvent.setup();
     renderScreen(<HolidaysPage />);
     await user.click(await screen.findByRole('button', { name: /Přidat vlastní volno/ }));
     const dialog = screen.getByRole('dialog', { name: 'Přidat vlastní volno' });
-    expect(within(dialog).getByLabelText('Datum')).toHaveValue(`${year.mock.calls[0][0]}-01-01`);
+    expect(within(dialog).getByLabelText('Datum')).toHaveValue('');
     expect(within(dialog).getByLabelText('Datum')).toBeEnabled();
     expect(within(dialog).getByLabelText('Název')).toHaveValue('');
     expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();

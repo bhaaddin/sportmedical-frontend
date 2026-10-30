@@ -8,6 +8,7 @@
  * expanded, every chip was grey and not one of the counters ever drew.
  */
 import type { EntityKind, EntityRef } from '../ui/shelf/entities';
+import { addDaysToDateOnly, pragueWallClockToInstant } from '../utils/time';
 
 export type ActionTone = 'green' | 'blue' | 'red' | 'beige' | 'grey' | 'primary';
 
@@ -103,4 +104,30 @@ export function auditSubject(entry: { entity?: string | null; entityId?: string 
   const id = entry.entityId?.trim() ?? '';
   if (kind === undefined || id === '') return null;
   return { kind, id, label: id.slice(0, 8) };
+}
+
+/* ───────────────────────────── the server-side search (NET-09) ───────────────────────────── */
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The `from` / `to` the audit routes take, from two picked days: the start of the first day and the start of the day
+ * AFTER the last (Prague time), so the last day is in. Anything that is not a yyyy-MM-dd is left out.
+ */
+export function auditRange(from: string, to: string): { from?: string; to?: string } {
+  const out: { from?: string; to?: string } = {};
+  if (DAY.test(from)) out.from = pragueWallClockToInstant(from, '00:00').toISOString();
+  if (DAY.test(to)) out.to = pragueWallClockToInstant(addDaysToDateOnly(to, 1), '00:00').toISOString();
+  return out;
+}
+
+/** "Strana 2 z 7" - the last page the total allows, at least one. */
+export function pageCount(totalCount: number | null, pageSize: number): number | null {
+  return totalCount === null ? null : Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize)));
+}
+
+/** Whether a next page may exist: by the total when the server counts, else because this page came back full. */
+export function hasNextPage(totalCount: number | null, page: number, pageSize: number, received: number): boolean {
+  const pages = pageCount(totalCount, pageSize);
+  return pages === null ? received >= pageSize : page < pages;
 }

@@ -131,15 +131,26 @@ const audit = (i: number, over: Record<string, unknown> = {}) => ({
 });
 
 describe('Auditní log', () => {
-  const open = async (entries: unknown[]) => {
-    get.mockResolvedValue({ data: entries });
-    wrap(<AuditLog />, '/audit-log');
+  /** The routes as the server answers them: the search is paged, the catalogue may be missing (older server). */
+  const serve = (entries: unknown[], total = entries.length, catalogue?: unknown) =>
+    get.mockImplementation((url: string) => {
+      if (url === '/api/audit/search') return Promise.resolve({ data: { items: entries, totalCount: total, page: 1, pageSize: 25 } });
+      if (url === '/api/audit/catalogue') return catalogue === undefined ? Promise.reject({ response: { status: 404 } }) : Promise.resolve({ data: catalogue });
+      if (url === '/api/v1/exports/policy') return Promise.resolve({ data: { allowed: true } });
+      if (url === '/api/audit/sensitive-access') return Promise.resolve({ data: entries });
+      return Promise.reject(new Error(url));
+    });
+  const open = async (entries: unknown[], total?: number, catalogue?: unknown, path = '/audit-log') => {
+    serve(entries, total, catalogue);
+    wrap(<AuditLog />, path);
     await screen.findByText('Čas');
   };
+  const lastSearch = () => [...get.mock.calls].reverse().find((c) => c[0] === '/api/audit/search')?.[1] as { params: Record<string, unknown> };
 
-  it('asks for the latest 100', async () => {
+  it('asks the server for the first page of 25, not the latest 100 to filter in the browser', async () => {
     await open([audit(1)]);
-    expect(get).toHaveBeenCalledWith('/api/audit?take=100');
+    expect(lastSearch().params).toEqual({ page: 1, pageSize: 25 });
+    expect(get).not.toHaveBeenCalledWith('/api/audit?take=100');
   });
 
   it('expands an entry to show the value before and after, read from oldValue / newValue', async () => {
@@ -156,24 +167,55 @@ describe('Auditní log', () => {
     expect(screen.queryByRole('button', { name: 'Zobrazit změnu' })).toBeNull();
   });
 
-  it('counts the real actions, most frequent first', async () => {
+  it('counts the real actions of the page, most frequent first', async () => {
     await open([audit(1), audit(2), audit(3, { action: 'account.session_created' })]);
     const top = screen.getByRole('region', { name: 'Nejčastější akce' });
     const labels = within(top).getAllByText(/^(settings\.changed|account\.session_created)$/).map((e) => e.textContent);
     expect(labels).toEqual(['settings.changed', 'account.session_created']);
   });
 
-  it('searches the loaded entries by user, action, entity, id and notes', async () => {
-    await open([audit(1), audit(2, { action: 'account.session_created', userEmail: 'jana@ordinace.cz', notes: null, entity: 'UserAccount' })]);
+  it('sends the typed text to the server search, after a short pause', async () => {
+    await open([audit(1)]);
     await userEvent.type(screen.getByPlaceholderText(/Hledat v auditním logu/), 'jana');
-    expect(screen.getByText('jana@ordinace.cz')).toBeInTheDocument();
-    expect(screen.queryByText('admin@sportmedical.cz')).toBeNull();
+    await waitFor(() => expect(lastSearch().params).toMatchObject({ search: 'jana', page: 1 }));
   });
 
-  it('says there are no records for a search with no match', async () => {
+  it('sends the action, entity, user and the picked days as the server filters', async () => {
+    await open([audit(1)]);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    await userEvent.type(screen.getByLabelText('Akce'), 'settings.changed');
+    await userEvent.type(screen.getByLabelText('Entita'), 'Patient');
+    await userEvent.type(screen.getByLabelText('Uživatel'), 'jana@');
+    fireEvent.change(screen.getByLabelText('Od data'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('Do data'), { target: { value: '2026-10-02' } });
+    await waitFor(() => expect(lastSearch().params).toMatchObject({
+      action: 'settings.changed', entity: 'Patient', user: 'jana@',
+      from: '2026-09-30T22:00:00.000Z', to: '2026-10-02T22:00:00.000Z',
+    }));
+  });
+
+  it('offers the catalogue as suggestions when the server has one, and plain typing when it has not', async () => {
+    await open([audit(1)], 1, { actions: ['settings.changed'], entities: ['Patient'], users: ['jana@ordinace.cz'] });
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    await userEvent.click(screen.getByLabelText('Akce'));
+    expect(await screen.findByRole('option', { name: 'settings.changed' })).toBeInTheDocument();
+  });
+
+  it('says there are no records for a search with no match, and Zrušit hledání empties the filters', async () => {
     await open([audit(1)]);
     await userEvent.type(screen.getByPlaceholderText(/Hledat v auditním logu/), 'zzzzzz');
-    expect(screen.getByText('Žádné záznamy')).toBeInTheDocument();
+    serve([], 0);
+    expect(await screen.findByText('Žádné záznamy')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zrušit hledání' }));
+    expect(screen.getByPlaceholderText(/Hledat v auditním logu/)).toHaveValue('');
+  });
+
+  it('pages by the server total: Strana 1 z 3, Další asks for page 2', async () => {
+    await open([audit(1)], 60);
+    expect(screen.getByText('Strana 1 z 3')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Předchozí' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Další' }));
+    await waitFor(() => expect(lastSearch().params).toMatchObject({ page: 2 }));
   });
 
   it('shows the whole id of nothing: only its first eight characters', async () => {
@@ -190,21 +232,53 @@ describe('Auditní log', () => {
     expect(screen.getByText('cc33dd44')).toBeInTheDocument();
   });
 
-  it('draws the events as a shelf with its count, and an empty search offers Zrušit hledání', async () => {
-    await open([audit(1), audit(2)]);
+  it('draws the events as a shelf with the server total as its count', async () => {
+    await open([audit(1), audit(2)], 57);
     const events = screen.getByRole('region', { name: 'Události' });
-    expect(within(events).getByLabelText('Počet: 2')).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText(/Hledat v auditním logu/), 'zzzzzz');
-    await userEvent.click(screen.getByRole('button', { name: 'Zrušit hledání' }));
-    expect(screen.getByPlaceholderText(/Hledat v auditním logu/)).toHaveValue('');
-    expect(within(screen.getByRole('region', { name: 'Události' })).getByLabelText('Počet: 2')).toBeInTheDocument();
+    expect(within(events).getByLabelText('Počet: 57')).toBeInTheDocument();
+  });
+
+  it('the sensitive-access tab reads its own route', async () => {
+    await open([audit(1)]);
+    await userEvent.click(screen.getByRole('tab', { name: 'Přístupy k citlivým údajům' }));
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/api/audit/sensitive-access', { params: { page: 1, pageSize: 25 } }));
+    expect(screen.queryByRole('button', { name: 'Export celého období' })).toBeNull();
+  });
+
+  it('one patient’s records (?entity=Patient&entityId=…) come from the entity route, with a way back', async () => {
+    const id = 'aa11bb22-0000-4000-8000-000000000001';
+    get.mockImplementation((url: string) => {
+      if (url === `/api/audit/entity/Patient/${id}`) return Promise.resolve({ data: [audit(1, { entity: 'Patient', entityId: id })] });
+      if (url === '/api/audit/catalogue') return Promise.reject({ response: { status: 404 } });
+      if (url === '/api/v1/exports/policy') return Promise.resolve({ data: { allowed: true } });
+      return Promise.reject(new Error(url));
+    });
+    wrap(<AuditLog />, `/audit-log?entity=Patient&entityId=${id}`);
+    expect(await screen.findByText('Záznamy o pacientovi:')).toBeInTheDocument();
+    expect(await screen.findByText('admin@sportmedical.cz')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zobrazit vše' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export celého období' })).toBeNull();
+  });
+
+  it('the export asks the server for the picked days as a file', async () => {
+    await open([audit(1)]);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    fireEvent.change(screen.getByLabelText('Od data'), { target: { value: '2026-10-01' } });
+    await waitFor(() => expect(lastSearch().params).toMatchObject({ from: '2026-09-30T22:00:00.000Z' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export celého období' })).toBeEnabled());
+    const search = get.getMockImplementation()!;
+    get.mockImplementation((url: string, ...rest: unknown[]) => (url === '/api/audit/export' ? Promise.resolve({ data: new Blob(['a;b']) }) : search(url, ...rest)));
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    await userEvent.click(screen.getByRole('button', { name: 'Export celého období' }));
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/api/audit/export', { params: { from: '2026-09-30T22:00:00.000Z', format: 'csv' }, responseType: 'blob' }));
   });
 
   it('says the load failed and tries again on request', async () => {
-    get.mockRejectedValueOnce(new Error('down'));
+    get.mockRejectedValue(new Error('down'));
     wrap(<AuditLog />, '/audit-log');
     expect(await screen.findByText('Auditní log se nepodařilo načíst.')).toBeInTheDocument();
-    get.mockResolvedValue({ data: [audit(1)] });
+    serve([audit(1)]);
     await userEvent.click(screen.getByRole('button', { name: 'Zkusit znovu' }));
     expect(await screen.findByText('admin@sportmedical.cz')).toBeInTheDocument();
   });

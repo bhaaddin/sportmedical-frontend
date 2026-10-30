@@ -33,6 +33,30 @@ export function patientFilterFromState(raw: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+/**
+ * What the address asks Fakturace for: `?invoice=ID` opens that document, `?patient=ID` narrows the list to that
+ * patient, `?q=text` searches. Merged under the router state (the state wins), so both ways of linking keep working.
+ */
+export function mergeBillingSearch(search: string, state: unknown): Record<string, unknown> {
+  const params = new URLSearchParams(search);
+  const fromAddress: Record<string, unknown> = {};
+  const invoice = params.get('invoice')?.trim();
+  const patient = params.get('patient')?.trim();
+  const q = params.get('q')?.trim();
+  if (invoice) fromAddress.invoiceId = invoice;
+  if (patient) fromAddress.filterPatientId = patient;
+  if (q) fromAddress.search = q;
+  const own = state !== null && typeof state === 'object' ? (state as Record<string, unknown>) : {};
+  return { ...fromAddress, ...own };
+}
+
+/** The search text another screen asks Fakturace to open with: `state.search`, or null. */
+export function searchFromState(raw: unknown): string | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const value = (raw as Record<string, unknown>).search;
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
 /** True when no patient narrowing is on, or the invoice is that patient's. */
 export function matchesPatient(inv: Invoice, patientId: string | null): boolean {
   return patientId === null || inv.patientId === patientId;

@@ -13,6 +13,7 @@
  * "Chybí: Výpis" stayed on a card whose výpis was uploaded and signed. A
  * warning that is always on is indistinguishable from one that is stuck.
  */
+import { handoffFromSearch } from '../../planner/handoffFromSearch';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -375,7 +376,9 @@ describe('booking from the card', () => {
 });
 
 function HandedOver() {
-  const { state } = useLocation() as { state: { newAppointment?: number; patientId?: string } | null };
+  /* The hand-over is spelled in the address (?patient=ID&new=1); the calendar reads it like the router state. */
+  const location = useLocation();
+  const state = handoffFromSearch(location.search, location.state, location.key) as { newAppointment?: number; patientId?: string } | null;
   return (
     <div>
       {typeof state?.newAppointment === 'number' && typeof state.patientId === 'string'

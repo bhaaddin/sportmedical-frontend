@@ -72,6 +72,8 @@ const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTempla
 const MessagesPage = lazy(() => import('./pages/settings/messages/MessagesPage'));
 const TwoFactorPage = lazy(() => import('./pages/settings/TwoFactorPage'));
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
+const BookingChangesPage = lazy(() => import('./pages/settings/BookingChangesPage'));
+const AttendancePage = lazy(() => import('./pages/settings/AttendancePage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
 const CalendarDisplayPage = lazy(() => import('./pages/settings/CalendarDisplayPage'));
 const PatientFieldsPage = lazy(() => import('./pages/settings/PatientFieldsPage'));
@@ -453,6 +455,8 @@ export default function StaffApp() {
           {/* The staff price list. /cenik is the PUBLIC price list now (the other bundle). */}
           <Route path="/nastaveni/cenik" element={<CenikPage />} />
           <Route path="/availability" element={<AvailabilityPage />} />
+          <Route path="/nastaveni/zmeny-rezervaci" element={<RequirePermission of="settings.clinic.manage"><BookingChangesPage /></RequirePermission>} />
+          <Route path="/nastaveni/dochazka" element={<RequirePermission of="settings.clinic.manage"><AttendancePage /></RequirePermission>} />
           <Route path="/svatky" element={<RequirePermission of="settings.clinic.manage"><HolidaysPage /></RequirePermission>} />
           <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
           <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
