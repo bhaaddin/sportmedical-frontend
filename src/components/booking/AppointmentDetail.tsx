@@ -91,6 +91,7 @@ import {
   type PaperworkRow,
 } from "./appointmentEdit";
 import { AgreedPriceField } from "./price/AgreedPriceField";
+import { ChangeActivityDialog } from "./ChangeActivityDialog";
 import { amountText, priceLine, priceView } from "./price/agreedPrice";
 
 /**
@@ -256,6 +257,8 @@ function DetailBody({
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [moving, setMoving] = useState(false);
+  /* NET-13: the činnost can be changed while the booking is still open. */
+  const [changingActivity, setChangingActivity] = useState(false);
   /* On a phone the move panel opens in the scrolling body while the button that
      opened it is docked below; bring the panel into view so it is not hidden. */
   const movePanelRef = useRef<HTMLDivElement | null>(null);
@@ -467,6 +470,7 @@ function DetailBody({
 
   if (mode === "edit") {
     return (
+      <>
       <EditMode
         layout={layout}
         appointment={appointment}
@@ -484,12 +488,28 @@ function DetailBody({
           setMode("view");
         }}
         onClose={onClose}
+        onChangeActivity={mayEdit && !terminal ? () => setChangingActivity(true) : undefined}
         onSave={(plan) => saveMutation.mutate(plan)}
         onCancelRequest={() => {
           setMode("view");
           setCancelling(true);
         }}
       />
+      {changingActivity ? (
+        <ChangeActivityDialog
+          calendarId={calendarId}
+          appointment={appointment}
+          activities={activities}
+          onClose={() => setChangingActivity(false)}
+          onChanged={() => {
+            setChangingActivity(false);
+            afterWrite();
+            /* The appointment may now stand in another calendar: this detail would 404, so close it and let the grid reload. */
+            onClose();
+          }}
+        />
+      ) : null}
+      </>
     );
   }
 
@@ -1664,6 +1684,7 @@ function EditMode({
   mayCancel,
   onBack,
   onClose,
+  onChangeActivity,
   onSave,
   onCancelRequest,
 }: {
@@ -1680,6 +1701,8 @@ function EditMode({
   mayCancel: boolean;
   onBack: () => void;
   onClose: () => void;
+  /** Present only for somebody who may edit an open booking. */
+  onChangeActivity?: () => void;
   onSave: (plan: { startUtc: string | null; status: number | null; agreedPriceCzk?: number | null }) => void;
   onCancelRequest: () => void;
 }) {
@@ -1831,10 +1854,7 @@ function EditMode({
       {/* The body scrolls; the header above and the buttons below stay where they are. */}
       <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
       <Stack spacing={2.5} sx={{ p: compact ? 2 : 3 }}>
-        {/* ── SLUŽBA · ČINNOST ──
-            Information only (Matko, 10. 10. 2026: "to má být jen informace, co má jen
-            napsat služba a činnost"). No endpoint changes an appointment's činnost, so
-            a grid of every činnost as disabled chips only confused the desk. */}
+        {/* ── SLUŽBA · ČINNOST ── the činnost is changed through its own dialog (NET-13); the price is below. */}
         <Box data-testid="appointment-service-line">
           <SectionLabel>Služba a činnost</SectionLabel>
           <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: 1.4 }}>
@@ -1844,6 +1864,11 @@ function EditMode({
             {appointment.activityName || activity?.name || "—"}
             {minutes > 0 ? ` · ${minutes} min` : ""}
           </Typography>
+          {onChangeActivity ? (
+            <Button size="small" onClick={onChangeActivity} disabled={busy} sx={{ mt: 0.5, ml: -1, minHeight: 44 }}>
+              Změnit činnost
+            </Button>
+          ) : null}
           {/* Etapa 12: what the visit costs as saved - and, under it, the one field that changes it. */}
           <Typography variant="body2" data-testid="appointment-price-line" sx={{ mt: 0.5 }}>
             Cena: {priceLine(storedAgreed, listPrice)}
