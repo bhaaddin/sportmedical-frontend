@@ -115,7 +115,12 @@ export default function ClubOrderHistoryPage() {
 
   const open = (entry: TimelineEntry) => {
     if (entry.link?.kind === 'order') navigate('/clubs/objednavky', { state: { openOrderId: entry.link.orderId } });
-    else if (entry.link?.kind === 'billing') navigate('/billing');
+    else if (entry.link?.kind === 'billing') {
+      const { invoiceId, clubName } = entry.link;
+      /* One known invoice opens that document; otherwise Billing opens searched for the club. */
+      if (invoiceId !== undefined) navigate(`/billing?invoice=${encodeURIComponent(invoiceId)}`, { state: { invoiceId } });
+      else navigate(clubName !== undefined ? `/billing?q=${encodeURIComponent(clubName)}` : '/billing');
+    }
   };
 
   const subtitle = order === undefined

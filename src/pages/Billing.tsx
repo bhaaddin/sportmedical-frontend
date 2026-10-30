@@ -43,7 +43,7 @@ import NewInvoiceFlow from '../components/billing/NewInvoiceFlow';
 import RejectInvoiceDialog from '../components/billing/RejectInvoiceDialog';
 import { czk } from './billing/money';
 import {
-  doklady, filterFromState, isClub, matchesFilter, matchesPatient, matchesSearch, patientFilterFromState, monthIn, monthYear, statusOf, summarize, customerOf,
+  doklady, filterFromState, isClub, matchesFilter, matchesPatient, matchesSearch, patientFilterFromState, mergeBillingSearch, searchFromState, monthIn, monthYear, statusOf, summarize, customerOf,
   PAYMENT_METHOD_LABEL,
 } from './billing/invoiceView';
 import type { InvoiceFilter } from './billing/invoiceView';
@@ -171,22 +171,25 @@ export default function Billing() {
 
   useEffect(() => {
     if (loading || handled.current === location.key) return;
-    const state = readNavState(location.state);
-    const askedFilter = filterFromState(location.state);
-    const askedPatient = patientFilterFromState(location.state);
-    if (!hasPrefill(state) && askedFilter === null && askedPatient === null) return;
+    const raw = mergeBillingSearch(location.search, location.state);
+    const state = readNavState(raw);
+    const askedFilter = filterFromState(raw);
+    const askedPatient = patientFilterFromState(raw);
+    const askedSearch = searchFromState(raw);
+    if (!hasPrefill(state) && askedFilter === null && askedPatient === null && askedSearch === null) return;
     handled.current = location.key;
     /* Spent: a reload must not open the dialog again. */
     navigate(location.pathname, { replace: true, state: null });
     if (askedFilter !== null) setFilter(askedFilter);
     if (askedPatient !== null) { setPatientFilter(askedPatient); setSearch(''); }
+    if (askedSearch !== null) { setSearch(askedSearch); setPatientFilter(null); if (askedFilter === null) setFilter('all'); }
     if (state.invoiceId !== undefined) {
       setOpenId(state.invoiceId);
       /* The document must be in the list it is opened in. */
       if (askedFilter === null) { setFilter('all'); setSearch(''); setPatientFilter(null); }
     }
     if (wantsNewInvoice(state)) { setUnfinished(state); setFlow({ nav: state }); }
-  }, [loading, location.key, location.state, location.pathname, navigate]);
+  }, [loading, location.key, location.state, location.search, location.pathname, navigate]);
 
   /* A link to one document brings it into view. */
   useEffect(() => {

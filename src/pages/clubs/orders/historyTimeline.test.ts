@@ -150,7 +150,7 @@ describe('buildTimeline', () => {
     const cancelledRoot = timeline.find((e) => e.text.startsWith('Dodatek ') && e.text.includes('zrušen.'))!;
     expect(cancelledRoot.link).toMatchObject({ kind: 'order', orderId: ADD1 });
     const invoice = timeline.find((e) => e.kinds.includes('invoice'))!;
-    expect(invoice.link).toEqual({ kind: 'billing', label: 'Otevřít faktury' });
+    expect(invoice.link).toEqual({ kind: 'billing', label: 'Otevřít faktury', clubName: 'FK Slaný' });
     const players = timeline.find((e) => e.text.startsWith('Počet hráčů'))!;
     expect(players.link).toBeNull();
     const message = timeline.find((e) => e.text.startsWith('Zpráva ordinace'))!;

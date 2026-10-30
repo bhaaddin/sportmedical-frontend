@@ -5,11 +5,12 @@
 import { describe, it, expect } from 'vitest';
 import type { Invoice } from '../../api/billing';
 import {
-  filterFromState, issuedBetween,
+  filterFromState, issuedBetween, mergeBillingSearch, patientFilterFromState, searchFromState,
   customerOf, discountSuffix, doklady, isOverdue, isPendingApproval, itemsLabel, itemsWithDiscount, matchesFilter,
   matchesSearch, monthIn, recipientTypeOf, statusOf, summarize,
 } from './invoiceView';
 import { czk } from './money';
+import { readNavState, wantsNewInvoice } from './invoicePrefill';
 
 const NOW = new Date(2026, 9, 26, 9, 42); // 26. 10. 2026
 
@@ -213,5 +214,21 @@ describe('issuedBetween', () => {
   it('is nothing for a range that is not two dates or runs backwards', () => {
     expect(issuedBetween([], '2026-10-31', '2026-10-01')).toBeNull();
     expect(issuedBetween([], '', '2026-10-01')).toBeNull();
+  });
+});
+
+describe('mergeBillingSearch (addressable billing)', () => {
+  it('reads invoice, patient and search from the address', () => {
+    const raw = mergeBillingSearch('?invoice=i-1&patient=p-1&q=Slan', null);
+    expect(readNavState(raw).invoiceId).toBe('i-1');
+    expect(patientFilterFromState(raw)).toBe('p-1');
+    expect(searchFromState(raw)).toBe('Slan');
+  });
+  it('lets the router state win and ignores an empty address', () => {
+    expect(readNavState(mergeBillingSearch('?invoice=a', { invoiceId: 'b' })).invoiceId).toBe('b');
+    expect(searchFromState(mergeBillingSearch('', null))).toBeNull();
+  });
+  it('never turns the patient parameter into a new-document request', () => {
+    expect(wantsNewInvoice(readNavState(mergeBillingSearch('?patient=p-1', null)))).toBe(false);
   });
 });

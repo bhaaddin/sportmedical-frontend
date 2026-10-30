@@ -55,7 +55,7 @@ export function classifyHistoryText(text: string): HistoryKind[] {
 /** Where an entry leads. `order` opens that order's panel on /clubs/objednavky, `billing` the invoices. */
 export type HistoryLink =
   | { kind: 'order'; orderId: string; label: string }
-  | { kind: 'billing'; label: string };
+  | { kind: 'billing'; label: string; /** The invoice that billed the order the line was written on (absent = open Billing for the club). */ invoiceId?: string; clubName?: string };
 
 export interface TimelineEntry {
   /** Unique within the timeline. */
@@ -92,7 +92,11 @@ const time = (atUtc: string): number => {
 };
 
 function linkFor(item: OrderHistoryItem, kinds: readonly HistoryKind[], own: ClubOrderView, root: ClubOrderView, byCode: ReadonlyMap<string, string>): HistoryLink | null {
-  if (kinds.includes('invoice')) return { kind: 'billing', label: 'Otevřít faktury' };
+  if (kinds.includes('invoice')) {
+    const invoiceId = own.invoiceId ?? undefined;
+    const clubName = own.clubName || undefined;
+    return { kind: 'billing', label: 'Otevřít faktury', ...(invoiceId !== undefined ? { invoiceId } : {}), ...(clubName !== undefined ? { clubName } : {}) };
+  }
 
   if (kinds.includes('addendum') || kinds.includes('status')) {
     /* A line that names another order of the group leads to it ("Přidán dodatek KO-…"). */
