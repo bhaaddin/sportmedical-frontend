@@ -128,6 +128,7 @@ export default function PatientHistoryPage() {
         title="Změny karty"
         hint="Kdo, kdy a proč. Citlivé údaje jsou skryté."
         count={settled ? changed.length : undefined}
+        viewAll={mayRead && id !== undefined ? { to: `/audit-log?entity=${AUDIT_ENTITY.patient}&entityId=${encodeURIComponent(id)}`, label: 'Auditní log' } : undefined}
         layout="list"
         stagger={false}
         loading={mayRead && query.isLoading}

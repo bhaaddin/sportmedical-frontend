@@ -1,7 +1,9 @@
 /* ══════════════════════════════════════════════════════════════
    AUDIT LOG — PLAN-01 Feature A31-A40
-   - The latest 100 entries
-   - Search by user, entity, action, id, notes
+   - The server searches and pages (GET /api/audit/search): free text, action, entity, user, from / to
+   - "Přístupy k citlivým údajům" (GET /api/audit/sensitive-access) as its own tab
+   - Export CSV (GET /api/audit/export), behind the same export permission as every other download
+   - ?entity=Patient&entityId=ID shows one patient's records (linked from the patient's history)
    - Expandable rows for the value before and after
 
    Shelf look (Phase 2, S-5): "Nejčastější akce" (a figure per
@@ -10,104 +12,149 @@
    an entry about a patient, an invoice, a club ... names it with a
    connected chip.
    ══════════════════════════════════════════════════════════════ */
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Box, Button, Typography, Paper, Table, TableBody, TableCell,
-  TableHead, TableRow, TextField, Grid, IconButton, InputAdornment,
+  Autocomplete, Box, Button, Tab, Tabs, Typography, Paper, Table, TableBody, TableCell,
+  TableHead, TableRow, TextField, Grid, IconButton, InputAdornment, Stack,
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon, Search as SearchIcon,
+  Download as DownloadIcon, Refresh as RefreshIcon, Search as SearchIcon,
   ExpandMore as ExpandIcon, ExpandLess as CollapseIcon,
 } from '@mui/icons-material';
-import client from '../api/client';
+import { auditApi, auditSearchApi, type AuditEntry, type AuditPage } from '../api/audit';
+import { download } from '../utils/download';
+import { ExportGate } from '../components/ui/ExportGate';
 import { StackTable } from '../components/ui/StackTable';
 import { TONE_CSS, StatusChip, type ChipTone } from '../components/ui';
 import { useIsPhone } from '../layout/useDevice';
 import { EntityChip, MetricCard, MUTED_SX, Shelf, TARGET_SX } from '../ui/shelf';
 import { SettingsScreen } from './settings/SettingsFrame';
-import { auditSubject, stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
-
-/* ── Types ── */
-interface AuditEntry {
-  id: string;
-  userId?: string;
-  userName?: string;
-  userEmail?: string;
-  action: string;
-  entity: string;
-  entityId: string;
-  timestamp: string;
-  notes?: string;
-  /** What the API sends (the scrubbed value before and after). */
-  oldValue?: unknown;
-  newValue?: unknown;
-  /** Older names, kept so an entry that still carries them is read too. */
-  beforeState?: unknown;
-  afterState?: unknown;
-}
+import { auditRange, auditSubject, hasNextPage, pageCount, stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
 
 /* ── Config: the board's soft tones, one per kind of action (auditLogModel.toneOfAction) ── */
 const toneOf = (action: string): ChipTone => toneOfAction(action);
 
 /* ══════════════════════════════════════════════════════════════ */
+const PAGE_SIZE = 25;
+type View = 'all' | 'sensitive';
+
+/** A short pause after typing, so one request goes out per phrase, not per key. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
+
 export default function AuditLog() {
   const phone = useIsPhone();
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [params, setParams] = useSearchParams();
+  /* One patient's records: set by the link on the patient's history (an id, never a name). */
+  const entityId = params.get('entityId') ?? '';
+  const [view, setView] = useState<View>('all');
   const [search, setSearch] = useState('');
+  const [action, setAction] = useState('');
+  const [entity, setEntity] = useState(params.get('entity') ?? '');
+  const [user, setUser] = useState('');
+  const [fromDay, setFromDay] = useState('');
+  const [toDay, setToDay] = useState('');
+  const [page, setPage] = useState(1);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState(false);
 
-  /* ── Load audit log ── */
-  useEffect(() => {
-    void loadAuditLog();
-  }, []);
+  const text = useDebounced(search.trim(), 350);
+  const typedAction = useDebounced(action.trim(), 350);
+  const typedEntity = useDebounced(entity.trim(), 350);
+  const typedUser = useDebounced(user.trim(), 350);
+  const range = useMemo(() => auditRange(fromDay, toDay), [fromDay, toDay]);
+  const forOne = entityId !== '' && view === 'all';
 
-  const loadAuditLog = async () => {
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const res = await client.get('/api/audit?take=100');
-      const data = res.data?.value ?? res.data;
-      setEntries(Array.isArray(data) ? data : data?.items ?? []);
-    } catch {
-      /* Not "Žádné záznamy": an empty log and a log that did not load are different things. */
-      setEntries([]);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const reload = () => { void loadAuditLog(); };
+  /* Back to the first page whenever the question changes. */
+  useEffect(() => { setPage(1); }, [view, text, typedAction, typedEntity, typedUser, fromDay, toDay, entityId]);
 
-  /* ── Filter entries ── */
-  const filteredEntries = entries.filter(entry => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      entry.userEmail?.toLowerCase().includes(q) ||
-      entry.userName?.toLowerCase().includes(q) ||
-      entry.action?.toLowerCase().includes(q) ||
-      entry.entity?.toLowerCase().includes(q) ||
-      entry.entityId?.toLowerCase().includes(q) ||
-      entry.notes?.toLowerCase().includes(q)
-    );
+  const filters = useQuery({ queryKey: ['audit', 'catalogue'], queryFn: auditSearchApi.catalogue, retry: false, staleTime: 5 * 60 * 1000 });
+  const catalogue = filters.data;
+
+  const events = useQuery<AuditPage>({
+    queryKey: ['audit', view, forOne ? entityId : '', entityId === '' ? [text, typedAction, typedEntity, typedUser, range.from, range.to, page] : [entity, page]],
+    queryFn: async () => {
+      if (forOne) {
+        /* The server answers this route in full (one person's records are few); it is paged here. */
+        const all = await auditApi.listByEntity(typedEntity !== '' ? typedEntity : 'Patient', entityId);
+        const start = (page - 1) * PAGE_SIZE;
+        return { items: all.slice(start, start + PAGE_SIZE), totalCount: all.length, page, pageSize: PAGE_SIZE };
+      }
+      if (view === 'sensitive') return auditSearchApi.sensitiveAccess({ ...range, page, pageSize: PAGE_SIZE });
+      return auditSearchApi.search({ user: typedUser, action: typedAction, entity: typedEntity, search: text, ...range, page, pageSize: PAGE_SIZE });
+    },
+    retry: false,
+    placeholderData: (previous) => previous,
   });
-  const top = topActions(entries);
+
+  const loading = events.isPending;
+  const loadError = events.isError;
+  const filteredEntries: AuditEntry[] = events.data?.items ?? [];
+  const totalCount = events.data?.totalCount ?? null;
+  const pages = pageCount(totalCount, PAGE_SIZE);
+  const nextOk = hasNextPage(totalCount, page, PAGE_SIZE, filteredEntries.length);
+  const reload = () => { void events.refetch(); };
+  const top = topActions(filteredEntries);
+  const filtered = text !== '' || typedAction !== '' || typedEntity !== '' || typedUser !== '' || fromDay !== '' || toDay !== '';
+  const clearFilters = () => { setSearch(''); setAction(''); setEntity(''); setUser(''); setFromDay(''); setToDay(''); };
+  const clearPatient = () => { const next = new URLSearchParams(params); next.delete('entityId'); next.delete('entity'); setParams(next, { replace: true }); setEntity(''); };
+
+  const exportCsv = () => download(
+    { kind: 'audit-csv', fileName: 'audit-export.csv', failureMessage: 'Export se nepodařil. Zúžte období a zkuste to znovu.' },
+    { kind: 'fetch', fetch: () => auditSearchApi.exportCsv(range) },
+  );
+
+  const filterBox = (
+    value: string, set: (value: string) => void, label: string, options: string[] | undefined,
+  ) => (
+    <Autocomplete
+      freeSolo
+      size="small"
+      options={options ?? []}
+      inputValue={value}
+      onInputChange={(_, next) => set(next)}
+      disabled={entityId !== '' && view === 'all' && label !== 'Entita'}
+      renderInput={(inputParams) => <TextField {...inputParams} label={label} slotProps={{ ...inputParams.slotProps, htmlInput: { ...inputParams.slotProps.htmlInput, 'aria-label': label } }} />}
+      sx={{ minWidth: phone ? '100%' : 170, flex: phone ? '1 1 100%' : '1 1 170px', '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+    />
+  );
 
   const searchField = (
-    <TextField
-      size="small"
-      placeholder="Hledat v auditním logu — uživatel, akce, entita"
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      disabled={loading || loadError}
-      slotProps={{
-        htmlInput: { 'aria-label': 'Hledat v auditním logu' },
-        input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={MUTED_SX} /></InputAdornment> },
-      }}
-      sx={{ width: { xs: '100%', sm: 380 }, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
-    />
+    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', width: '100%', alignItems: 'center' }}>
+      <TextField
+        size="small"
+        placeholder="Hledat v auditním logu — poznámky a zaznamenané hodnoty"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        disabled={view === 'sensitive' || forOne}
+        slotProps={{
+          htmlInput: { 'aria-label': 'Hledat v auditním logu' },
+          input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={MUTED_SX} /></InputAdornment> },
+        }}
+        sx={{ flex: '2 1 280px', minWidth: phone ? '100%' : 280, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+      />
+      {view === 'all' && !forOne && filterBox(user, setUser, 'Uživatel', catalogue?.users)}
+      {view === 'all' && !forOne && filterBox(action, setAction, 'Akce', catalogue?.actions)}
+      {view === 'all' && !forOne && filterBox(entity, setEntity, 'Entita', catalogue?.entities)}
+      <TextField
+        size="small" type="date" label="Od" value={fromDay} onChange={(e) => setFromDay(e.target.value)}
+        disabled={forOne} slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Od data' } }}
+        sx={{ minWidth: phone ? '47%' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+      />
+      <TextField
+        size="small" type="date" label="Do" value={toDay} onChange={(e) => setToDay(e.target.value)}
+        disabled={forOne} slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Do data' } }}
+        sx={{ minWidth: phone ? '47%' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+      />
+      {filtered && !forOne && <Button onClick={clearFilters} sx={{ ...TARGET_SX, minHeight: 44 }}>Zrušit filtry</Button>}
+    </Stack>
   );
 
   return (
@@ -118,23 +165,50 @@ export default function AuditLog() {
       related={false}
       scope={false}
       actions={
-        <Button
-          variant="outlined"
-          color="inherit"
-          aria-label="Obnovit"
-          startIcon={<RefreshIcon />}
-          onClick={reload}
-          disabled={loading}
-          sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
-        >
-          Obnovit
-        </Button>
+        <>
+          <ExportGate>
+            {(blocked) => (
+              <Button
+                variant="outlined"
+                color="inherit"
+                startIcon={<DownloadIcon />}
+                onClick={() => void exportCsv()}
+                disabled={blocked || loading || loadError}
+                sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
+              >
+                Export CSV
+              </Button>
+            )}
+          </ExportGate>
+          <Button
+            variant="outlined"
+            color="inherit"
+            aria-label="Obnovit"
+            startIcon={<RefreshIcon />}
+            onClick={reload}
+            disabled={loading}
+            sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
+          >
+            Obnovit
+          </Button>
+        </>
       }
     >
       {/* The section fills its column: "Události" takes what is left and scrolls inside (tablet, desktop). */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, ...(phone ? {} : { height: '100%', minHeight: 0 }) }}>
+        <Tabs value={view} onChange={(_, next: View) => setView(next)} aria-label="Pohled na záznamy" variant={phone ? 'fullWidth' : 'standard'} sx={{ minHeight: 44, flexShrink: 0 }}>
+          <Tab value="all" label="Všechny události" sx={{ minHeight: 44 }} />
+          <Tab value="sensitive" label="Přístupy k citlivým údajům" sx={{ minHeight: 44 }} />
+        </Tabs>
+        {forOne && (
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+            <Typography variant="body2" sx={MUTED_SX}>Záznamy o pacientovi:</Typography>
+            <EntityChip entity={{ kind: 'patient', id: entityId, label: entityId.slice(0, 8) }} size="sm" />
+            <Button onClick={clearPatient} sx={{ ...TARGET_SX, minHeight: 44 }}>Zobrazit vše</Button>
+          </Stack>
+        )}
         {!loadError && (loading || top.length > 0) && (
-          <Shelf id="audit-top" title="Nejčastější akce" hint="V posledních 100 záznamech" layout="grid" minCardWidth={170} cardHeight={96} skeletons={4} loading={loading} stagger={false}>
+          <Shelf id="audit-top" title="Nejčastější akce" hint="Na této stránce" layout="grid" minCardWidth={170} cardHeight={96} skeletons={4} loading={loading} stagger={false}>
             {top.map(({ action, count }) => (
               <MetricCard key={action} label={action} value={count} tone={toneOf(action) === 'red' ? 'red' : 'grey'} />
             ))}
@@ -144,7 +218,7 @@ export default function AuditLog() {
         <Shelf
           id="audit-events"
           title="Události"
-          count={loading || loadError ? undefined : filteredEntries.length}
+          count={loading || loadError ? undefined : totalCount ?? filteredEntries.length}
           layout="free"
           grow
           controls={searchField}
@@ -153,8 +227,8 @@ export default function AuditLog() {
           onRetry={reload}
           empty={filteredEntries.length === 0}
           emptyState={
-            search !== ''
-              ? { text: 'Žádné záznamy', action: { label: 'Zrušit hledání', onClick: () => setSearch('') } }
+            filtered && !forOne
+              ? { text: 'Žádné záznamy', action: { label: 'Zrušit hledání', onClick: clearFilters } }
               : { text: 'Žádné záznamy', action: { label: 'Historie změn', to: '/nastaveni/historie-zmen' } }
           }
         >
@@ -203,7 +277,7 @@ export default function AuditLog() {
                         </TableCell>
                         <TableCell>
                           <Typography sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}>
-                            {entry.userEmail || entry.userName || 'System'}
+                            {entry.userEmail || 'System'}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -264,6 +338,15 @@ export default function AuditLog() {
               </TableBody>
             </Table>
           </StackTable>
+          {(page > 1 || nextOk) && (
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'center', pt: 1.5 }}>
+              <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || events.isFetching} sx={{ ...TARGET_SX, minHeight: 44 }}>Předchozí</Button>
+              <Typography variant="body2" sx={MUTED_SX} aria-live="polite">
+                Strana {page}{pages !== null ? ` z ${pages}` : ''}
+              </Typography>
+              <Button onClick={() => setPage((p) => p + 1)} disabled={!nextOk || events.isFetching} sx={{ ...TARGET_SX, minHeight: 44 }}>Další</Button>
+            </Stack>
+          )}
         </Shelf>
       </Box>
     </SettingsScreen>
