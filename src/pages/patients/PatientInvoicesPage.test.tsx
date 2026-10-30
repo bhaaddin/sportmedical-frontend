@@ -66,6 +66,13 @@ describe('Faktury karty', () => {
     expect(getInvoices).toHaveBeenCalledWith({ patientId: 'p1' });
   });
 
+  it('"Otevřít ve Fakturaci" carries the patient so Fakturace can narrow the list', async () => {
+    getInvoices.mockResolvedValue([inv({ id: 'b', invoiceNumber: '2026-0414', remainingCzk: 1600, dueDateUtc: lastWeek })]);
+    renderAt();
+    fireEvent.click(await screen.findByText(/Otevřít ve Fakturaci/));
+    expect(screen.getByTestId('where').textContent).toBe('/billing {"filter":"overdue","filterPatientId":"p1"}');
+  });
+
   it('has no K úhradě when everything is paid', async () => {
     getInvoices.mockResolvedValue([inv({ status: 'Paid', remainingCzk: 0, paidCzk: 2200 })]);
     renderAt();

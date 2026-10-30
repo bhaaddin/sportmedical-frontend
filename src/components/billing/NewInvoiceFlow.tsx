@@ -17,6 +17,8 @@ import { billingApi } from '../../api/billing';
 import type { Invoice } from '../../api/billing';
 import { activitiesApi } from '../../api/activities';
 import type { Activity } from '../../api/bookingContracts';
+import { clinicServicesApi } from '../../api/clinicServices';
+import type { ClinicService } from '../../api/clinicServices';
 import { calendarsApi } from '../../api/calendars';
 import { clubsApi } from '../../api/clubs';
 import { partnerOrdersApi } from '../../api/partnerOrders';
@@ -70,6 +72,9 @@ export default function NewInvoiceFlow({
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesFailed, setActivitiesFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /* Služba first, then its činnosti. No služby (or one) means one list. */
+  const [services, setServices] = useState<ClinicService[]>([]);
+  const [serviceId, setServiceId] = useState('');
   /* Which opening of the dialog an async answer belongs to. */
   const session = useRef(0);
 
@@ -99,7 +104,9 @@ export default function NewInvoiceFlow({
 
     setDraft(EMPTY_DRAFT);
     setPatient(null);
+    setServiceId('');
     setSubmitting(false);
+    clinicServicesApi.list().then((rows) => { if (alive()) setServices(rows); }).catch(() => { /* one list */ });
 
     void (async () => {
       const rows = await loadActivities();
@@ -161,6 +168,9 @@ export default function NewInvoiceFlow({
         }
         if (!alive()) return;
         const { lines: found, unpriced } = linesFromActivities(wanted, rows);
+        /* The visit's činnost is known: its služba is already chosen. */
+        const firstService = rows.find((a) => a.id === found[0]?.activityId)?.clinicServiceId;
+        if (firstService) setServiceId(firstService);
         setDraft((d) => ({
           ...d,
           headcount: headcount !== undefined && d.headcount === '' ? String(headcount) : d.headcount,
@@ -269,6 +279,9 @@ export default function NewInvoiceFlow({
         <SectionLabel>Položky z ceníku</SectionLabel>
         <InvoiceLinesEditor
           activities={billableActivities}
+          services={services}
+          serviceId={serviceId}
+          onServiceChange={setServiceId}
           lines={draft.lines}
           loading={activitiesLoading}
           failed={activitiesFailed}

@@ -105,3 +105,16 @@ export function linesFromActivities(
   }
   return { lines, unpriced };
 }
+
+/**
+ * Služba first, then its činnosti: the služby (a handful) that have at least one of the given činnosti, in the
+ * clinic's order. A clinic with one such služba (or none) gets no choice - one list.
+ */
+export function serviceChoices<S extends { id: string; name: string; sortOrder: number; isActive: boolean }>(
+  services: S[],
+  activities: Pick<Activity, 'clinicServiceId'>[],
+): S[] {
+  return services
+    .filter((s) => s.isActive && activities.some((a) => a.clinicServiceId === s.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'cs'));
+}

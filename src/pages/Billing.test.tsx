@@ -31,6 +31,8 @@ const getClub = vi.fn();
 vi.mock('../api/clubs', () => ({ clubsApi: { getById: getClub, getAll: vi.fn().mockResolvedValue([]) } }));
 const listActivities = vi.fn();
 vi.mock('../api/activities', () => ({ activitiesApi: { list: listActivities } }));
+const listServices = vi.hoisted(() => vi.fn());
+vi.mock('../api/clinicServices', () => ({ clinicServicesApi: { list: listServices } }));
 vi.mock('../api/calendars', () => ({ calendarsApi: { list: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../api/partnerOrders', () => ({ partnerOrdersApi: { list: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../components/patients/PatientPicker', () => ({ default: () => <div data-testid="picker" /> }));
@@ -105,6 +107,7 @@ beforeEach(() => {
     lines: [{ activityId: 'a1', name: 'Komplexní prohlídka', quantity: 1, unitPriceCzk: 2200, listTotalCzk: 2200 }],
     listTotalCzk: 2200, discounts: [], appliedGroupPercent: 0, totalCzk: 2200, manualAllowedPercent: 10, requiresApproval: false,
   });
+  listServices.mockReset().mockResolvedValue([]);
   createInvoice.mockReset();
   getClubBlock.mockReset();
   getPatient.mockReset();
@@ -547,6 +550,51 @@ describe('the new document, entered from another screen', () => {
       recipientType: 'Person', patientId: 'p9', lines: [{ activityId: 'act1', quantity: 1 }],
     }));
     await waitFor(() => expect(getInvoices).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('a patient narrowing and an unfinished document', () => {
+  it('narrows the list to the patient with a chip, and the chip removes the narrowing', async () => {
+    getInvoices.mockResolvedValue(everything);
+    renderPage({ filterPatientId: 'p2' });
+    expect(await screen.findByText('Pacient: Petra Dvořáková')).toBeInTheDocument();
+    expect(screen.getByText('2026-0416')).toBeInTheDocument();
+    expect(screen.queryByText('2026-0418')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Zrušit filtr pacienta'));
+    expect(await screen.findByText('2026-0418')).toBeInTheDocument();
+    expect(screen.queryByText(/^Pacient: /)).not.toBeInTheDocument();
+  });
+
+  it('combines the overdue filter with the patient', async () => {
+    getInvoices.mockResolvedValue(everything);
+    renderPage({ filter: 'overdue', filterPatientId: 'p3' });
+    expect(await screen.findByText('2026-0414')).toBeInTheDocument();
+    expect(screen.queryByText('2026-0418')).not.toBeInTheDocument();
+  });
+
+  it('keeps the prefill of the visit after Esc and opens it again from Nový doklad, until a document is made', async () => {
+    getPatient.mockResolvedValue({ id: 'p9', firstName: 'Jan', lastName: 'Novák' });
+    renderPage({ patientId: 'p9', appointmentId: 'ap1', activityId: 'act1' });
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(getPatient).toHaveBeenCalledTimes(1));
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nový doklad' }));
+    const again = await screen.findByRole('dialog');
+    await waitFor(() => expect(getPatient).toHaveBeenCalledTimes(2));
+    expect(getPatient).toHaveBeenLastCalledWith('p9');
+    expect(await within(again).findByLabelText('Počet Komplexní prohlídka')).toHaveValue(1);
+  });
+
+  it('opens a blank document when there is nothing unfinished', async () => {
+    renderPage();
+    await screen.findByText('2026-0418');
+    fireEvent.click(screen.getByRole('button', { name: 'Nový doklad' }));
+    await screen.findByRole('dialog');
+    expect(getPatient).not.toHaveBeenCalled();
   });
 });
 
