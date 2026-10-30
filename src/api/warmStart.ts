@@ -15,12 +15,22 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const CLUB_PAGE = new RegExp(`^/clubs/(${UUID})/?$`, 'i');
 const CLUB_SCREEN = new RegExp(`^/clubs/(${UUID})/kalendar/?$`, 'i');
 const CALENDAR_SCREEN = /^\/(planovani|dnes|prehled-sluzeb)(\/|$)/;
+/** Přehled; the Staff role lands on the day overview instead, which reads other things. */
+const DASHBOARD = /^\/prehled\/?$/;
 const CLUB_LIST = /^\/clubs\/?$/;
 
 /** The window a club address's router state names (react-router keeps it under `usr`), if any. */
 function blockIdOf(historyState: unknown): string | null {
   const usr = (historyState as { usr?: { clubBlockId?: unknown } } | null)?.usr;
   return typeof usr?.clubBlockId === 'string' ? usr.clubBlockId : null;
+}
+
+function isStaffRole(): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem('user') || '{}') as { role?: string }).role === 'Staff';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -41,7 +51,8 @@ export function warmForPath(queryClient: QueryClient, pathname: string, search =
   const page = CLUB_PAGE.exec(pathname);
   const list = CLUB_LIST.test(pathname);
   const calendar = CALENDAR_SCREEN.test(pathname);
-  if (!club && !page && !list && !calendar) return;
+  const dashboard = DASHBOARD.test(pathname) && !isStaffRole();
+  if (!club && !page && !list && !calendar && !dashboard) return;
 
   void import('./warmReads')
     .then((reads) => {
@@ -53,6 +64,7 @@ export function warmForPath(queryClient: QueryClient, pathname: string, search =
         reads.warmAccount();
         reads.prefetchClubPage(queryClient, page[1]);
       }
+      else if (dashboard) reads.warmDashboard(queryClient);
       else if (list) reads.warmClubList(queryClient);
       else reads.warmReferenceData(queryClient);
     })

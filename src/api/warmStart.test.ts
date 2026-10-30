@@ -226,3 +226,20 @@ describe('prefetchClubScreen', () => {
     await settle();
   });
 });
+
+describe('warmForPath: Přehled (speed-fe-4)', () => {
+  it('starts the week and the club-order reads for /prehled, but not for the Staff role', async () => {
+    const qc = new QueryClient();
+    warmForPath(qc, '/prehled');
+    await settle();
+    expect(qc.getQueryCache().getAll().map((q) => q.queryKey)).toEqual(expect.arrayContaining([['shelf', 'club-orders', 'Requested']]));
+    expect(qc.getQueryCache().getAll().some((q) => q.queryKey[0] === 'overview')).toBe(true);
+
+    localStorage.setItem('user', JSON.stringify({ role: 'Staff' }));
+    const staff = new QueryClient();
+    warmForPath(staff, '/prehled');
+    await settle();
+    expect(staff.getQueryCache().getAll()).toHaveLength(0);
+    localStorage.removeItem('user');
+  });
+});

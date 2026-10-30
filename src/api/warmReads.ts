@@ -35,6 +35,8 @@ import { CLUB_SETTINGS_QUERY_KEY, clubSettingsApi, clubsApi, type Club } from '.
 import { CALENDAR_DISPLAY_QUERY_KEY, readCalendarDisplay } from './displaySettings';
 import { holidaysApi } from './holidays';
 import { normalizeSummary } from '../components/clubs/orders/orderLogic';
+import { weekRange } from '../pages/overview/model';
+import { overviewClubOrdersQuery, overviewWeekQuery } from '../pages/overview/queries';
 import { newestOrderIds } from '../pages/clubs/overview/clubOverviewModel';
 
 /** How long the pointer rests on a card before it counts as an intention to open it. */
@@ -54,6 +56,13 @@ export function warmReferenceData(queryClient: QueryClient, year = new Date().ge
   warm(queryClient.prefetchQuery({ queryKey: CLUB_SETTINGS_QUERY_KEY, queryFn: clubSettingsApi.get }));
   warm(queryClient.prefetchQuery({ queryKey: ['public-clinic'], queryFn: readPublicClinic }));
   warm(queryClient.prefetchQuery({ queryKey: ['holidays', year], queryFn: () => holidaysApi.year(year) }));
+}
+
+/** What Přehled starts from (same keys and reads as the screen: pages/overview/queries.ts). */
+export function warmDashboard(queryClient: QueryClient, now = new Date()): void {
+  const { from, to } = weekRange(now);
+  warm(queryClient.prefetchQuery(overviewWeekQuery(from, to)));
+  warm(queryClient.prefetchQuery(overviewClubOrdersQuery()));
 }
 
 /** What a warm-up of the club screen knows about where it is going (all optional). */

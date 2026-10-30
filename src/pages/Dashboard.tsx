@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
-import { useQueries, useQuery } from '@tanstack/react-query';
-import { patientsApi } from '../api/patients';
-import type { Patient } from '../api/patients';
+import { useQuery } from '@tanstack/react-query';
 import { usePermission } from '../auth/usePermission';
-import { appointmentsApi } from '../api/appointments';
-import { clubOrdersApi } from '../api/clubOrders';
 import type { DayAppointment } from '../api/bookingContracts';
 import DayOverviewPage from './booking/DayOverviewPage';
 import { FitPage } from '../components/ui/fit';
 import { pragueDateKey } from '../utils/time';
 import { useAttention } from '../ui/shelf/useAttention';
 import { AttentionList, ClubsList, TodayHero, WeekChart } from './overview/Blocks';
+import { overviewClubOrdersQuery, overviewWeekQuery } from './overview/queries';
 import { attentionBlock, clubsBlock, dayOf, statusOf, todayBlock, weekBlock, weekRange } from './overview/model';
 
 /*
@@ -37,15 +34,6 @@ function getGreeting(): string {
   if (h < 12) return 'Dobré ráno';
   if (h < 17) return 'Dobrý den';
   return 'Dobrý večer';
-}
-
-/* Name by patient id, from whichever lookups have come back. */
-function namesOf(results: { data?: Patient }[]): Record<string, string> {
-  const names: Record<string, string> = {};
-  for (const r of results) {
-    if (r.data) names[r.data.id] = `${r.data.firstName} ${r.data.lastName}`;
-  }
-  return names;
 }
 
 /* ── Dashboard: a doctor lands on their day; the owner/admin get the overview. ── */
@@ -79,42 +67,24 @@ function OwnerDashboard() {
   const { from, to } = weekRange(now);
 
   /* ONE request for the Prague week: it answers Dnes (today's rows) and Tento týden (the seven bars). */
-  const weekQuery = useQuery({
-    queryKey: ['overview', 'week', from],
-    queryFn: () => appointmentsApi.range(from, to),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    retry: false,
-  });
-  /* The same list the attention model reads (same key: asked once). */
-  const clubOrders = useQuery({
-    queryKey: ['shelf', 'club-orders', 'Requested'],
-    queryFn: () => clubOrdersApi.list({ status: 'Requested' }),
-    staleTime: 60_000,
-    retry: false,
-  });
+  const weekQuery = useQuery({ ...overviewWeekQuery(from, to), refetchInterval: 60_000, retry: false });
+  const clubOrders = useQuery({ ...overviewClubOrdersQuery(), retry: false });
 
   const todayRows: DayAppointment[] = useMemo(() => (weekQuery.data ?? []).filter((a) => dayOf(a) === today), [weekQuery.data, today]);
-  const patientIds = useMemo(
-    () => (canSeePatients ? [...new Set(todayRows.map((a) => a.patientId).filter((id) => id !== ''))] : []),
-    [canSeePatients, todayRows],
-  );
-  const patientNames = useQueries({
-    queries: patientIds.map((id) => ({
-      queryKey: ['patient', id],
-      queryFn: () => patientsApi.getById(id),
-      staleTime: 5 * 60 * 1000,
-      retry: false,
-    })),
-    combine: namesOf,
-  });
+  /* The day rows already carry the registered patient's name (patientName), so no per-patient request is made (speed-fe-2). */
+  const patientNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    if (!canSeePatients) return names;
+    for (const a of todayRows) if (a.patientId !== '' && a.patientName) names[a.patientId] = a.patientName;
+    return names;
+  }, [canSeePatients, todayRows]);
 
   /* A failed week must not leave the attention model waiting for today's list for ever: it reads "no rows" and the failure counts. */
   const attention = useAttention(weekQuery.isError ? [] : weekQuery.data === undefined ? null : todayRows, patientNames);
 
   const weekStatus = statusOf(weekQuery);
-  const nameOf = (a: DayAppointment): string => patientNames[a.patientId] ?? a.patientName ?? 'Pacient';
-  const registered = (a: DayAppointment): boolean => canSeePatients && a.patientId !== '' && patientNames[a.patientId] !== undefined;
+  const nameOf = (a: DayAppointment): string => a.patientName || 'Pacient';
+  const registered = (a: DayAppointment): boolean => canSeePatients && a.patientId !== '' && !!a.patientName;
 
   const day = todayBlock(weekStatus, weekQuery.data, now, nameOf, registered);
   const week = weekBlock(weekStatus, weekQuery.data, now);

@@ -69,7 +69,7 @@ afterEach(() => {
 const { default: Dashboard } = await import('./Dashboard');
 
 /** Status codes as the contract numbers them: 0 Scheduled, 1 Confirmed, 2 CheckedIn, 3 Completed, 4 Cancelled, 5 NoShow. */
-const at = (day: string, hourUtc: number, status: number, id: string, patientId = 'p1', patientName: string | null = null) => ({
+const at = (day: string, hourUtc: number, status: number, id: string, patientId = 'p1', patientName: string | null = PEOPLE[patientId] ? `${PEOPLE[patientId].firstName} ${PEOPLE[patientId].lastName}` : null) => ({
   id,
   calendarId: 'c1',
   patientId,
@@ -177,10 +177,11 @@ describe('1. Dnes', () => {
     expect(waiting.queryByText('Jana Marková')).not.toBeInTheDocument();
   });
 
-  it('shows a name, not an id; each patient is fetched once', async () => {
+  it('shows a name from the day rows, not an id; no patient is fetched one by one (speed-fe-2)', async () => {
     range.mockResolvedValue([at(TODAY, 11, 1, 'a', 'p1'), at(TODAY, 12, 1, 'b', 'p1'), at(TODAY, 13, 1, 'c', 'p2')]);
     renderDashboard();
-    await waitFor(() => expect(getById).toHaveBeenCalledTimes(2));
+    await block('Dnes');
+    expect(getById).not.toHaveBeenCalled();
     expect(screen.queryByText('p1')).not.toBeInTheDocument();
   });
 
