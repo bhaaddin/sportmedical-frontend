@@ -182,6 +182,7 @@ describe('Auditní log', () => {
 
   it('sends the action, entity, user and the picked days as the server filters', async () => {
     await open([audit(1)]);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
     await userEvent.type(screen.getByLabelText('Akce'), 'settings.changed');
     await userEvent.type(screen.getByLabelText('Entita'), 'Patient');
     await userEvent.type(screen.getByLabelText('Uživatel'), 'jana@');
@@ -195,6 +196,7 @@ describe('Auditní log', () => {
 
   it('offers the catalogue as suggestions when the server has one, and plain typing when it has not', async () => {
     await open([audit(1)], 1, { actions: ['settings.changed'], entities: ['Patient'], users: ['jana@ordinace.cz'] });
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
     await userEvent.click(screen.getByLabelText('Akce'));
     expect(await screen.findByRole('option', { name: 'settings.changed' })).toBeInTheDocument();
   });
@@ -258,6 +260,7 @@ describe('Auditní log', () => {
 
   it('Export CSV asks the server for the picked days as a file', async () => {
     await open([audit(1)]);
+    await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
     fireEvent.change(screen.getByLabelText('Od data'), { target: { value: '2026-10-01' } });
     await waitFor(() => expect(lastSearch().params).toMatchObject({ from: '2026-09-30T22:00:00.000Z' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Export CSV' })).toBeEnabled());

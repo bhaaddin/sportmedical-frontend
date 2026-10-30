@@ -88,7 +88,7 @@ function RuleSettingsPage({ cfg }: { cfg: RuleConfig }) {
     <SettingsScreen
       title={cfg.title}
       subtitle={cfg.subtitle}
-      save={mayEdit ? { dirty: dirty && problem === null, saving: save.isPending, onSave: submit, onDiscard: () => { setEdit(null); setFailure(null); setServerError(null); } } : undefined}
+      save={mayEdit && !notDeployed ? { dirty: dirty && problem === null, saving: save.isPending, onSave: submit, onDiscard: () => { setEdit(null); setFailure(null); setServerError(null); } } : undefined}
       loading={loaded === undefined && !query.isError}
       error={query.isError && !notDeployed ? 'Nastavení se nepodařilo načíst.' : undefined}
       onRetry={() => void query.refetch()}

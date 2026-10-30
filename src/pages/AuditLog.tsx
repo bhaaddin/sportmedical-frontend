@@ -20,7 +20,7 @@ import {
   TableHead, TableRow, TextField, Grid, IconButton, InputAdornment, Stack,
 } from '@mui/material';
 import {
-  Download as DownloadIcon, Refresh as RefreshIcon, Search as SearchIcon,
+  Download as DownloadIcon, FilterList as FilterIcon, Refresh as RefreshIcon, Search as SearchIcon,
   ExpandMore as ExpandIcon, ExpandLess as CollapseIcon,
 } from '@mui/icons-material';
 import { auditApi, auditSearchApi, type AuditEntry, type AuditPage } from '../api/audit';
@@ -63,6 +63,7 @@ export default function AuditLog() {
   const [fromDay, setFromDay] = useState('');
   const [toDay, setToDay] = useState('');
   const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const text = useDebounced(search.trim(), 350);
@@ -122,38 +123,58 @@ export default function AuditLog() {
       onInputChange={(_, next) => set(next)}
       disabled={entityId !== '' && view === 'all' && label !== 'Entita'}
       renderInput={(inputParams) => <TextField {...inputParams} label={label} slotProps={{ ...inputParams.slotProps, htmlInput: { ...inputParams.slotProps.htmlInput, 'aria-label': label } }} />}
-      sx={{ minWidth: phone ? '100%' : 170, flex: phone ? '1 1 100%' : '1 1 170px', '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+      sx={{ minWidth: phone ? '100%' : 170, flex: phone ? '1 1 100%' : '1 1 170px', maxWidth: phone ? undefined : 260, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
     />
   );
 
+  /* The text search stays in view; the four narrower filters sit behind one "Filtry" button (calm by default). */
+  const activeFilters = [typedUser, typedAction, typedEntity, fromDay, toDay].filter((v) => v !== '').length;
   const searchField = (
-    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', width: '100%', alignItems: 'center' }}>
-      <TextField
-        size="small"
-        placeholder="Hledat v auditním logu — poznámky a zaznamenané hodnoty"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        disabled={view === 'sensitive' || forOne}
-        slotProps={{
-          htmlInput: { 'aria-label': 'Hledat v auditním logu' },
-          input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={MUTED_SX} /></InputAdornment> },
-        }}
-        sx={{ flex: '2 1 280px', minWidth: phone ? '100%' : 280, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
-      />
-      {view === 'all' && !forOne && filterBox(user, setUser, 'Uživatel', catalogue?.users)}
-      {view === 'all' && !forOne && filterBox(action, setAction, 'Akce', catalogue?.actions)}
-      {view === 'all' && !forOne && filterBox(entity, setEntity, 'Entita', catalogue?.entities)}
-      <TextField
-        size="small" type="date" label="Od" value={fromDay} onChange={(e) => setFromDay(e.target.value)}
-        disabled={forOne} slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Od data' } }}
-        sx={{ minWidth: phone ? '47%' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
-      />
-      <TextField
-        size="small" type="date" label="Do" value={toDay} onChange={(e) => setToDay(e.target.value)}
-        disabled={forOne} slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Do data' } }}
-        sx={{ minWidth: phone ? '47%' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
-      />
-      {filtered && !forOne && <Button onClick={clearFilters} sx={{ ...TARGET_SX, minHeight: 44 }}>Zrušit filtry</Button>}
+    <Stack spacing={1.5} sx={{ width: '100%' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="Hledat v auditním logu — poznámky a zaznamenané hodnoty"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          disabled={view === 'sensitive' || forOne}
+          slotProps={{
+            htmlInput: { 'aria-label': 'Hledat v auditním logu' },
+            input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={MUTED_SX} /></InputAdornment> },
+          }}
+          sx={{ flex: '1 1 auto', maxWidth: 560, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+        />
+        {!forOne && (
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<FilterIcon />}
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
+            sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider', flexShrink: 0 }}
+          >
+            Filtry{activeFilters > 0 ? ` (${activeFilters})` : ''}
+          </Button>
+        )}
+      </Stack>
+      {filtersOpen && !forOne && (
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
+          {view === 'all' && filterBox(user, setUser, 'Uživatel', catalogue?.users)}
+          {view === 'all' && filterBox(action, setAction, 'Akce', catalogue?.actions)}
+          {view === 'all' && filterBox(entity, setEntity, 'Entita', catalogue?.entities)}
+          <TextField
+            size="small" type="date" label="Od" value={fromDay} onChange={(e) => setFromDay(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Od data' } }}
+            sx={{ minWidth: phone ? 'calc(50% - 4px)' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+          />
+          <TextField
+            size="small" type="date" label="Do" value={toDay} onChange={(e) => setToDay(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { 'aria-label': 'Do data' } }}
+            sx={{ minWidth: phone ? 'calc(50% - 4px)' : 150, '& .MuiInputBase-root': { minHeight: phone ? 44 : 36 } }}
+          />
+          {filtered && <Button onClick={clearFilters} sx={{ ...TARGET_SX, minHeight: 44 }}>Zrušit filtry</Button>}
+        </Stack>
+      )}
     </Stack>
   );
 
@@ -207,7 +228,7 @@ export default function AuditLog() {
             <Button onClick={clearPatient} sx={{ ...TARGET_SX, minHeight: 44 }}>Zobrazit vše</Button>
           </Stack>
         )}
-        {!loadError && (loading || top.length > 0) && (
+        {!loadError && !phone && (loading || top.length > 0) && (
           <Shelf id="audit-top" title="Nejčastější akce" hint="Na této stránce" layout="grid" minCardWidth={170} cardHeight={96} skeletons={4} loading={loading} stagger={false}>
             {top.map(({ action, count }) => (
               <MetricCard key={action} label={action} value={count} tone={toneOf(action) === 'red' ? 'red' : 'grey'} />
