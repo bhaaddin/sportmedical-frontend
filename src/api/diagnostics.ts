@@ -54,6 +54,8 @@ export interface DiagnosticSession extends SessionMeasurements {
   rawPractitionerNotes?: string;
   detectedAnomaliesJson?: string;
   requiresDoctorReview: boolean;
+  /** The visit this examination was done for; absent / null on an older server or a session without one. */
+  appointmentId?: string | null;
   createdAtUtc: string;
 }
 
@@ -82,6 +84,8 @@ export interface UpdateSessionRequest {
 
 export interface CreateSessionRequest extends UpdateSessionRequest {
   patientId: string;
+  /** Link the examination to a visit of the same patient (the server checks it). Fixed at create. */
+  appointmentId?: string;
 }
 
 /* ── tolerant reading ── */
@@ -147,6 +151,7 @@ export function readSession(raw: unknown): DiagnosticSession {
   // The old fields stay as sent; the C-M ones are replaced by their tolerant reading.
   return {
     ...base,
+    appointmentId: typeof base.appointmentId === 'string' && base.appointmentId !== '' ? base.appointmentId : null,
     measuredOn: undefined,
     thresholdPercentVo2Max: undefined,
     maxPowerWatts: undefined,

@@ -57,6 +57,7 @@ import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
+import { AppointmentExamination } from "./AppointmentExamination";
 import { useCompletionLink } from "./quick/useCompletionLink";
 import { QuickPendingCard } from "./quick/QuickPendingCard";
 import { missingConsentsLine } from "./patient/consentNames";
@@ -944,6 +945,8 @@ function DetailBody({
             />
             </Box>
           ) : null}
+
+          {hasPatient ? <AppointmentExamination patientId={appointment.patientId} appointmentId={appointment.id} /> : null}
 
           {/* The patient's personal portal link, issuable straight from the booking. */}
           {hasPatient ? (
