@@ -25,6 +25,8 @@ vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() 
 const { default: DiagnosticForm } = await import('./DiagnosticForm');
 
 beforeEach(() => {
+  getById.mockReset().mockResolvedValue({ id: 'p1', firstName: 'Jana', lastName: 'Marková' });
+  window.history.replaceState({}, '', '/diagnostics/new?patientId=p1');
   create.mockReset().mockResolvedValue({
     id: 's1', patientId: 'p1', requiresDoctorReview: false, detectedAnomaliesJson: '[]',
     restingHeartRateBpm: 58, maxHeartRateBpm: 190, vo2MaxMlMinKg: 52, anaerobicThresholdBpm: 160,
@@ -41,7 +43,7 @@ describe('DiagnosticForm', () => {
   it('starts every vital empty and will not move on until they are filled', async () => {
     render(<DiagnosticForm />);
 
-    type(/ID pacienta/, 'p1');
+    await screen.findByDisplayValue(/Marková/);
     type(/Jméno praktika/, 'MUDr. Test');
     next();
 
@@ -61,7 +63,7 @@ describe('DiagnosticForm', () => {
   it('sends exactly the typed values', async () => {
     render(<DiagnosticForm />);
 
-    type(/ID pacienta/, 'p1');
+    await screen.findByDisplayValue(/Marková/);
     type(/Jméno praktika/, 'MUDr. Test');
     next();
 
@@ -135,5 +137,26 @@ describe('as a shelf page', () => {
     const after = await screen.findByRole('region', { name: 'Po uložení' });
     expect(within(after).getByRole('link', { name: /Výsledky pacienta/ })).toHaveAttribute('href', '/patients/p1/vysledky');
     expect(within(screen.getByRole('region', { name: 'Metriky relace' })).getAllByRole('listitem')).toHaveLength(7);
+  });
+
+  it('keeps the patient when another session is started', async () => {
+    render(<DiagnosticForm />);
+    type(/Jméno praktika/, 'MUDr. Test');
+    next();
+    await screen.findByLabelText(/Klidová srdeční frekvence/);
+    type(/Klidová srdeční frekvence/, '58');
+    type(/Maximální srdeční frekvence/, '190');
+    type(/Anaerobní práh/, '160');
+    type(/VO2 Max/, '52');
+    next();
+    await screen.findByLabelText(/Systolický krevní tlak/);
+    type(/Systolický krevní tlak/, '118');
+    type(/Diastolický krevní tlak/, '76');
+    type(/Podíl tělesného tuku/, '12');
+    type(/Svalová hmota/, '41');
+    next();
+    fireEvent.click(await screen.findByRole('button', { name: 'Odeslat relaci' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Vytvořit další relaci/ }));
+    expect(await screen.findByDisplayValue(/Marková/)).toBeInTheDocument();
   });
 });

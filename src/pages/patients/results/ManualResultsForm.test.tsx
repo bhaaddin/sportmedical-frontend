@@ -19,6 +19,7 @@ const getByPatient = vi.fn();
 const createSession = vi.fn();
 const updateSession = vi.fn();
 const listActivities = vi.fn();
+const listServices = vi.fn();
 
 vi.mock('../../../api/patients', () => ({ patientsApi: { search: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../../api/diagnostics', async () => {
@@ -26,6 +27,7 @@ vi.mock('../../../api/diagnostics', async () => {
   return { ...actual, diagnosticsApi: { getByPatient, create: createSession, update: updateSession, downloadPdf: vi.fn() } };
 });
 vi.mock('../../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
+vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: listServices } }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const { default: ManualResultsForm } = await import('../ManualResultsForm');
@@ -73,6 +75,7 @@ beforeEach(() => {
   createSession.mockReset().mockResolvedValue(session());
   updateSession.mockReset().mockResolvedValue(session());
   listActivities.mockReset().mockResolvedValue({ activities: [] });
+  listServices.mockReset().mockResolvedValue([]);
 });
 
 describe.each([
@@ -314,5 +317,23 @@ describe('the form', () => {
 
     expect(container.textContent).not.toMatch(/Ruční zápis/);
     expect(container.textContent).not.toMatch(/uloží do poznámek/);
+  });
+
+  it('asks for the sluzba first when there are several, then offers only its cinnosti', async () => {
+    listServices.mockResolvedValue([
+      { id: 's1', name: 'Prohlídky', sortOrder: 1, isActive: true },
+      { id: 's2', name: 'Diagnostika', sortOrder: 2, isActive: true },
+    ]);
+    listActivities.mockResolvedValue({ activities: [
+      { id: 'a1', name: 'Základní', isActive: true, clinicServiceId: 's1' },
+      { id: 'a2', name: 'Spiroergo', isActive: true, clinicServiceId: 's2' },
+    ] });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(await screen.findByLabelText(/^Služba/));
+    await user.click(await screen.findByRole('option', { name: 'Diagnostika' }));
+    await user.click(screen.getByLabelText(/^Typ protokolu/));
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Spiroergo']);
   });
 });

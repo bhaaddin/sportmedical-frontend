@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { DISCOUNT_SETTINGS_QUERY_KEY, discountSettingsApi, type DiscountSettings } from '../../api/discounts';
 import { activitiesApi } from '../../api/activities';
+import { clinicServicesApi } from '../../api/clinicServices';
 import { useDevice } from '../../layout/useDevice';
 import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
@@ -55,6 +56,11 @@ export default function DiscountsPage() {
   const roomy = useMediaQuery('(min-width: 1024px)');
 
   const query = useQuery({ queryKey: DISCOUNT_SETTINGS_QUERY_KEY, queryFn: discountSettingsApi.get, retry: false });
+  const servicesQuery = useQuery({
+    queryKey: ['settings', 'discounts', 'services'],
+    queryFn: clinicServicesApi.list,
+    retry: false,
+  });
   const activitiesQuery = useQuery({
     queryKey: ['settings', 'discounts', 'activities'],
     queryFn: async () => (await activitiesApi.list()).activities,
@@ -177,7 +183,8 @@ export default function DiscountsPage() {
             <PackageEditor
               rows={draft.packages}
               errors={shown.packages}
-              activities={activities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))}
+              activities={activities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive, clinicServiceId: a.clinicServiceId }))}
+              services={(servicesQuery.data ?? []).filter((sv) => sv.isActive).map((sv) => ({ id: sv.id, name: sv.name }))}
               onChange={(packages) => change({ packages })}
             />
           </SectionCard>

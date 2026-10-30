@@ -15,6 +15,8 @@ import toast from 'react-hot-toast';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
 import ManualResultsForm from './patients/ManualResultsForm';
+import PatientPicker from '../components/patients/PatientPicker';
+import type { Patient } from '../api/patients';
 
 type VitalKey =
   | 'restingHeartRateBpm'
@@ -205,6 +207,7 @@ export default function DiagnosticForm() {
   const [error, setError] = useState('');
 
   /* The patient this was opened for (the card's "Nové vyšetření" sends `?patientId=`): their name for the chip in the header. */
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [urlPatient, setUrlPatient] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -215,6 +218,7 @@ export default function DiagnosticForm() {
     let live = true;
     Promise.resolve().then(() => patientsApi.getById(pid))
       .then((p) => {
+        if (live && p) setPatient(p);
         const name = safeLabel(p ? `${p.firstName} ${p.lastName}` : '', 'patient');
         if (live && name !== '') setUrlPatient({ id: pid, name });
       })
@@ -283,7 +287,7 @@ export default function DiagnosticForm() {
         purpose="Diagnostika a měření · uložená relace"
         entities={patientChip(result.patientId)}
         actions={
-          <Button variant="outlined" onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }} sx={TARGET_SX}>
+          <Button variant="outlined" onClick={() => { setResult(null); setForm({ ...emptyDraft(), patientId: form.patientId }); setActiveStep(0); }} sx={TARGET_SX}>
             Vytvořit další relaci
           </Button>
         }
@@ -390,8 +394,12 @@ export default function DiagnosticForm() {
           <Box>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField fullWidth required label="ID pacienta" value={form.patientId}
-                  onChange={e => update('patientId', e.target.value)} />
+                <PatientPicker
+                  value={patient}
+                  onChange={(p) => { setPatient(p); update('patientId', p?.id ?? ''); }}
+                  label="Pacient"
+                  required
+                />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth required label="Jméno praktika" value={form.practitionerName}
