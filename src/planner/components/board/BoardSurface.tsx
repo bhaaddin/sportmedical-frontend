@@ -31,7 +31,6 @@ import { longDate, minutesFree } from '../../../components/booking/grid/periodTi
 import { localDateTime, pragueMinuteOfDay, spanLabel, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
 import type { GridMoveRequest } from '../../../components/booking/grid/moveRequest';
 import { MoveConfirmDialog } from '../../../components/booking/calendar/MoveConfirmDialog';
-import { AddToClubOrderDialog } from '../../../components/booking/calendar/AddToClubOrderDialog';
 import type { ClubBlockPick } from '../../../components/booking/calendar/ClubBlockPopover';
 import { SelectionPopover } from '../../../components/booking/calendar/SelectionPopover';
 import { dayCount, daysWord, rangeDates } from '../../../components/booking/calendar/model';
@@ -91,7 +90,6 @@ import type { UndoOp } from './undoState';
 import type { Appointment } from '../../../api/bookingContracts';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
-import { DaysBlockDialog } from './month/DaysBlockDialog';
 import { useDaySelect } from './month/useDaySelect';
 import { useDayPick } from '../plan/useDayPick';
 import { PlanFxHost } from '../../motion/PlanFxHost';
@@ -125,6 +123,8 @@ const AppointmentDetail = lazy(() => import('../../../components/booking/Appoint
 const LunchLayer = lazy(() => import('./LunchLayer'));
 const ClashLayer = lazy(() => import('./ClashLayer'));
 const OfferedAsk = lazy(() => import('./OfferedAsk'));
+const AddToClubOrderDialog = lazy(() => import('../../../components/booking/calendar/AddToClubOrderDialog').then((m) => ({ default: m.AddToClubOrderDialog })));
+const DaysBlockDialog = lazy(() => import('./month/DaysBlockDialog').then((m) => ({ default: m.DaysBlockDialog })));
 const GapChoice = lazy(() => import('./GapChoice'));
 const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
@@ -1607,6 +1607,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       </Popover>
 
       {dayBlock && calendar ? (
+        <Suspense fallback={null}>
         <DaysBlockDialog
           ranges={dayBlock}
           calendars={calendar.calendars}
@@ -1618,6 +1619,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             void refreshCalendar();
           }}
         />
+        </Suspense>
       ) : null}
       {blockTarget ? <BlockReasonDialog target={blockTarget} onClose={() => setBlockTarget(null)} /> : null}
       {openBlock ? (
@@ -1631,6 +1633,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       ) : null}
 
       {addToClub && calendar ? (
+        <Suspense fallback={null}>
         <AddToClubOrderDialog
           marked={addToClub.marked}
           calendars={calendar.calendars}
@@ -1643,6 +1646,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             void refreshCalendar();
           }}
         />
+        </Suspense>
       ) : null}
 
       {clubPick ? (
