@@ -328,6 +328,11 @@ class SocketService {
     }
   }
 
+  /** True while the hub connection is up (a screen may then poll more slowly). */
+  isConnected(): boolean {
+    return this.connection?.state === STATE_CONNECTED;
+  }
+
   /* ── Subscribe to event ── */
   on(event: SocketEventName, callback: EventCallback): () => void {
     if (!this.listeners.has(event)) {

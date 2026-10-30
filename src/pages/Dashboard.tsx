@@ -8,6 +8,7 @@ import { FitPage } from '../components/ui/fit';
 import { pragueDateKey } from '../utils/time';
 import { useAttention } from '../ui/shelf/useAttention';
 import { AttentionList, ClubsList, TodayHero, WeekChart } from './overview/Blocks';
+import { useOverviewLive } from './overview/useOverviewLive';
 import { overviewClubOrdersQuery, overviewWeekQuery } from './overview/queries';
 import { attentionBlock, clubsBlock, dayOf, statusOf, todayBlock, weekBlock, weekRange } from './overview/model';
 
@@ -67,7 +68,8 @@ function OwnerDashboard() {
   const { from, to } = weekRange(now);
 
   /* ONE request for the Prague week: it answers Dnes (today's rows) and Tento týden (the seven bars). */
-  const weekQuery = useQuery({ ...overviewWeekQuery(from, to), refetchInterval: 60_000, retry: false });
+  const pollMs = useOverviewLive();
+  const weekQuery = useQuery({ ...overviewWeekQuery(from, to), refetchInterval: pollMs, retry: false });
   const clubOrders = useQuery({ ...overviewClubOrdersQuery(), retry: false });
 
   const todayRows: DayAppointment[] = useMemo(() => (weekQuery.data ?? []).filter((a) => dayOf(a) === today), [weekQuery.data, today]);
