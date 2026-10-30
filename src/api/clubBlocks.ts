@@ -54,6 +54,8 @@ export interface ClubBlockAthlete {
   agreedPriceCzk?: number | null;
   /** Etapa 12: the price list's price for the činnost today; null when it has none. Absent on an older server. */
   listPriceCzk?: number | null;
+  /** The patient this athlete was linked to at the desk; present only when linked (absent on an older server). */
+  patientId?: string;
 }
 
 /** What goes to the server: how many places the club takes on one činnost. */
@@ -240,6 +242,7 @@ const athleteSchema = z.object({
   activityId: text,
   agreedPriceCzk: money,
   listPriceCzk: money,
+  patientId: text,
 });
 
 /** Athletes that cannot be read (no name) are left out; a list that is not a list is empty. */
@@ -250,8 +253,8 @@ export function toAthletes(raw: unknown): ClubBlockAthlete[] {
     const parsed = athleteSchema.safeParse(withId);
     if (!parsed.success) return [];
     /* `activityId` is only there when the server sent one (seats per činnost). */
-    const { activityId, ...rest } = parsed.data;
-    return [{ ...rest, activityName: rest.activityName ?? '', ...(activityId !== null ? { activityId } : {}) }];
+    const { activityId, patientId, ...rest } = parsed.data;
+    return [{ ...rest, activityName: rest.activityName ?? '', ...(activityId !== null ? { activityId } : {}), ...(patientId !== null ? { patientId } : {}) }];
   });
 }
 
@@ -470,6 +473,22 @@ export const clubBlocksApi = {
       return toBlock(res.data);
     }),
 
+  /**
+   * "Spojit s pacientem": links one athlete (`athlete.id` is the appointment id) with a registered patient and makes the patient
+   * a member of the club. The reason is required (up to 500 characters). Errors are left as the server sent them: see
+   * `linkAthleteProblem`. Idempotent.
+   */
+  linkAthleteToPatient: async (blockId: string, athleteId: string, input: { patientId: string; reason: string }): Promise<AthleteLinkResult> => {
+    const res = await client.post(`${BASE}/${encodeURIComponent(blockId)}/athletes/${encodeURIComponent(athleteId)}/patient`, input);
+    const d = isRecord(res.data) ? res.data : {};
+    return {
+      patientId: typeof d.patientId === 'string' ? d.patientId : input.patientId,
+      clubId: typeof d.clubId === 'string' ? d.clubId : null,
+      linkedAppointments: typeof d.linkedAppointments === 'number' ? d.linkedAppointments : 0,
+      clubMemberCreated: d.clubMemberCreated === true,
+    };
+  },
+
   create: (input: ClubBlockInput): Promise<ClubBlockView> =>
     request(async () => {
       const res = await client.post(BASE, input);
@@ -545,3 +564,28 @@ export async function fetchBlockableActivities(): Promise<BlockableActivity[]> {
 }
 
 export default clubBlocksApi;
+
+export interface AthleteLinkResult {
+  patientId: string;
+  clubId: string | null;
+  linkedAppointments: number;
+  clubMemberCreated: boolean;
+}
+
+/** Czech sentence for a refused "Spojit s pacientem". */
+export function linkAthleteProblem(error: unknown): string {
+  const r = (error as { response?: { status?: number; data?: { code?: unknown } } } | null)?.response;
+  const code = typeof r?.data?.code === 'string' ? r.data.code : '';
+  switch (code) {
+    case 'club_athlete.reason_required': return 'Napište důvod spojení.';
+    case 'club_athlete.linked_to_another_patient': return 'Tento sportovec je už spojen s jiným pacientem.';
+    case 'club_athlete.not_found': return 'Sportovec už v bloku není. Obnovte stránku.';
+    case 'club_block.not_found': return 'Blok už neexistuje. Obnovte stránku.';
+    case 'patient.not_found': return 'Pacient nebyl nalezen.';
+    case 'access.denied': return 'K tomuto pacientovi nebo bloku nemáte přístup.';
+    default: break;
+  }
+  if (r?.status === 404 || r?.status === 405) return 'Spojení s pacientem zatím server nepodporuje.';
+  if (r?.status === 403) return 'Na spojení sportovce s pacientem nemáte oprávnění.';
+  return 'Spojení se nepovedlo. Zkuste to znovu.';
+}

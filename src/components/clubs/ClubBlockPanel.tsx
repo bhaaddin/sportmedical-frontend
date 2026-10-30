@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from '@mui/material';
 import { ContentCopy, FileDownloadOutlined } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { calendarsApi } from '../../api/calendars';
 import { clubBlocksApi, fetchBlockableActivities } from '../../api/clubBlocks';
@@ -29,6 +29,9 @@ import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
 import { ExportGate } from '../ui/ExportGate';
+import { EntityChip, safeLabel } from '../../ui/shelf';
+import { usePermission } from '../../auth/usePermission';
+import { LinkAthleteDialog } from './LinkAthleteDialog';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText, downloadAthletesCsv, sortAthletes } from './athleteList';
 import type { SortDirection } from './athleteList';
 
@@ -51,6 +54,20 @@ export function ClubBlockPanel({
   const active = block.status === 'Active';
   const [dialog, setDialog] = useState<null | 'edit' | 'cancel' | RangeMode>(null);
   const root = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
+  const mayLink = usePermission('bookings.edit') && usePermission('patients.view');
+  const [linking, setLinking] = useState<{ id: string; name: string } | null>(null);
+  const linkCell = (a: { id: string; name: string; patientId?: string; status: string }) => {
+    if (a.patientId !== undefined) {
+      return <EntityChip entity={{ kind: 'patient', id: a.patientId, label: safeLabel(a.name, 'patient') || 'Pacient' }} size="sm" />;
+    }
+    if (!mayLink || a.status === 'Cancelled') return null;
+    return (
+      <Button size="small" variant="text" onClick={() => setLinking({ id: a.id, name: a.name })} sx={{ minHeight: 44 }}>
+        Spojit s pacientem
+      </Button>
+    );
+  };
 
   /* Landed on from the calendar or the booking drawer: bring the block into view. */
   useEffect(() => {
@@ -269,6 +286,7 @@ export function ClubBlockPanel({
                     {[a.activityName, a.startUtc ? formatSlotTime(a.startUtc) : null].filter(Boolean).join(' · ')}
                   </Typography>
                   <Typography variant="body2" data-testid="block-athlete-price" sx={{ fontWeight: 600 }}>{athletePriceText(a)}</Typography>
+                  {linkCell(a)}
                   {a.phone ? (
                     <Typography variant="body2" component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
                       {a.phone}
@@ -292,6 +310,7 @@ export function ClubBlockPanel({
                     <TableCell>Stav</TableCell>
                     <TableCell>Telefon</TableCell>
                     <TableCell align="right">Cena</TableCell>
+                    {mayLink || detail.athletes.some((x) => x.patientId !== undefined) ? <TableCell>Pacient</TableCell> : null}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -307,6 +326,7 @@ export function ClubBlockPanel({
                         {a.phone ? <Box component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main' }}>{a.phone}</Box> : '—'}
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} data-testid="block-athlete-price">{athletePriceText(a)}</TableCell>
+                      {mayLink || detail.athletes.some((x) => x.patientId !== undefined) ? <TableCell>{linkCell(a)}</TableCell> : null}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -325,6 +345,20 @@ export function ClubBlockPanel({
             Zrušit blok
           </Button>
         </Stack>
+      ) : null}
+
+      {linking !== null ? (
+        <LinkAthleteDialog
+          blockId={block.id}
+          athleteId={linking.id}
+          athleteName={linking.name}
+          onClose={() => setLinking(null)}
+          onLinked={(result) => {
+            setLinking(null);
+            toast.success(result.clubMemberCreated ? 'Sportovec je spojen s pacientem a přidán do klubu' : 'Sportovec je spojen s pacientem');
+            void queryClient.invalidateQueries({ queryKey: ['club-blocks', 'detail', block.id] });
+          }}
+        />
       ) : null}
 
       {dialog === 'shorten' || dialog === 'extend' ? (
