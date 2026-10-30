@@ -11,7 +11,7 @@
  * The "jiný čas" form used to be saveable empty; it now says what is missing.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderScreen } from '../../test/auditHarness';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
@@ -22,6 +22,7 @@ const listExceptions = vi.fn();
 const createException = vi.fn();
 const deleteException = vi.fn();
 const getAccess = vi.fn();
+const dayRange = vi.fn();
 
 vi.mock('../../api/calendars', () => ({
   calendarsApi: {
@@ -32,6 +33,7 @@ vi.mock('../../api/calendars', () => ({
     getAccess,
   },
 }));
+vi.mock('../../api/appointments', () => ({ appointmentsApi: { range: dayRange } }));
 vi.mock('../../api/workingHours', () => ({ workingHoursApi: { listExceptions, createException, deleteException } }));
 
 const { default: ExceptionsPage } = await import('./ExceptionsPage');
@@ -45,6 +47,7 @@ beforeEach(() => {
   listExceptions.mockReset().mockResolvedValue([]);
   createException.mockReset().mockResolvedValue(exception());
   deleteException.mockReset().mockResolvedValue(undefined);
+  dayRange.mockReset().mockResolvedValue([]);
   getAccess.mockReset().mockResolvedValue([
     { userId: 'u1', displayName: 'MUDr. Novák', role: 'Owner', hasAccess: true, lockedBy: 'role' },
     { userId: 'u2', displayName: 'Bez přístupu', role: 'Staff', hasAccess: false, lockedBy: null },
@@ -70,12 +73,17 @@ describe('exceptionProblem', () => {
     ['differentWorker', draft(), 'worker'],
     ['closed', draft({ date: '' }), 'date'],
     ['closed', draft({ date: '26.10.2026' }), 'date'],
+    ['closed', draft({ date: '2026-02-30' }), 'date'],
+    [null, draft({ isClosed: true }), 'kind'],
+    ['differentHours', draft({ date: '2027-03-28', startTime: '02:30', endTime: '10:00' }), 'timeGap'],
+    ['differentHours', draft({ date: '2027-03-28', startTime: '03:00', endTime: '10:00' }), null],
+    ['differentHours', draft({ date: '2026-10-25', startTime: '02:30', endTime: '10:00' }), null],
   ] as const)('%s %#', (kind, input, expected) => {
     expect(exceptionProblem(kind, input)).toBe(expected);
   });
 
   it('has a Czech sentence for every problem', () => {
-    expect(Object.keys(EXCEPTION_PROBLEM_TEXT).sort()).toEqual(['date', 'hoursMissing', 'hoursOrder', 'worker']);
+    expect(Object.keys(EXCEPTION_PROBLEM_TEXT).sort()).toEqual(['date', 'hoursMissing', 'hoursOrder', 'kind', 'timeGap', 'worker']);
   });
 });
 
@@ -85,6 +93,12 @@ const open = async () => {
   await user.click(await screen.findByRole('button', { name: 'Nová výjimka' }));
   const dialog = await screen.findByRole('dialog');
   return { user, dialog };
+};
+
+const fillDate = async (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, date = '2026-11-12') => {
+  const field = within(dialog).getByLabelText(/^Datum/);
+  await user.clear(field);
+  await user.type(field, date);
 };
 
 const pickKind = async (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, name: string) => {
@@ -148,18 +162,51 @@ describe('the list', () => {
 });
 
 describe('a new exception', () => {
-  it('"Zavřeno" is the default and sends isClosed true, no hours, no worker', async () => {
+  it('opens with no date and no kind chosen, and Uložit does nothing until both are', async () => {
     const { user, dialog } = await open();
+    expect(within(dialog).getByLabelText(/^Datum/)).toHaveValue('');
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
+    await fillDate(user, dialog);
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
+    await pickKind(user, dialog, 'Zavřeno');
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeEnabled();
+    expect(createException).not.toHaveBeenCalled();
+  });
+
+  it('"Zavřeno" asks once more, names how many bookings it touches, and only then sends isClosed true', async () => {
+    dayRange.mockResolvedValue([
+      { id: 'a1', startUtc: '2026-11-12T08:00:00Z', endUtc: '2026-11-12T08:30:00Z', status: 1 },
+      { id: 'a2', startUtc: '2026-11-12T09:00:00Z', endUtc: '2026-11-12T09:30:00Z', status: 0 },
+      { id: 'a3', startUtc: '2026-11-12T10:00:00Z', endUtc: '2026-11-12T10:30:00Z', status: 4 },
+    ]);
+    const { user, dialog } = await open();
+    await fillDate(user, dialog);
+    await pickKind(user, dialog, 'Zavřeno');
     await user.type(within(dialog).getByLabelText('Důvod'), 'Školení');
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    expect(createException).not.toHaveBeenCalled();
+    expect(await within(dialog).findByText(/Týká se to 2 objednávek/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Ano, zavřít' }));
     await waitFor(() => expect(createException).toHaveBeenCalled());
     expect(createException).toHaveBeenCalledWith('c1', {
-      date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), isClosed: true, startTime: null, endTime: null, workerUserId: null, reason: 'Školení', isClosedToPublic: false,
+      date: '2026-11-12', isClosed: true, startTime: null, endTime: null, workerUserId: null, reason: 'Školení', isClosedToPublic: false,
     });
   });
 
-  it('"Online objednávky vypnuty" sends only isClosedToPublic', async () => {
+  it('says plainly when nobody is booked that day, and Zpět leaves without writing', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
+    await pickKind(user, dialog, 'Zavřeno');
+    await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    expect(await within(dialog).findByText(/Nikdo objednaný se to netýká/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Zpět' }));
+    expect(createException).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeEnabled();
+  });
+
+  it('"Online objednávky vypnuty" sends only isClosedToPublic, without a second step', async () => {
+    const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Online objednávky vypnuty');
     expect(within(dialog).getByText(/jen přes internet si termín nikdo nevezme/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
@@ -167,39 +214,53 @@ describe('a new exception', () => {
     expect(createException.mock.calls[0][1]).toMatchObject({ isClosed: false, isClosedToPublic: true, startTime: null, endTime: null, workerUserId: null });
   });
 
-  it('"Jiný čas" opens with 08:00-16:00 and sends the hours as typed', async () => {
+  it('"Jiný čas" opens with empty hours, needs both, then confirms and sends them as typed', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Jiný čas');
-    expect(within(dialog).getByLabelText('Od')).toHaveValue('08:00');
-    expect(within(dialog).getByLabelText('Do')).toHaveValue('16:00');
-    const to = within(dialog).getByLabelText('Do');
-    await user.clear(to);
-    await user.type(to, '13:30');
+    expect(within(dialog).getByLabelText('Od')).toHaveValue('');
+    expect(within(dialog).getByLabelText('Do')).toHaveValue('');
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: '08:00' } });
+    fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: '13:30' } });
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Ano, změnit' }));
     await waitFor(() => expect(createException).toHaveBeenCalled());
     expect(createException.mock.calls[0][1]).toMatchObject({ isClosed: false, startTime: '08:00', endTime: '13:30' });
   });
 
   it('"Jiný čas" with an end before the start says so and cannot be saved', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Jiný čas');
-    const to = within(dialog).getByLabelText('Do');
-    await user.clear(to);
-    await user.type(to, '07:00');
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: '08:00' } });
+    fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: '07:00' } });
     expect(within(dialog).getByText('Konec musí být později než začátek.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
   });
 
-  it('"Jiný čas" with a time cleared says both are needed and cannot be saved', async () => {
+  it('"Jiný čas" with only one time says both are needed and cannot be saved', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Jiný čas');
-    await user.clear(within(dialog).getByLabelText('Od'));
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: '08:00' } });
     expect(within(dialog).getByText('Jiné hodiny potřebují začátek i konec.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
+  });
+
+  it('refuses a time that does not exist on the spring clock-change day instead of shifting it', async () => {
+    const { user, dialog } = await open();
+    await fillDate(user, dialog, '2027-03-28');
+    await pickKind(user, dialog, 'Jiný čas');
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: '02:30' } });
+    fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: '10:00' } });
+    expect(within(dialog).getByText(/ten den neexistuje \(posun hodin\)/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
   });
 
   it('"Jiný pracovník" offers only the accounts ticked for this calendar and needs one', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Jiný pracovník');
     expect(within(dialog).getByRole('button', { name: 'Uložit' })).toBeDisabled();
     await user.click(within(dialog).getByRole('combobox', { name: 'Pracovník' }));
@@ -212,20 +273,20 @@ describe('a new exception', () => {
 
   it('switching the kind starts the form over, so hours typed for one kind do not leak into another', async () => {
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
     await pickKind(user, dialog, 'Jiný čas');
-    await user.clear(within(dialog).getByLabelText('Do'));
-    await user.type(within(dialog).getByLabelText('Do'), '11:00');
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: '08:00' } });
+    fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: '11:00' } });
     await pickKind(user, dialog, 'Zavřeno');
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Ano, zavřít' }));
     await waitFor(() => expect(createException).toHaveBeenCalled());
     expect(createException.mock.calls[0][1]).toMatchObject({ isClosed: true, startTime: null, endTime: null });
   });
 
   it('keeps the date when the kind changes', async () => {
     const { user, dialog } = await open();
-    const date = within(dialog).getByLabelText(/^Datum/);
-    await user.clear(date);
-    await user.type(date, '2026-12-24');
+    await fillDate(user, dialog, '2026-12-24');
     await pickKind(user, dialog, 'Online objednávky vypnuty');
     expect(within(dialog).getByLabelText(/^Datum/)).toHaveValue('2026-12-24');
   });
@@ -239,6 +300,8 @@ describe('a new exception', () => {
     const { BookingApiError } = await import('../../api/apiError');
     createException.mockRejectedValue(new BookingApiError('conflict', 409, 'Na tento den už výjimka existuje.'));
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
+    await pickKind(user, dialog, 'Online objednávky vypnuty');
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
     expect(await within(dialog).findByText('Na tento den už výjimka existuje.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -248,6 +311,8 @@ describe('a new exception', () => {
     let finish: (value: unknown) => void = () => undefined;
     createException.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
     const { user, dialog } = await open();
+    await fillDate(user, dialog);
+    await pickKind(user, dialog, 'Online objednávky vypnuty');
     await user.dblClick(within(dialog).getByRole('button', { name: 'Uložit' }));
     expect(createException).toHaveBeenCalledTimes(1);
     finish(exception());
