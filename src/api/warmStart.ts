@@ -54,6 +54,11 @@ export function warmForPath(queryClient: QueryClient, pathname: string, search =
   const dashboard = DASHBOARD.test(pathname) && !isStaffRole();
   if (!club && !page && !list && !calendar && !dashboard) return;
 
+  if (dashboard) {
+    void import('./warmDashboard').then((m) => m.warmDashboard(queryClient)).catch(() => undefined);
+    return;
+  }
+
   void import('./warmReads')
     .then((reads) => {
       if (club) {
@@ -64,7 +69,6 @@ export function warmForPath(queryClient: QueryClient, pathname: string, search =
         reads.warmAccount();
         reads.prefetchClubPage(queryClient, page[1]);
       }
-      else if (dashboard) reads.warmDashboard(queryClient);
       else if (list) reads.warmClubList(queryClient);
       else reads.warmReferenceData(queryClient);
     })

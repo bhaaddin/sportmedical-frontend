@@ -6,9 +6,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { calendarsApi } from '../../api/calendars';
-import { socketService, SOCKET_EVENTS, type CalendarChanged } from '../../services/socketService';
-import { LIVE_DEBOUNCE_MS } from '../../planner/api/usePlannerLive';
+import type { CalendarChanged } from '../../services/socketService';
 
+/** Same debounce as the planner's (usePlannerLive.ts): a burst becomes one refresh. */
+export const LIVE_DEBOUNCE_MS = 300;
 export const POLL_MS = 60_000;
 export const POLL_LIVE_MS = 5 * 60_000;
 
@@ -22,27 +23,31 @@ export function useOverviewLive(): number {
   useEffect(() => {
     if (ids === '') return;
     const shown = new Set(ids.split(','));
+    let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let release: (() => void) | null = null;
     let offChanged: (() => void) | null = null;
     let offConnected: (() => void) | null = null;
-    try {
-      socketService.init();
-      socketService.connect();
-      setLive(socketService.isConnected());
-      offConnected = socketService.on(SOCKET_EVENTS.CONNECTED, () => setLive(true));
-      offChanged = socketService.on(SOCKET_EVENTS.CALENDAR_CHANGED, (message: CalendarChanged) => {
-        if (!message.calendarIds.some((id) => shown.has(id)) || timer !== null) return;
-        timer = setTimeout(() => {
-          timer = null;
-          void queryClient.invalidateQueries({ queryKey: ['overview', 'week'] });
-        }, LIVE_DEBOUNCE_MS);
-      });
-      release = socketService.watchCalendars([...shown]);
-    } catch {
-      /* no hub: the poll stays at 60 s */
-    }
+    /* The hub client is loaded only now, off the first load of Přehled (the bundle budget counts what a screen downloads). */
+    void import('../../services/socketService')
+      .then(({ socketService, SOCKET_EVENTS }) => {
+        if (stopped) return;
+        socketService.init();
+        socketService.connect();
+        setLive(socketService.isConnected());
+        offConnected = socketService.on(SOCKET_EVENTS.CONNECTED, () => setLive(true));
+        offChanged = socketService.on(SOCKET_EVENTS.CALENDAR_CHANGED, (message: CalendarChanged) => {
+          if (!message.calendarIds.some((id) => shown.has(id)) || timer !== null) return;
+          timer = setTimeout(() => {
+            timer = null;
+            void queryClient.invalidateQueries({ queryKey: ['overview', 'week'] });
+          }, LIVE_DEBOUNCE_MS);
+        });
+        release = socketService.watchCalendars([...shown]);
+      })
+      .catch(() => undefined /* no hub: the poll stays at 60 s */);
     return () => {
+      stopped = true;
       if (timer !== null) clearTimeout(timer);
       offChanged?.();
       offConnected?.();

@@ -231,7 +231,7 @@ describe('warmForPath: Přehled (speed-fe-4)', () => {
   it('starts the week and the club-order reads for /prehled, but not for the Staff role', async () => {
     const qc = new QueryClient();
     warmForPath(qc, '/prehled');
-    await settle();
+    await vi.waitFor(() => expect(qc.getQueryCache().getAll().length).toBeGreaterThan(1));
     expect(qc.getQueryCache().getAll().map((q) => q.queryKey)).toEqual(expect.arrayContaining([['shelf', 'club-orders', 'Requested']]));
     expect(qc.getQueryCache().getAll().some((q) => q.queryKey[0] === 'overview')).toBe(true);
 
