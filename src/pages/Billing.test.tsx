@@ -182,7 +182,7 @@ describe('Fakturace', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zaevidovat platbu' }));
 
-    await waitFor(() => expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 2200, method: 'Cash' }));
+    await waitFor(() => expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 2200, method: 'Cash' }, expect.any(String)));
     await waitFor(() => expect(getInvoices).toHaveBeenCalledTimes(2));
   });
 
@@ -199,7 +199,7 @@ describe('Fakturace', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zaevidovat platbu' }));
 
     await waitFor(() =>
-      expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 1000, method: 'Card', note: 'záloha' }));
+      expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 1000, method: 'Card', note: 'záloha' }, expect.any(String)));
   });
 
   it('adds up the cash taken this month and says how much came by card', async () => {

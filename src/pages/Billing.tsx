@@ -23,13 +23,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper,
-  Stack, TextField, Typography, useMediaQuery,
+  Box, Chip, InputAdornment, Paper, TextField, Typography, useMediaQuery,
 } from '@mui/material';
 import { Add, Close, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { billingApi } from '../api/billing';
-import type { Invoice, InvoicePaymentMethod } from '../api/billing';
+import type { Invoice } from '../api/billing';
+import { usePayments } from '../api/payments';
 import { toBookingError } from '../api/apiError';
 import { usePermissions } from '../auth/usePermission';
 import { useDevice } from '../layout/useDevice';
@@ -41,6 +41,8 @@ import type { InvoiceSortKey } from '../components/billing/InvoiceTable';
 import type { InvoiceActionHandlers } from '../components/billing/InvoiceActions';
 import NewInvoiceFlow from '../components/billing/NewInvoiceFlow';
 import RejectInvoiceDialog from '../components/billing/RejectInvoiceDialog';
+import PayDialog from '../components/billing/PayDialog';
+import PaymentsList from '../components/billing/PaymentsList';
 import { czk } from './billing/money';
 import {
   doklady, filterFromState, isClub, matchesFilter, matchesPatient, matchesSearch, patientFilterFromState, mergeBillingSearch, searchFromState, monthIn, monthYear, statusOf, summarize, customerOf,
@@ -59,9 +61,9 @@ import { invoiceApprovals, overdueInvoices } from '../ui/shelf/attention';
 /** The permission that lets somebody approve or reject an invoice above a discount limit. */
 const APPROVE_PERMISSION = 'billing.approve';
 
-const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = (
-  Object.keys(PAYMENT_METHOD_LABEL) as InvoicePaymentMethod[]
-).map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }));
+/** The payment ledger: who may confirm a transfer, and who may refund. */
+const MANAGE_PERMISSION = 'billing.manage';
+const REFUND_PERMISSION = 'billing.refund';
 
 const messageOf = (error: unknown, fallback: string): string => toBookingError(error).serverMessage ?? fallback;
 
@@ -76,7 +78,12 @@ export default function Billing() {
   /* The seven-column table needs about 1180 px beside the sidebar (a 1440 window has that); narrower, it folds into five columns. */
   const narrow = useMediaQuery('(max-width: 1439px)');
   const tablet = device === 'tablet' || narrow;
-  const canApprove = usePermissions().includes(APPROVE_PERMISSION);
+  const held = usePermissions();
+  const canApprove = held.includes(APPROVE_PERMISSION);
+  /* The Platby tab exists only when the server answers the ledger (it may not be live yet, or this person may not see it). */
+  const ledger = usePayments({ pageSize: 1 });
+  const hasLedger = ledger.data != null;
+  const [section, setSection] = useState<'invoices' | 'payments'>('invoices');
 
   /* ── Data ── */
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -97,10 +104,6 @@ export default function Billing() {
   /* The prefill of a document that was opened and not yet issued: closing the flow keeps it, issuing clears it. */
   const [unfinished, setUnfinished] = useState<BillingNavState | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
-  const [payment, setPayment] = useState<{ amount: string; method: InvoicePaymentMethod; note: string }>({
-    amount: '', method: 'Cash', note: '',
-  });
-  const [savingPayment, setSavingPayment] = useState(false);
   const [rejecting, setRejecting] = useState<Invoice | null>(null);
   /* The invoice an approve / reject / PDF request is running for. */
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -197,34 +200,8 @@ export default function Billing() {
     document.getElementById(`invoice-${openId}`)?.scrollIntoView?.({ block: 'center' });
   }, [openId, loading]);
 
-  /* ── Record payment ── */
-  const openPayment = (inv: Invoice) => {
-    setPayment({ amount: String(inv.remainingCzk), method: isClub(inv) ? 'Transfer' : 'Cash', note: '' });
-    setPaying(inv);
-  };
-
-  const paymentAmount = Number(payment.amount.replace(/[\s ]/g, '').replace(',', '.'));
-  const paymentValid = Number.isFinite(paymentAmount) && paymentAmount > 0;
-
-  const handleRecordPayment = async () => {
-    if (paying === null || !paymentValid) return;
-    setSavingPayment(true);
-    try {
-      const note = payment.note.trim();
-      await billingApi.recordPayment(paying.id, {
-        amountCzk: paymentAmount,
-        method: payment.method,
-        ...(note !== '' ? { note } : {}),
-      });
-      toast.success('Platba zaevidována');
-      setPaying(null);
-      await reload();
-    } catch (error) {
-      toast.error(messageOf(error, 'Platbu se nepodařilo zaevidovat'));
-    } finally {
-      setSavingPayment(false);
-    }
-  };
+  /* ── Record payment (the dialog owns its form) ── */
+  const openPayment = (inv: Invoice) => setPaying(inv);
 
   /* ── Approve, reject, PDF ── */
   const handleApprove = async (inv: Invoice) => {
@@ -402,78 +379,103 @@ export default function Billing() {
         </>
       )}
 
-      {/* ── The invoices: search, filters, the table (cards on a phone) ── */}
-      <Shelf
-        id="invoices"
-        title="Doklady"
-        count={ready ? filteredInvoices.length : undefined}
-        layout="free"
-        grow
-        loading={loading}
-        error={loadFailed ? 'Doklady se nepodařilo načíst.' : false}
-        onRetry={load}
-        controls={ready ? filters : undefined}
-      >
-        {patientFilter !== null && (
-          <Box sx={{ mb: 1.5, flexShrink: 0 }}>
-            <Chip
-              color="primary"
-              variant="outlined"
-              label={`Pacient: ${patientFilterName || 'vybraný pacient'}`}
-              onDelete={() => setPatientFilter(null)}
-              deleteIcon={<Close aria-label="Zrušit filtr pacienta" />}
-              sx={{ minHeight: 44, borderRadius: 22 }}
-            />
-          </Box>
-        )}
-        <TextField
-          fullWidth
-          placeholder="Číslo dokladu, pacient nebo klub"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{
-            input: {
-              sx: { minHeight: 44 },
-              startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
-            },
-            htmlInput: { 'aria-label': 'Hledat doklad' },
-          }}
-          sx={{ mb: 1.5, flexShrink: 0 }}
+      {/* ── Doklady | Platby: the second only when the server has the payment ledger ── */}
+      {hasLedger && (
+        <Box sx={{ flexShrink: 0 }}>
+          <FilterChips
+            options={[{ key: 'invoices', label: 'Doklady' }, { key: 'payments', label: 'Platby' }] as FilterOption<'invoices' | 'payments'>[]}
+            value={section}
+            onChange={setSection}
+            ariaLabel="Doklady nebo platby"
+          />
+        </Box>
+      )}
+      {hasLedger && section === 'payments' ? (
+        <PaymentsList
+          invoices={invoices}
+          phone={phone}
+          touch={device !== 'desktop'}
+          canManage={held.includes(MANAGE_PERMISSION)}
+          canRefund={held.includes(REFUND_PERMISSION)}
+          onChanged={() => { void reload().catch(() => undefined); }}
+          onOpenInvoice={(id) => { setSection('invoices'); setFilter('all'); setSearch(''); setPatientFilter(null); setOpenId(id); }}
         />
-        {phone ? (
-          <>
-            <InvoiceCards
-              invoices={filteredInvoices}
-              now={now}
-              openId={openId}
-              onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
-              handlers={handlers}
-              empty={emptyText}
-            />
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, textAlign: 'center' }}>{shown}</Typography>
-          </>
-        ) : (
-          <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={[{ overflow: 'auto', overscrollBehavior: 'contain', ...FIT_FILL_SX }, STICKY_HEAD_SX]}>
-              <InvoiceTable
+      ) : (
+        <>
+        {/* ── The invoices: search, filters, the table (cards on a phone) ── */}
+        <Shelf
+          id="invoices"
+          title="Doklady"
+          count={ready ? filteredInvoices.length : undefined}
+          layout="free"
+          grow
+          loading={loading}
+          error={loadFailed ? 'Doklady se nepodařilo načíst.' : false}
+          onRetry={load}
+          controls={ready ? filters : undefined}
+        >
+          {patientFilter !== null && (
+            <Box sx={{ mb: 1.5, flexShrink: 0 }}>
+              <Chip
+                color="primary"
+                variant="outlined"
+                label={`Pacient: ${patientFilterName || 'vybraný pacient'}`}
+                onDelete={() => setPatientFilter(null)}
+                deleteIcon={<Close aria-label="Zrušit filtr pacienta" />}
+                sx={{ minHeight: 44, borderRadius: 22 }}
+              />
+            </Box>
+          )}
+          <TextField
+            fullWidth
+            placeholder="Číslo dokladu, pacient nebo klub"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            slotProps={{
+              input: {
+                sx: { minHeight: 44 },
+                startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+              },
+              htmlInput: { 'aria-label': 'Hledat doklad' },
+            }}
+            sx={{ mb: 1.5, flexShrink: 0 }}
+          />
+          {phone ? (
+            <>
+              <InvoiceCards
                 invoices={filteredInvoices}
                 now={now}
-                compact={tablet}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={handleSort}
                 openId={openId}
                 onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
                 handlers={handlers}
                 empty={emptyText}
               />
-            </Box>
-            <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{shown}</Typography>
-            </Box>
-          </Paper>
-        )}
-      </Shelf>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, textAlign: 'center' }}>{shown}</Typography>
+            </>
+          ) : (
+            <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
+              <Box sx={[{ overflow: 'auto', overscrollBehavior: 'contain', ...FIT_FILL_SX }, STICKY_HEAD_SX]}>
+                <InvoiceTable
+                  invoices={filteredInvoices}
+                  now={now}
+                  compact={tablet}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  openId={openId}
+                  onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
+                  handlers={handlers}
+                  empty={emptyText}
+                />
+              </Box>
+              <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>{shown}</Typography>
+              </Box>
+            </Paper>
+          )}
+        </Shelf>
+        </>
+      )}
 
       {/* ── New document ── */}
       <NewInvoiceFlow
@@ -491,59 +493,14 @@ export default function Billing() {
         onConfirm={(reason) => void handleReject(reason)}
       />
 
-      {/* ── Record payment dialog ── */}
-      <Dialog
-        open={paying !== null}
-        onClose={savingPayment ? undefined : () => setPaying(null)}
-        maxWidth="xs"
-        fullWidth
-        fullScreen={phone}
-        sx={phone ? { '& .MuiInputBase-root': { minHeight: 44 }, '& .MuiButton-root': { minHeight: 44 } } : undefined}
-      >
-        <DialogTitle>Přijmout platbu</DialogTitle>
-        <DialogContent>
-          {paying !== null && (
-            <Stack spacing={2} sx={{ mt: 0.5 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {paying.invoiceNumber} · {customerOf(paying)} · zbývá {czk(paying.remainingCzk)}
-              </Typography>
-              <TextField
-                label="Částka"
-                value={payment.amount}
-                onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))}
-                error={payment.amount !== '' && !paymentValid}
-                helperText={payment.amount !== '' && !paymentValid ? 'Zadejte částku v Kč.' : undefined}
-                slotProps={{ input: { endAdornment: <InputAdornment position="end">Kč</InputAdornment> } }}
-                fullWidth
-              />
-              <TextField
-                select
-                label="Způsob platby"
-                value={payment.method}
-                onChange={(e) => setPayment((p) => ({ ...p, method: e.target.value as InvoicePaymentMethod }))}
-                fullWidth
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label="Poznámka"
-                value={payment.note}
-                onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))}
-                slotProps={{ htmlInput: { maxLength: 200 } }}
-                fullWidth
-              />
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={phone ? { px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider' } : undefined}>
-          <Button variant="outlined" onClick={() => setPaying(null)} disabled={savingPayment}>Zrušit</Button>
-          <Button variant="contained" onClick={handleRecordPayment} disabled={savingPayment || !paymentValid}>
-            {savingPayment ? 'Ukládám…' : 'Zaevidovat platbu'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* ── Record payment ── */}
+      <PayDialog
+        invoice={paying}
+        phone={phone}
+        qrAvailable={hasLedger}
+        onClose={() => setPaying(null)}
+        onRecorded={async () => { try { await reload(); } catch { toast.error('Seznam dokladů se nepodařilo obnovit'); } }}
+      />
     </PageFrame>
   );
 }
