@@ -44,7 +44,7 @@ describe('server state (speed-fe-6)', () => {
     vi.useFakeTimers();
     try {
       const { getServerState, whenServerReady, POLL_MS } = await import('./warmUp');
-      const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('x')).mockResolvedValueOnce({ ok: false }).mockResolvedValue({ ok: true });
+      const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('x')).mockRejectedValueOnce(new TypeError('y')).mockResolvedValue({ ok: true });
       vi.stubGlobal('fetch', fetchMock);
       warmUpServer();
       const waited = whenServerReady();
@@ -52,6 +52,30 @@ describe('server state (speed-fe-6)', () => {
       await waited;
       expect(getServerState()).toBe('ready');
       expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('counts any answer as reachable and probes with no-cors', async () => {
+    const { getServerState } = await import('./warmUp');
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, type: 'opaque' });
+    vi.stubGlobal('fetch', fetchMock);
+    warmUpServer();
+    await vi.waitFor(() => expect(getServerState()).toBe('ready'));
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ mode: 'no-cors' });
+  });
+
+  it('stops making the sign-in wait after SUBMIT_WAIT_MS', async () => {
+    vi.useFakeTimers();
+    try {
+      const { getServerState, whenServerReady, SUBMIT_WAIT_MS } = await import('./warmUp');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('down')));
+      warmUpServer();
+      const waited = whenServerReady();
+      await vi.advanceTimersByTimeAsync(SUBMIT_WAIT_MS);
+      await waited;
+      expect(getServerState()).toBe('pending');
     } finally {
       vi.useRealTimers();
     }

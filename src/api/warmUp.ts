@@ -43,8 +43,10 @@ export function subscribeServerState(listener: () => void): () => void {
 
 async function answers(init: RequestInit): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/health/live`, init);
-    return response.ok;
+    /* no-cors: the answer is opaque and unreadable, but ANY answer means the server is reachable. Reading it would
+       need CORS headers on /health/live and would hang the sign-in if they were missing. */
+    await fetch(`${API_BASE}/health/live`, { ...init, mode: 'no-cors' });
+    return true;
   } catch {
     return false;
   }
@@ -62,15 +64,20 @@ function pollUntilReady(startedAt: number): void {
 }
 
 /** Resolves when the server has answered (or the polling gave up, or nobody started it): then the sign-in is sent ONCE. */
+export const SUBMIT_WAIT_MS = 10_000;
 export function whenServerReady(): Promise<void> {
   if (serverState !== 'pending') return Promise.resolve();
   return new Promise((resolve) => {
+    /* Capped: after SUBMIT_WAIT_MS the sign-in goes out anyway; withWakeUp is the safety net. */
+    const timer = setTimeout(done, SUBMIT_WAIT_MS);
     const off = subscribeServerState(() => {
-      if (serverState !== 'pending') {
-        off();
-        resolve();
-      }
+      if (serverState !== 'pending') done();
     });
+    function done(): void {
+      clearTimeout(timer);
+      off();
+      resolve();
+    }
   });
 }
 
@@ -80,7 +87,7 @@ export function warmUpServer(): void {
   setServerState('pending');
   const startedAt = Date.now();
   try {
-    void answers({ cache: 'no-store', credentials: 'omit', keepalive: true }).then((ok) => {
+    void answers({ cache: 'no-store', credentials: 'omit', keepalive: true, signal: AbortSignal.timeout(5_000) }).then((ok) => {
       if (ok) setServerState('ready');
       else pollUntilReady(startedAt);
     });
