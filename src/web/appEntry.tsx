@@ -10,19 +10,14 @@ import '../theme.css';
 import '../styles/accessibility.css';
 import '../motion/motion.css';
 import { trackPointerOrigin } from '../motion/pointerOrigin';
-/* Public Sans is the product's face (design board 3. 10. 2026); Inter stays as
-   the fallback and for the public pages that already wear it. Archivo is the public
+/* Public Sans is the product's face (design board 3. 10. 2026); Inter is no longer loaded here (nothing in the
+   application sets it; Public Sans covers Czech, system-ui is the fallback). Archivo is the public
    pages' heading face (artboard V-Web2). */
 import '@fontsource/public-sans/400.css';
 import '@fontsource/public-sans/500.css';
 import '@fontsource/public-sans/600.css';
 import '@fontsource/public-sans/700.css';
 import '@fontsource/public-sans/800.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
 import '@fontsource/archivo/700.css';
 import '@fontsource/archivo/800.css';
 

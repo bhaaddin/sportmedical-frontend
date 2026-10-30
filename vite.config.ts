@@ -68,6 +68,8 @@ function apiOriginHints(apiBase: string | undefined): Plugin {
       return [
         { tag: 'link', attrs: { rel: 'preconnect', href: origin, crossorigin: true }, injectTo: 'head-prepend' },
         { tag: 'link', attrs: { rel: 'dns-prefetch', href: origin }, injectTo: 'head-prepend' },
+        /* The wake-up ping starts with the HTML, in parallel with the JS download (public/early-wake.js). */
+        { tag: 'script', attrs: { async: true, src: '/early-wake.js', 'data-api': origin }, injectTo: 'head' },
       ];
     },
   };
