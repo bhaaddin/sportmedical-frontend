@@ -242,6 +242,7 @@ describe('Auditní log', () => {
     await open([audit(1)]);
     await userEvent.click(screen.getByRole('tab', { name: 'Přístupy k citlivým údajům' }));
     await waitFor(() => expect(get).toHaveBeenCalledWith('/api/audit/sensitive-access', { params: { page: 1, pageSize: 25 } }));
+    expect(screen.queryByRole('button', { name: 'Export celého období' })).toBeNull();
   });
 
   it('one patient’s records (?entity=Patient&entityId=…) come from the entity route, with a way back', async () => {
@@ -256,19 +257,20 @@ describe('Auditní log', () => {
     expect(await screen.findByText('Záznamy o pacientovi:')).toBeInTheDocument();
     expect(await screen.findByText('admin@sportmedical.cz')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zobrazit vše' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export celého období' })).toBeNull();
   });
 
-  it('Export CSV asks the server for the picked days as a file', async () => {
+  it('the export asks the server for the picked days as a file', async () => {
     await open([audit(1)]);
     await userEvent.click(screen.getByRole('button', { name: 'Filtry' }));
     fireEvent.change(screen.getByLabelText('Od data'), { target: { value: '2026-10-01' } });
     await waitFor(() => expect(lastSearch().params).toMatchObject({ from: '2026-09-30T22:00:00.000Z' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Export CSV' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export celého období' })).toBeEnabled());
     const search = get.getMockImplementation()!;
     get.mockImplementation((url: string, ...rest: unknown[]) => (url === '/api/audit/export' ? Promise.resolve({ data: new Blob(['a;b']) }) : search(url, ...rest)));
     URL.createObjectURL = vi.fn(() => 'blob:x');
     URL.revokeObjectURL = vi.fn();
-    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Export celého období' }));
     await waitFor(() => expect(get).toHaveBeenCalledWith('/api/audit/export', { params: { from: '2026-09-30T22:00:00.000Z', format: 'csv' }, responseType: 'blob' }));
   });
 

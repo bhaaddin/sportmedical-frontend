@@ -128,7 +128,7 @@ export const auditSearchApi = {
     return { actions: strings(o.actions), entities: strings(o.entities), users: strings(o.users) };
   },
 
-  /** `GET /api/audit/export?format=csv` - the server builds, masks, gates and audits the file. */
+  /** `GET /api/audit/export?format=csv` - the server filters by period only (not user/action/entity), so the screen hides it where the view is narrower. the server builds, masks, gates and audits the file. */
   exportCsv: async (p: Pick<AuditSearchParams, 'from' | 'to'>): Promise<Blob> => {
     const res = await client.get('/api/audit/export', { params: clean({ from: p.from, to: p.to, format: 'csv' }), responseType: 'blob' });
     return res.data as Blob;

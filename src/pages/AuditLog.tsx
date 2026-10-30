@@ -2,7 +2,7 @@
    AUDIT LOG — PLAN-01 Feature A31-A40
    - The server searches and pages (GET /api/audit/search): free text, action, entity, user, from / to
    - "Přístupy k citlivým údajům" (GET /api/audit/sensitive-access) as its own tab
-   - Export CSV (GET /api/audit/export), behind the same export permission as every other download
+   - Export celého období (GET /api/audit/export), behind the same export permission as every other download
    - ?entity=Patient&entityId=ID shows one patient's records (linked from the patient's history)
    - Expandable rows for the value before and after
 
@@ -187,6 +187,7 @@ export default function AuditLog() {
       scope={false}
       actions={
         <>
+          {view === 'all' && !forOne && (
           <ExportGate>
             {(blocked) => (
               <Button
@@ -197,10 +198,11 @@ export default function AuditLog() {
                 disabled={blocked || loading || loadError}
                 sx={{ ...TARGET_SX, minHeight: 44, borderColor: 'divider' }}
               >
-                Export CSV
+                Export celého období
               </Button>
             )}
           </ExportGate>
+          )}
           <Button
             variant="outlined"
             color="inherit"
