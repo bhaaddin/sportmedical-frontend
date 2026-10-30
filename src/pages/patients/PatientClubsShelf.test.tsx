@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import PatientClubsShelf, { membershipLine } from './PatientClubsShelf';
-import { readPatientClubs } from '../../api/clubs';
+import { readPatientClubs } from '../../api/patientClubs';
 
 const get = vi.fn();
 vi.mock('../../api/client', () => ({

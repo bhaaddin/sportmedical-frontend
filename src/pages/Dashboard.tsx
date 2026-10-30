@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { overviewScreenBlocked, seedOverviewScreen } from '../api/screens';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { usePermission } from '../auth/usePermission';
@@ -78,10 +79,26 @@ function OwnerDashboard() {
   const today = pragueDateKey(now);
   const { from, to } = weekRange(now);
 
+  /*
+   * One request for the week, the club orders and the names of today's patients when the server has the overview screen
+   * (NET-11): it seeds the keys below, and the reads wait for that one answer. An older server, a refusal or a failure
+   * settles it at once and the reads run exactly as they always did.
+   */
+  const queryClient = useQueryClient();
+  const [screenSettled, setScreenSettled] = useState(() => overviewScreenBlocked());
+  useEffect(() => {
+    if (screenSettled) return undefined;
+    let current = true;
+    void seedOverviewScreen(queryClient, { from, to, today }, { weekKey: ['overview', 'week', from], mayViewPatients: canSeePatients })
+      .then(() => { if (current) setScreenSettled(true); });
+    return () => { current = false; };
+  }, [queryClient, screenSettled, from, to, today, canSeePatients]);
+
   /* ONE request for the Prague week: it answers Dnes (today's rows) and Tento týden (the seven bars). */
   const weekQuery = useQuery({
     queryKey: ['overview', 'week', from],
     queryFn: () => appointmentsApi.range(from, to),
+    enabled: screenSettled,
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: false,

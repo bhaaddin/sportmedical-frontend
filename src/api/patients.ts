@@ -50,7 +50,7 @@ export const PATIENT_PAGE_SIZE_MAX = 100;
  * Said once here, so no screen has to tell "null" from "absent": either way
  * the field is simply not there.
  */
-function withContacts<T extends { phone?: string | null; email?: string | null }>(row: T): T {
+export function withContacts<T extends { phone?: string | null; email?: string | null }>(row: T): T {
   const out = { ...row };
   if (out.phone === null) delete out.phone;
   if (out.email === null) delete out.email;

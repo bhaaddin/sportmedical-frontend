@@ -12,7 +12,9 @@
  * The header stays put while the sections change, so the name and the missing
  * paperwork are on screen wherever you are inside the patient.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
+import { fetchPatientScreen, seedPatientClubs } from '../../api/screens';
 import {
   Link as RouterLink, Outlet, useLocation, useNavigate, useParams,
 } from 'react-router-dom';
@@ -150,6 +152,8 @@ export default function PatientLayout() {
   const location = useLocation();
   const mayEdit = usePermission('patients.edit');
   const mayBill = usePermission('billing.manage');
+  /* Without a provider (a bare test render) there is nothing to seed. */
+  const queryClient = useContext(QueryClientContext);
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
@@ -179,27 +183,45 @@ export default function PatientLayout() {
     setProfile(null);
     setUpcoming(null);
     setDocumentsKnown(false);
-    patientsApi.getById(id)
-      .then(setPatient)
-      .catch((error: unknown) => setNotOpened(whyNotOpened(error)));
-    /* The registration data carries the telephone and the e-mail; the card
-       itself does not. Absent is drawn as absent, never as a failure. */
-    Promise.resolve(patientsApi.getProfile(id))
-      .then((data: unknown) => setProfile(data && typeof data === 'object' ? (data as Record<string, unknown>) : null))
-      .catch(() => setProfile(null));
-    documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
-    /* Left null on failure, not emptied: a request that did not come back is
-       not an answer, and "nothing is required" is a claim. */
-    documentsApi.checkRequired(id)
-      .then((r) => setRequirements(r.requirements))
-      .catch(() => setRequirements(null));
+    /* One request when the server has the patient screen (NET-11); every section it does not give is read the way it always was. */
+    let live = true;
+    void fetchPatientScreen(id).then((screen) => {
+      if (!live) return;
+      if (queryClient !== undefined) seedPatientClubs(queryClient, id, screen.clubs);
+      if (screen.patient !== undefined) setPatient(screen.patient);
+      else {
+        patientsApi.getById(id)
+          .then(setPatient)
+          .catch((error: unknown) => setNotOpened(whyNotOpened(error)));
+      }
+      /* The registration data carries the telephone and the e-mail; the card
+         itself does not. Absent is drawn as absent, never as a failure. */
+      if (screen.profile !== undefined) setProfile(screen.profile);
+      else {
+        Promise.resolve(patientsApi.getProfile(id))
+          .then((data: unknown) => setProfile(data && typeof data === 'object' ? (data as Record<string, unknown>) : null))
+          .catch(() => setProfile(null));
+      }
+      if (screen.documentTemplates !== undefined) setTemplates(screen.documentTemplates);
+      else documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
+      /* Left null on failure, not emptied: a request that did not come back is
+         not an answer, and "nothing is required" is a claim. */
+      if (screen.documentCheck !== undefined) setRequirements(screen.documentCheck.requirements as AppointmentRequirementDto[]);
+      else {
+        documentsApi.checkRequired(id)
+          .then((r) => setRequirements(r.requirements))
+          .catch(() => setRequirements(null));
+      }
+      if (screen.documents !== undefined) { setDocuments(screen.documents); setDocumentsKnown(true); }
+      else reloadDocuments();
+    });
     /* The next booking and whether its questionnaire is in. Scoped by the
        server to the calendars this account may see. */
     fetchUpcomingWindow()
       .then(setUpcoming)
       .catch(() => setUpcoming(null));
-    reloadDocuments();
-  }, [id, reloadDocuments]);
+    return () => { live = false; };
+  }, [id, reloadDocuments, queryClient]);
 
   /*
    * The telephone, written the way the desk reads it: a Czech number without

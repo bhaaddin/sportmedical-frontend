@@ -6,10 +6,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Box, Stack, Typography } from '@mui/material';
 import { Shelf, EntityChip } from '../../ui/shelf';
-import { patientClubsApi, type PatientClubMembership } from '../../api/clubs';
+import { patientClubsApi, patientClubsKey, type PatientClubMembership } from '../../api/patientClubs';
 import { formatDateOnly } from '../../utils/time';
-
-export const patientClubsKey = (patientId: string) => ['patient-clubs', patientId] as const;
 
 export function membershipLine(m: PatientClubMembership): string {
   const parts: string[] = [];
