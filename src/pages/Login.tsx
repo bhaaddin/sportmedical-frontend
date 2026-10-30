@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, TextField, Button, Alert,
@@ -8,6 +8,7 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
 import { withWakeUp } from '../auth/wakeUpRetry';
+import { getServerState, subscribeServerState, whenServerReady } from '../api/warmUp';
 import { DESIGN, SoftCard } from '../components/ui';
 import { safeNextPath } from '../components/shell/loginRedirect';
 import { SiteLink } from '../web/SiteLink';
@@ -76,12 +77,25 @@ export default function Login() {
 
   /* The server sleeps after a quarter of an hour unused; the first sign-in waits for it instead of failing. */
   const [waking, setWaking] = useState(false);
+  /* The page load already asked /health/live and keeps asking every 2 s: say so if it has not answered after a moment. */
+  const serverState = useSyncExternalStore(subscribeServerState, getServerState, () => 'idle' as const);
+  const [slowServer, setSlowServer] = useState(false);
+  useEffect(() => {
+    if (serverState !== 'pending') {
+      setSlowServer(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlowServer(true), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [serverState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
+      /* A server that is still waking is waited for with the cheap probe; the password goes out once, when it answers. */
+      await whenServerReady();
       const res = await withWakeUp(() => authApi.login(email, password), setWaking);
       if (isSecondFactorChallenge(res)) {
         setSecondFactorToken(res.challengeToken);
@@ -209,7 +223,7 @@ export default function Login() {
           <Alert severity="warning" sx={{ mb: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
         )}
 
-        {waking && !error && (
+        {(waking || slowServer) && !error && (
           <Alert severity="info" role="status" data-testid="login-waking" sx={{ mb: 2 }}>
             {WAKING_MESSAGE}
           </Alert>

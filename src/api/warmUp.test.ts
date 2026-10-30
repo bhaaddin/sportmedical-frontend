@@ -29,3 +29,31 @@ describe('warmUpServer: opening any page starts waking a sleeping server', () =>
     expect(() => warmUpServer()).not.toThrow();
   });
 });
+
+describe('server state (speed-fe-6)', () => {
+  it('is idle (nothing waits) until warmUpServer is called, ready once /health/live answers', async () => {
+    const { getServerState, whenServerReady } = await import('./warmUp');
+    expect(getServerState()).toBe('idle');
+    await whenServerReady();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    warmUpServer();
+    await vi.waitFor(() => expect(getServerState()).toBe('ready'));
+  });
+
+  it('polls every 2 s while the server sleeps, then releases whoever waits', async () => {
+    vi.useFakeTimers();
+    try {
+      const { getServerState, whenServerReady, POLL_MS } = await import('./warmUp');
+      const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('x')).mockResolvedValueOnce({ ok: false }).mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      warmUpServer();
+      const waited = whenServerReady();
+      await vi.advanceTimersByTimeAsync(POLL_MS * 3);
+      await waited;
+      expect(getServerState()).toBe('ready');
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
