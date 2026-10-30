@@ -21,15 +21,20 @@ interface Props {
   size?: 'small' | 'medium';
   /** A patient never to offer - the one a document is being moved away from. */
   excludeId?: string;
+  /** Show only the year of birth under the name (a screen that just needs to tell two people apart). */
+  birthYearOnly?: boolean;
 }
 
 const DEBOUNCE_MS = 250;
 const MIN_QUERY = 2;
 
+/** The year of an ISO date, or the text unchanged when it is not one. */
+export const birthYearOf = (iso: string): string => (/^\d{4}/.test(iso) ? iso.slice(0, 4) : iso);
+
 const patientLabel = (p: Patient): string => `${p.firstName} ${p.lastName}`;
 
 export default function PatientPicker({
-  value, onChange, label = 'Pacient', required, disabled, size, excludeId,
+  value, onChange, label = 'Pacient', required, disabled, size, excludeId, birthYearOnly,
 }: Props) {
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState<Patient[]>([]);
@@ -94,7 +99,7 @@ export default function PatientPicker({
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{patientLabel(option)}</Typography>
               {option.dateOfBirth && (
                 <Typography variant="caption" color="text.secondary">
-                  nar. {new Date(option.dateOfBirth).toLocaleDateString('cs-CZ')}
+                  nar. {birthYearOnly ? birthYearOf(option.dateOfBirth) : new Date(option.dateOfBirth).toLocaleDateString('cs-CZ')}
                 </Typography>
               )}
             </Box>

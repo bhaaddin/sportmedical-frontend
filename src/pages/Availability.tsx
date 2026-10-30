@@ -9,6 +9,8 @@ import { FormDialog } from './sports/FormDialog';
 import { ScrollChips } from './sports/ScrollChips';
 import { EntityLink, PageFrame, Shelf } from '../ui/shelf';
 import toast from 'react-hot-toast';
+import PatientPicker from '../components/patients/PatientPicker';
+import type { Patient } from '../api/patients';
 
 const statusConfig: Record<string, { label: string; tone: ChipTone }> = {
   Available: { label: 'K dispozici', tone: 'green' },
@@ -33,6 +35,7 @@ export default function Availability() {
   const [failed, setFailed] = useState(false);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<Patient | null>(null);
   const [form, setForm] = useState({ patientId: '', status: 'Available', reason: '', expectedReturnDate: '' });
   const update = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }));
 
@@ -47,7 +50,7 @@ export default function Availability() {
   useEffect(() => { load(); }, [load]);
 
   const handleAdd = async () => {
-    if (!form.patientId) { toast.error('Zadejte ID pacienta'); return; }
+    if (!form.patientId) { toast.error('Vyberte pacienta'); return; }
     try {
       const newAvail = await availabilityApi.create({
         patientId: form.patientId,
@@ -59,6 +62,7 @@ export default function Availability() {
       setAthletes(p => [newAvail, ...p]);
       setOpen(false);
       toast.success('Sportovec přidán');
+      setPicked(null);
       setForm({ patientId: '', status: 'Available', reason: '', expectedReturnDate: '' });
     } catch { toast.error('Chyba při přidávání'); }
   };
@@ -161,7 +165,7 @@ export default function Availability() {
         }
       >
         <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid size={{ xs: 12 }}><TextField fullWidth label="ID pacienta" value={form.patientId} onChange={e => update('patientId', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12 }}><PatientPicker label="Pacient" required birthYearOnly value={picked} onChange={(p) => { setPicked(p); update('patientId', p?.id ?? ''); }} /></Grid>
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth select label="Stav" value={form.status} onChange={e => update('status', e.target.value)}>
               <MenuItem value="Available">K dispozici</MenuItem>
