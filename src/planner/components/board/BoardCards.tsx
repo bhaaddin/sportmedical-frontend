@@ -10,7 +10,7 @@
  *
  * Hover cards are MUI tooltips (real size, portalled to the body); they carry the price line.
  */
-import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { wasJustWritten } from '../../motion/planFx';
 import { Tooltip } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
@@ -84,7 +84,7 @@ function SessionTip({ card }: { card: SessionCardModel }) {
   );
 }
 
-export function SessionCard({
+function SessionCardImpl({
   card,
   armed,
   onOpen,
@@ -147,7 +147,7 @@ export function SessionCard({
 
 const isRealPatient = (a: DayAppointment) => a.patientId !== '' && a.patientId !== '00000000-0000-0000-0000-000000000000';
 
-export function BookingCard({
+function BookingCardImpl({
   card,
   selected,
   proposed,
@@ -255,7 +255,7 @@ export function BookingCard({
 /* Club window / manual block                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; onOpen: (w: BoardWindowModel, point: { x: number; y: number }) => void }) {
+function WindowBlockImpl({ window: w, onOpen }: { window: BoardWindowModel; onOpen: (w: BoardWindowModel, point: { x: number; y: number }) => void }) {
   const manual = w.kind === 'manual';
   const hold = manual ? null : holdStateOf(w.block);
   /* R22: time given to a club that has not confirmed / answered: lighter than a confirmed hold, and it says so */
@@ -329,7 +329,7 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
  * The lunch of a day: a hatched band that says what it is ("Oběd", "Oběd · přesunut", "Oběd · smazán dnes" for the ghost of a
  * removed one). With `handlers` (a Stage 2 server and a user who may edit) it is a button that opens the pop-out and can be dragged.
  */
-export function LunchBandEl({
+function LunchBandElImpl({
   day,
   col,
   box,
@@ -361,3 +361,13 @@ export function LunchBandEl({
     </div>
   );
 }
+
+/* Memoised (speed-fe-3): a card whose model and handlers did not change is not drawn again when its neighbour is dragged,
+   hovered or refreshed by a live message. The handlers come from useCallback in BoardSurface. */
+export const SessionCard = memo(SessionCardImpl);
+
+export const BookingCard = memo(BookingCardImpl);
+
+export const WindowBlock = memo(WindowBlockImpl);
+
+export const LunchBandEl = memo(LunchBandElImpl);

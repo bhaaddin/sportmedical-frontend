@@ -111,7 +111,7 @@ describe('vercel.json', () => {
 
   it('caches every public page at the edge and the assets for good', () => {
     const cacheFor = (path: string) => {
-      const rule = vercel.headers.find((h) => new RegExp(`^${h.source}$`).test(path));
+      const rule = vercel.headers.find((h) => new RegExp(`^${h.source}$`).test(path) && h.headers.some((x) => x.key === 'Cache-Control'));
       return rule?.headers.find((h) => h.key === 'Cache-Control')?.value ?? '';
     };
     for (const route of WEB_ROUTES) expect(cacheFor(route.path), route.path).toContain('s-maxage');

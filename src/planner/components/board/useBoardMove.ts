@@ -494,13 +494,17 @@ export function useBoardMove(args: UseBoardMoveArgs) {
     return () => node.removeEventListener('touchmove', onTouchMove);
   }, [boardRef]);
 
+  /* The cards are memoised (BoardCards.tsx): hand them ONE function for the life of the board, which calls the latest press. */
+  const pressLatest = useRef(press);
+  pressLatest.current = press;
+  const stablePress = useCallback((event: ReactPointerEvent<HTMLElement>, card: BookingCardModel) => pressLatest.current(event, card), []);
   return {
     moving,
     proposal,
     proposalAnchor,
     /** The bookings to draw: the server's, the moved ones at their new slot. */
     appointments,
-    press,
+    press: stablePress,
     cancelProposal,
     confirmProposal,
     /** The click the browser fires after a drop is not a click on the card: read once, then cleared. */
