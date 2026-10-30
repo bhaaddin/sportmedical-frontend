@@ -881,7 +881,18 @@ export default function PatientRegistration() {
           <ActionCard
             title="Objednat termín"
             icon={<EventAvailable fontSize="small" />}
-            onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: issued.patientId } })}
+            onClick={() => {
+              const chosen = activities.find((activity) => activity.id === form.activityId);
+              const service = serviceId || chosen?.clinicServiceId || '';
+              navigate('/planovani', {
+                state: {
+                  newAppointment: Date.now(),
+                  patientId: issued.patientId,
+                  ...(service ? { serviceId: service } : {}),
+                  ...(chosen ? { activityId: chosen.id } : {}),
+                },
+              });
+            }}
           />
           <ActionCard title="Další pacient" icon={<PersonAdd fontSize="small" />} onClick={startAnother} />
         </Shelf>

@@ -19,7 +19,7 @@ import ArrowBack from "@mui/icons-material/ArrowBack";
 import BoltOutlined from "@mui/icons-material/BoltOutlined";
 import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
@@ -128,9 +128,13 @@ export interface NewOrderChooserProps {
   onClose: () => void;
 }
 
+/** On a patient's card, the patient whose card it is: a new order from there is for them. */
+const PATIENT_PATH = /^\/patients\/([0-9a-f-]{36})(?:\/|$)/i;
+
 export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
   const device = useDevice();
   const navigate = useNavigate();
+  const cardPatientId = PATIENT_PATH.exec(useLocation().pathname)?.[1];
   const queryClient = useQueryClient();
 
   const [service, setService] = useState<ClinicService | null>(null);
@@ -183,7 +187,11 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
 
   const inCalendar = () => {
     if (service === null) return;
-    navigate("/planovani", { state: { serviceId: service.id } });
+    navigate("/planovani", {
+      state: cardPatientId
+        ? { newAppointment: Date.now(), patientId: cardPatientId, serviceId: service.id }
+        : { serviceId: service.id },
+    });
     finish();
   };
 
@@ -201,7 +209,7 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
           initialCalendarId={slot.calendarId}
           initialStart={`${slot.date}T${slot.time}`}
           initialEnd={`${slot.date}T${slot.end}`}
-          initialQuick
+          {...(cardPatientId ? { initialPatientId: cardPatientId } : { initialQuick: true })}
           initialActivityId={slot.activityId}
           initialServiceId={service?.id}
         />

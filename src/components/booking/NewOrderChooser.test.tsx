@@ -30,6 +30,7 @@ vi.mock('./NewAppointmentDialog', () => ({
         quick: props.initialQuick,
         activity: props.initialActivityId,
         service: props.initialServiceId,
+        patient: props.initialPatientId,
       })}
     </pre>
   ),
@@ -52,13 +53,16 @@ function Probe() {
   return <pre data-testid="where">{JSON.stringify({ path: location.pathname, state: location.state })}</pre>;
 }
 
-function renderChooser() {
+const CARD = '/patients/0193a7c2-1111-7222-8333-944445555666';
+
+function renderChooser(at = '/start') {
   const onClose = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={['/start']}>
+      <MemoryRouter initialEntries={[at]}>
         <Routes>
           <Route path="/start" element={<NewOrderChooser open onClose={onClose} />} />
+          <Route path="/patients/:id" element={<NewOrderChooser open onClose={onClose} />} />
           <Route path="/planovani" element={<Probe />} />
         </Routes>
       </MemoryRouter>
@@ -148,6 +152,24 @@ describe.each(['phone', 'tablet', 'desktop'] as ViewportName[])('NewOrderChooser
       state: { serviceId: 's2' },
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('on a patient card, both ways book for that patient', async () => {
+    renderChooser(CARD);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sportovní prohlídky' }));
+    await userEvent.click(screen.getByRole('button', { name: /Rychlá registrace/ }));
+    const drawer = JSON.parse((await screen.findByTestId('drawer')).textContent ?? '{}');
+    expect(drawer).toMatchObject({ patient: '0193a7c2-1111-7222-8333-944445555666', service: 's1' });
+    expect(drawer.quick).toBeUndefined();
+  });
+
+  it('on a patient card, Vybrat v kalendáři opens the booking for that patient and služba', async () => {
+    renderChooser(CARD);
+    await userEvent.click(await screen.findByRole('button', { name: 'Diagnostika' }));
+    await userEvent.click(screen.getByRole('button', { name: /Vybrat v kalendáři/ }));
+    const where = JSON.parse((await screen.findByTestId('where')).textContent ?? '{}');
+    expect(where.state).toMatchObject({ patientId: '0193a7c2-1111-7222-8333-944445555666', serviceId: 's2' });
+    expect(typeof where.state.newAppointment).toBe('number');
   });
 
 });

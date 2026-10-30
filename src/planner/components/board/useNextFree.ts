@@ -109,8 +109,9 @@ export function useNextFree(calendar: BoardCalendarData | null) {
   );
 
   /** The prefill for "Nová objednávka"; `null` when no calendar is on screen. */
-  const nextFreeBooking = useCallback(async (): Promise<{ prefill: NextFreeBooking; day: string } | null> => {
-    const first = calendar?.calendars[0];
+  const nextFreeBooking = useCallback(async (serviceId?: string): Promise<{ prefill: NextFreeBooking; day: string } | null> => {
+    /* A služba already chosen (the registration screen, the dialog) looks on that služba's calendar first. */
+    const first = (serviceId ? calendar?.calendars.find((c) => c.clinicServiceId === serviceId) : undefined) ?? calendar?.calendars[0];
     if (!calendar || !first) return null;
     const nowDate = new Date();
     const dayKey = pragueDateKey(nowDate);

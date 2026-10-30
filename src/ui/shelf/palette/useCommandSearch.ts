@@ -125,7 +125,7 @@ export function useCommandSearch(query: string, open: boolean): CommandSearch {
               label: [a.patientName, a.serviceType].filter(Boolean).join(' · ') || 'Termín',
               hint: `${new Date(a.startTime).toLocaleDateString('cs-CZ')}${a.practitionerName ? ` · ${a.practitionerName}` : ''}`,
               to: '/planovani',
-              state: { date: day },
+              state: { date: day, appointmentId: a.id },
               entity: { kind: 'appointment', id: a.id, label: a.patientName || a.serviceType || 'Termín' },
             };
           }),

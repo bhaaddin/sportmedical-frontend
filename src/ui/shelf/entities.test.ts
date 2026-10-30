@@ -16,7 +16,7 @@ describe('entityTarget: the one place that knows an address', () => {
 
   it('needs the calendar for an appointment and the patient for a document, and lands on the list without them', () => {
     expect(entityTarget({ kind: 'appointment', id: 'a1', calendarId: 'k1' })).toEqual({ to: '/kalendar/k1/termin/a1' });
-    expect(entityTarget({ kind: 'appointment', id: 'a1' })).toEqual({ to: '/planovani' });
+    expect(entityTarget({ kind: 'appointment', id: 'a1' })).toEqual({ to: '/planovani', state: { appointmentId: 'a1' } });
     expect(entityTarget({ kind: 'document', id: 'd1', patientId: 'p1' })).toEqual({ to: '/patients/p1/dokumenty' });
     expect(entityTarget({ kind: 'document', id: 'd1' })).toEqual({ to: '/patients' });
   });

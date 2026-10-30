@@ -20,6 +20,8 @@ import { appointmentsApi } from '../../../api/appointments';
 import { statusName, type DayAppointment, type TimeBlock } from '../../../api/bookingContracts';
 import { CALENDAR_DISPLAY_OFFLINE } from '../../../api/displaySettings';
 import { NewAppointmentDialog } from '../../../components/booking/NewAppointmentDialog';
+import type { PickInGridKept } from '../../../components/booking/NewAppointmentDialog';
+import { writeLastPlace } from '../../state/lastPlace';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from '../../../components/booking/grid/BlockDialogs';
 import { CAL_TEXT } from '../../../components/booking/calendar/calendarText';
@@ -135,6 +137,7 @@ interface BookingPrefill {
   initialStart?: string;
   initialEnd?: string;
   initialActivityId?: string;
+  initialServiceId?: string;
   /** The patient's card said "Objednat termín": the dialog opens with them chosen. */
   initialPatientId?: string;
   /** R17: booked into the lunch slot (`into-lunch`): the day's lunch goes, the booking comes. */
@@ -648,13 +651,22 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   /* ---- what the popover's actions open ---- */
   const [booking, setBooking] = useState<{ key: number; prefill: BookingPrefill } | null>(null);
-  /* The patient a booking started from (their card's "Objednat termín"). It stays chosen while the desk closes the dialog
-     to pick another time in the grid, and goes once the booking is made: the desk is still talking to the same person. */
-  const carriedPatient = useRef<string | undefined>(undefined);
+  /* Who and what a booking is for (the patient's card, or what the desk chose in the dialog). It stays chosen while the
+     desk closes the dialog to pick another time in the grid, and goes once the booking is made or the desk cancels:
+     the desk is still talking to the same person about the same thing. */
+  const carried = useRef<PickInGridKept>({});
   const openBooking = useCallback((prefill: BookingPrefill) => {
-    if (prefill.initialPatientId) carriedPatient.current = prefill.initialPatientId;
-    const patient = prefill.initialPatientId ?? carriedPatient.current;
-    setBooking((c) => ({ key: (c?.key ?? 0) + 1, prefill: patient ? { ...prefill, initialPatientId: patient } : prefill }));
+    if (prefill.initialPatientId) carried.current = { ...carried.current, patientId: prefill.initialPatientId };
+    const keep = carried.current;
+    setBooking((c) => ({
+      key: (c?.key ?? 0) + 1,
+      prefill: {
+        ...prefill,
+        ...(keep.patientId ? { initialPatientId: prefill.initialPatientId ?? keep.patientId } : {}),
+        ...(keep.serviceId && !prefill.initialServiceId ? { initialServiceId: keep.serviceId } : {}),
+        ...(keep.activityId ? { initialActivityId: keep.activityId } : {}),
+      },
+    }));
   }, []);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
   const [openBlock, setOpenBlock] = useState<{ calendarId: string; calendarName: string; block: TimeBlock } | null>(null);
@@ -737,8 +749,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   /* ---- "Nová objednávka" ---- */
   const nextFree = useNextFree(calendar);
   const bookNextFree = useCallback(
-    async (extra: { initialPatientId?: string } = {}) => {
-      const found = await nextFree.nextFreeBooking();
+    async (extra: { initialPatientId?: string; initialServiceId?: string; initialActivityId?: string } = {}) => {
+      const found = await nextFree.nextFreeBooking(extra.initialServiceId);
       if (!found) return;
       act.focusDate(found.day, true);
       openBooking({ ...found.prefill, ...extra });
@@ -754,10 +766,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
    *   `date`           moves the board to that day ("Zobrazit v kalendáři" from the club reservations);
    *   `serviceId`      shows only that služba ("Nová objednávka -> Vybrat v kalendáři").
    */
-  const handoff = nav.state as { newAppointment?: unknown; patientId?: unknown; openClubOrder?: unknown; date?: unknown; serviceId?: unknown } | null;
-  const handled = useRef({ newAppointment: null as unknown, club: null as string | null, date: null as string | null, service: null as string | null });
+  const handoff = nav.state as { newAppointment?: unknown; patientId?: unknown; activityId?: unknown; openClubOrder?: unknown; date?: unknown; serviceId?: unknown; appointmentId?: unknown } | null;
+  const handled = useRef({ newAppointment: null as unknown, club: null as string | null, date: null as string | null, service: null as string | null, appointment: null as string | null });
   const newAppointmentKey = typeof handoff?.newAppointment === 'number' ? handoff.newAppointment : null;
   const landingPatient = typeof handoff?.patientId === 'string' ? handoff.patientId : undefined;
+  /* With newAppointment: the služba and činnost already chosen (the registration screen) come along too. */
+  const landingBookingService = newAppointmentKey !== null && typeof handoff?.serviceId === 'string' ? handoff.serviceId : undefined;
+  const landingActivity = typeof handoff?.activityId === 'string' ? handoff.activityId : undefined;
   const mayBook = calendar?.mayBook ?? false;
   /* R15c (e): the main calendar's keyboard shortcuts (never on a club's own screen, never while typing) */
   const [helpOpen, setHelpOpen] = useState(false);
@@ -781,8 +796,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     if (!config.realCalendar || newAppointmentKey === null || handled.current.newAppointment === newAppointmentKey) return;
     if (!mayBook || !calendarReady) return;
     handled.current.newAppointment = newAppointmentKey;
-    void bookNextFree(landingPatient ? { initialPatientId: landingPatient } : {});
-  }, [config.realCalendar, newAppointmentKey, landingPatient, mayBook, calendarReady, bookNextFree]);
+    void bookNextFree({
+      ...(landingPatient ? { initialPatientId: landingPatient } : {}),
+      ...(landingBookingService ? { initialServiceId: landingBookingService } : {}),
+      ...(landingActivity ? { initialActivityId: landingActivity } : {}),
+    });
+  }, [config.realCalendar, newAppointmentKey, landingPatient, landingBookingService, landingActivity, mayBook, calendarReady, bookNextFree]);
   const wantsClubOrder = handoff?.openClubOrder === true;
   useEffect(() => {
     if (!config.realCalendar || !wantsClubOrder || !mayBook || handled.current.club === nav.key) return;
@@ -795,6 +814,18 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     handled.current.date = nav.key;
     act.selectDay(landingDate);
   }, [config.realCalendar, landingDate, nav.key, act]);
+  /* Remember where the desk is, so leaving for a patient's card and coming back lands here again. */
+  const rememberPlace = config.realCalendar && config.mode === 'standard' && !onClubScreenForKeys;
+  useEffect(() => {
+    if (rememberPlace) writeLastPlace(selectedDate, view, ctx.today);
+  }, [rememberPlace, selectedDate, view, ctx.today]);
+  /* `appointmentId` (with `date`): a link to one termín - the search, an invoice, the termín's own page - opens it. */
+  const landingAppointment = typeof handoff?.appointmentId === 'string' ? handoff.appointmentId : null;
+  useEffect(() => {
+    if (!config.realCalendar || landingAppointment === null || handled.current.appointment === nav.key) return;
+    handled.current.appointment = nav.key;
+    setOpenId(landingAppointment);
+  }, [config.realCalendar, landingAppointment, nav.key]);
   const landingService = typeof handoff?.serviceId === 'string' ? handoff.serviceId : null;
   const knownServices = settings.facets.services;
   useEffect(() => {
@@ -1642,11 +1673,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         <NewAppointmentDialog
           key={booking.key}
           open
-          onClose={() => { carriedPatient.current = undefined; setBooking(null); }}
-          onBooked={() => { carriedPatient.current = undefined; void refreshCalendar(); }}
-          onPickInGrid={() => {
+          onClose={() => { carried.current = {}; setBooking(null); }}
+          onBooked={() => { carried.current = {}; void refreshCalendar(); }}
+          onPickInGrid={(kept) => {
+            carried.current = { ...carried.current, ...kept };
             setBooking(null);
-            if (carriedPatient.current) showNotice({ text: 'Vyberte v kalendáři jiný čas. Pacient zůstane vybraný.', tone: 'info' });
+            showNotice({ text: carried.current.patientId ? 'Vyberte v kalendáři jiný čas. Pacient zůstane vybraný.' : 'Vyberte v kalendáři jiný čas. Co jste vybrali, zůstane.', tone: 'info' });
           }}
           onFindNextFree={nextFree.findForDialog}
           {...booking.prefill}

@@ -33,6 +33,7 @@ import { ClubPlannerProvider } from './club/ClubPlannerContext';
 import { useClubPlannerData, type ClubPlannerData } from './club/useClubPlannerData';
 import { useApiDataSource } from './api/useApiDataSource';
 import { PlannerShell } from './components/PlannerShell';
+import { readLastPlace } from './state/lastPlace';
 import { BoardConfigProvider, type BoardConfig } from './components/board/boardConfig';
 import { boardSettings } from './components/board/boardSettings';
 import { useDemoDataSource } from './data/useDemoDataSource';
@@ -120,6 +121,8 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
   const [params] = useSearchParams();
   const demo = params.get('source') === 'demo';
   const today = useMemo(() => pragueDateKey(new Date()), []);
+  /* Back from a patient's card: the day and view the desk left, not today. */
+  const lastPlace = useMemo(() => readLastPlace(today), [today]);
   const user = useMemo(() => storedUser(), []);
   /* The clinic's "Výchozí pohled": the standard calendar opens in it (a club's planning stage and the demo keep the week). */
   const display = useCalendarDisplay();
@@ -191,10 +194,10 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
           key={`${source.id}:${session ? `${session.clubId}:${session.editOrder?.orderId ?? 'new'}` : club !== null ? 'club' : 'standard'}`}
           source={source}
           today={today}
-          initialDate={club !== null ? club.openOn : today}
+          initialDate={club !== null ? club.openOn : (mode === 'standard' && !demo ? lastPlace?.day : undefined) ?? today}
           user={user}
           headerMode={mode === 'club' ? 'club' : 'clinic'}
-          defaultView={mode === 'standard' && !demo && display.loaded ? display.settings.defaultView : undefined}
+          defaultView={mode === 'standard' && !demo && display.loaded ? lastPlace?.view ?? display.settings.defaultView : undefined}
         />
       </div>
       {needsSetup ? <PickOrderSetup open defaultClubId={pick?.clubId} parent={pick?.parent} onClose={closeSetup} onStart={startWith} /> : null}

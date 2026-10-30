@@ -239,6 +239,13 @@ export interface FoundSlot {
   end: string;
 }
 
+/** What "Vybrat v kalendáři" hands back, so the next dialog opens with it already chosen. */
+export interface PickInGridKept {
+  patientId?: string;
+  serviceId?: string;
+  activityId?: string;
+}
+
 interface NewAppointmentDialogProps {
   open: boolean;
   onClose: () => void;
@@ -250,8 +257,8 @@ interface NewAppointmentDialogProps {
    * moment given (exclusive), on the calendar given.
    */
   onFindNextFree?: (after: LocalMoment, calendarId: string) => Promise<FoundSlot | null>;
-  /** "Vybrat v kalendáři": the dialog closes so the desk picks another time; the caller keeps who it was for. */
-  onPickInGrid?: () => void;
+  /** "Vybrat v kalendáři": the dialog closes so the desk picks another time; the caller keeps who and what it was for. */
+  onPickInGrid?: (kept: PickInGridKept) => void;
   /** The day the caller was looking at, when no time was chosen. */
   initialDate?: string;
   /** The calendar the caller was looking at, or the column clicked. */
@@ -1077,8 +1084,15 @@ export function NewAppointmentDialog({
 
   const pickInGrid = () => {
     setChangeAnchor(null);
+    const keptActivity = mode === "quick" ? quick.activityId : activityId;
+    const kept: PickInGridKept = {
+      ...(mode === "database" && patient !== null ? { patientId: patient.id } : {}),
+      ...(pickedServiceId !== "" ? { serviceId: pickedServiceId } : {}),
+      ...(keptActivity ? { activityId: keptActivity } : {}),
+    };
     resetBooking();
-    (onPickInGrid ?? onClose)();
+    if (onPickInGrid) onPickInGrid(kept);
+    else onClose();
   };
 
   const goToStep2 = () => setStep(2);

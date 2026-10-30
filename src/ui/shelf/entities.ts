@@ -87,7 +87,7 @@ export function entityTarget(ref: Pick<EntityRef, 'kind' | 'id' | 'calendarId' |
     case 'order':
       return { to: '/clubs/objednavky', state: { openOrderId: ref.id } };
     case 'appointment':
-      return ref.calendarId ? { to: `/kalendar/${seg(ref.calendarId)}/termin/${seg(ref.id)}` } : { to: '/planovani' };
+      return ref.calendarId ? { to: `/kalendar/${seg(ref.calendarId)}/termin/${seg(ref.id)}` } : { to: '/planovani', state: { appointmentId: ref.id } };
     case 'invoice':
       return { to: '/billing', state: { invoiceId: ref.id } };
     case 'document':

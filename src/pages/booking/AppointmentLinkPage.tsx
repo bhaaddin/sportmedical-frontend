@@ -109,7 +109,7 @@ export default function AppointmentLinkPage() {
         loading={detailQuery.isPending}
         error={detailQuery.isError ? "Termín se nepodařilo načíst." : false}
         onRetry={() => void detailQuery.refetch()}
-        viewAll={appointment ? { to: "/planovani", state: { date: pragueDateKey(appointment.startUtc) }, label: "V kalendáři" } : undefined}
+        viewAll={appointment ? { to: "/planovani", state: { date: pragueDateKey(appointment.startUtc), appointmentId: appointment.id }, label: "V kalendáři" } : undefined}
       >
         {appointment && (
           <Stack spacing={1.25} sx={{ p: 2 }}>

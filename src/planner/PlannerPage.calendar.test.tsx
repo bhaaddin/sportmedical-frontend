@@ -33,7 +33,8 @@ vi.mock('../api/displaySettings', async (importActual) => {
 vi.mock('../components/booking/NewAppointmentDialog', () => ({
   NewAppointmentDialog: (props: Record<string, unknown>) => (
     <div role="dialog" aria-label="Nová objednávka" data-testid="new-appointment" data-props={JSON.stringify(props)}>
-      <button type="button" onClick={props.onPickInGrid as () => void}>Vybrat v kalendáři</button>
+      <button type="button" onClick={() => (props.onPickInGrid as (kept: object) => void)({})}>Vybrat v kalendáři</button>
+      <button type="button" onClick={() => (props.onPickInGrid as (kept: object) => void)({ patientId: 'p7', serviceId: 's2', activityId: 'a2' })}>Vybrat v kalendáři s výběrem</button>
       <button type="button" onClick={props.onClose as () => void}>Zrušit</button>
     </div>
   ),
@@ -317,6 +318,24 @@ describe('/planovani takes what other screens hand over by router state', () => 
     drag(3, 13 * 60, 14 * 60);
     fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
     expect(JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!).initialPatientId).toBeUndefined();
+  });
+
+  it('what the desk chose in the dialog (patient, služba, činnost) comes back when it picks another time', async () => {
+    mount();
+    await screen.findByTestId('board-booking-b1');
+    drag(3, 13 * 60, 14 * 60);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    fireEvent.click(within(await screen.findByTestId('new-appointment')).getByRole('button', { name: 'Vybrat v kalendáři s výběrem' }));
+    await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
+    drag(3, 13 * 60, 14 * 60);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
+    expect(props).toMatchObject({ initialPatientId: 'p7', initialServiceId: 's2', initialActivityId: 'a2' });
+  });
+
+  it('a link to one termín (state.appointmentId) opens it', async () => {
+    mount({ state: { date: TODAY, appointmentId: 'b1' } });
+    expect(await screen.findByTestId('appointment-detail', undefined, { timeout: 3000 })).toBeInTheDocument();
   });
 
   it('"Zobrazit v kalendáři" from the club reservations (state.date) moves the board to that week', async () => {
