@@ -648,7 +648,14 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   /* ---- what the popover's actions open ---- */
   const [booking, setBooking] = useState<{ key: number; prefill: BookingPrefill } | null>(null);
-  const openBooking = useCallback((prefill: BookingPrefill) => setBooking((c) => ({ key: (c?.key ?? 0) + 1, prefill })), []);
+  /* The patient a booking started from (their card's "Objednat termín"). It stays chosen while the desk closes the dialog
+     to pick another time in the grid, and goes once the booking is made: the desk is still talking to the same person. */
+  const carriedPatient = useRef<string | undefined>(undefined);
+  const openBooking = useCallback((prefill: BookingPrefill) => {
+    if (prefill.initialPatientId) carriedPatient.current = prefill.initialPatientId;
+    const patient = prefill.initialPatientId ?? carriedPatient.current;
+    setBooking((c) => ({ key: (c?.key ?? 0) + 1, prefill: patient ? { ...prefill, initialPatientId: patient } : prefill }));
+  }, []);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
   const [openBlock, setOpenBlock] = useState<{ calendarId: string; calendarName: string; block: TimeBlock } | null>(null);
   const [addToClub, setAddToClub] = useState<{ marked: PickedRange } | null>(null);
@@ -1635,8 +1642,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         <NewAppointmentDialog
           key={booking.key}
           open
-          onClose={() => setBooking(null)}
-          onBooked={() => void refreshCalendar()}
+          onClose={() => { carriedPatient.current = undefined; setBooking(null); }}
+          onBooked={() => { carriedPatient.current = undefined; void refreshCalendar(); }}
+          onPickInGrid={() => {
+            setBooking(null);
+            if (carriedPatient.current) showNotice({ text: 'Vyberte v kalendáři jiný čas. Pacient zůstane vybraný.', tone: 'info' });
+          }}
           onFindNextFree={nextFree.findForDialog}
           {...booking.prefill}
         />

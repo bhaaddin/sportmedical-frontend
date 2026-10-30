@@ -46,6 +46,8 @@ import {
 import { EventAvailable, InfoOutlined, PersonAdd, PersonOutlined } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { activitiesApi } from '../api/activities';
+import { clinicServicesApi } from '../api/clinicServices';
+import type { ClinicService } from '../api/clinicServices';
 import type { Activity } from '../api/bookingContracts';
 import patientRegistryApi, {
   type EmailInspection,
@@ -236,6 +238,25 @@ export default function PatientRegistration() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activitiesState, setActivitiesState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [activitiesAttempt, setActivitiesAttempt] = useState(0);
+  /* Služba first, then its činnosti: there are a handful of služby and a long list of činnosti. A clinic whose
+     činnosti carry no služba (or whose služby did not load) simply gets the one list. */
+  const [services, setServices] = useState<ClinicService[]>([]);
+  const [serviceId, setServiceId] = useState('');
+  useEffect(() => {
+    let alive = true;
+    clinicServicesApi.list().then((rows) => { if (alive) setServices(rows); }).catch(() => { /* no služby: one list */ });
+    return () => { alive = false; };
+  }, []);
+  const serviceOptions = useMemo(
+    () => services
+      .filter((service) => service.isActive && activities.some((activity) => activity.clinicServiceId === service.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'cs')),
+    [services, activities],
+  );
+  const serviceGate = serviceOptions.length > 1;
+  const shownActivities = serviceGate
+    ? activities.filter((activity) => activity.clinicServiceId === serviceId)
+    : activities;
 
   const [similar, setSimilar] = useState<PatientSearchResult[]>([]);
   const [addressPoint, setAddressPoint] = useState<MapySuggestion | null>(null);
@@ -1171,13 +1192,34 @@ export default function PatientRegistration() {
                 </Alert>
               ) : (
                 <FieldGrid>
+                  {serviceGate && (
+                    <FieldCell full>
+                      <FormField label="Služba" required name="serviceId">
+                        {(id) => (
+                          <TextField
+                            id={id} select fullWidth
+                            value={serviceId}
+                            onChange={(e) => {
+                              setServiceId(e.target.value);
+                              if (!activities.some((a) => a.id === form.activityId && a.clinicServiceId === e.target.value)) update('activityId', '');
+                            }}
+                            slotProps={selectLabelledBy(id)}
+                          >
+                            {serviceOptions.map((service) => (
+                              <MenuItem key={service.id} value={service.id}>{service.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+                      </FormField>
+                    </FieldCell>
+                  )}
                   <FieldCell full>
                     <FormField label="Prohlídka, na kterou volal" required name="activityId">
                       {(id) => (
                         <TextField
                           id={id} select fullWidth
                           value={form.activityId}
-                          disabled={activitiesState === 'loading'}
+                          disabled={activitiesState === 'loading' || (serviceGate && serviceId === '')}
                           onChange={(e) => update('activityId', e.target.value)}
                           onBlur={checkOnLeave('activityId')}
                           error={errors.activityId !== undefined}
@@ -1185,13 +1227,15 @@ export default function PatientRegistration() {
                             errors.activityId
                             ?? (activitiesState === 'loading'
                               ? 'Načítám činnosti…'
+                              : serviceGate && serviceId === ''
+                                ? 'Nejdřív vyberte službu.'
                               : activities.length === 0
                                 ? 'V nastavení zatím není žádná aktivní činnost.'
                                 : undefined)
                           }
                           slotProps={selectLabelledBy(id)}
                         >
-                          {activities.map((activity) => (
+                          {shownActivities.map((activity) => (
                             <MenuItem key={activity.id} value={activity.id}>
                               {activityLabel(activity)}
                             </MenuItem>

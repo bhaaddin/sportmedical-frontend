@@ -250,6 +250,8 @@ interface NewAppointmentDialogProps {
    * moment given (exclusive), on the calendar given.
    */
   onFindNextFree?: (after: LocalMoment, calendarId: string) => Promise<FoundSlot | null>;
+  /** "Vybrat v kalendáři": the dialog closes so the desk picks another time; the caller keeps who it was for. */
+  onPickInGrid?: () => void;
   /** The day the caller was looking at, when no time was chosen. */
   initialDate?: string;
   /** The calendar the caller was looking at, or the column clicked. */
@@ -327,6 +329,7 @@ export function NewAppointmentDialog({
   initialServiceId,
   intoLunch = false,
   onFindNextFree,
+  onPickInGrid,
   anchor,
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
@@ -1074,7 +1077,8 @@ export function NewAppointmentDialog({
 
   const pickInGrid = () => {
     setChangeAnchor(null);
-    close();
+    resetBooking();
+    (onPickInGrid ?? onClose)();
   };
 
   const goToStep2 = () => setStep(2);

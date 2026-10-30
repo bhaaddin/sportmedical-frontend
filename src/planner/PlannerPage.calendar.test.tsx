@@ -32,7 +32,10 @@ vi.mock('../api/displaySettings', async (importActual) => {
 });
 vi.mock('../components/booking/NewAppointmentDialog', () => ({
   NewAppointmentDialog: (props: Record<string, unknown>) => (
-    <div role="dialog" aria-label="Nová objednávka" data-testid="new-appointment" data-props={JSON.stringify(props)} />
+    <div role="dialog" aria-label="Nová objednávka" data-testid="new-appointment" data-props={JSON.stringify(props)}>
+      <button type="button" onClick={props.onPickInGrid as () => void}>Vybrat v kalendáři</button>
+      <button type="button" onClick={props.onClose as () => void}>Zrušit</button>
+    </div>
   ),
 }));
 vi.mock('../components/booking/AppointmentDetail', () => ({
@@ -298,6 +301,22 @@ describe('/planovani takes what other screens hand over by router state', () => 
     mount({ state: { newAppointment: 2, patientId: 'p9' } });
     const props = JSON.parse((await screen.findByTestId('new-appointment', undefined, { timeout: 3000 })).dataset.props!);
     expect(props).toMatchObject({ initialPatientId: 'p9', initialCalendarId: 'c1' });
+  });
+
+  it('the patient stays chosen when the desk picks another time in the calendar, and goes after Zrušit', async () => {
+    mount({ state: { newAppointment: 3, patientId: 'p9' } });
+    fireEvent.click(within(await screen.findByTestId('new-appointment', undefined, { timeout: 3000 })).getByRole('button', { name: 'Vybrat v kalendáři' }));
+    await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
+    drag(3, 13 * 60, 14 * 60);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
+    expect(props).toMatchObject({ initialPatientId: 'p9', initialStart: '2026-12-10T13:00' });
+
+    fireEvent.click(within(screen.getByTestId('new-appointment')).getByRole('button', { name: 'Zrušit' }));
+    await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
+    drag(3, 13 * 60, 14 * 60);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    expect(JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!).initialPatientId).toBeUndefined();
   });
 
   it('"Zobrazit v kalendáři" from the club reservations (state.date) moves the board to that week', async () => {

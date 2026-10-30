@@ -21,6 +21,7 @@ const inspectPhone = vi.fn();
 const inspectEmail = vi.fn();
 const issueLink = vi.fn();
 const listActivities = vi.fn();
+const listServices = vi.fn();
 
 vi.mock('../api/patientRegistry', () => {
   const api = { getOptions, register, searchPatients, inspectIdentity, inspectPhone, inspectEmail };
@@ -31,6 +32,7 @@ vi.mock('../api/activities', () => ({
   activitiesApi: { list: listActivities },
   default: { list: listActivities },
 }));
+vi.mock('../api/clinicServices', () => ({ clinicServicesApi: { list: listServices } }));
 vi.mock('../api/patientPreRegistration', () => ({
   patientPreRegistrationApi: { issueLink },
   default: { issueLink },
@@ -64,6 +66,7 @@ const ACTIVITY_OPTION = 'Základní prohlídka · 30 min · 1 600 Kč';
 
 beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
+  listServices.mockReset().mockResolvedValue([]);
   listActivities.mockReset().mockResolvedValue({
     activities: [
       { id: 'act-1', name: 'Základní prohlídka', durationMinutes: 30, priceCzk: 1600, isActive: true },
@@ -205,6 +208,31 @@ describe('Rychlá registrace', () => {
     expect(await screen.findByRole('option', { name: ACTIVITY_OPTION })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Spiroergometrie · 45 min' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Zrušená/ })).not.toBeInTheDocument();
+  });
+
+  it('asks for the služba first and then offers only its činnosti', async () => {
+    listServices.mockResolvedValue([
+      { id: 'sv-a', name: 'Sportovní prohlídky', sortOrder: 1, isActive: true },
+      { id: 'sv-b', name: 'Zátěžové testy', sortOrder: 2, isActive: true },
+    ]);
+    listActivities.mockResolvedValue({
+      activities: [
+        { id: 'act-1', name: 'Základní prohlídka', durationMinutes: 30, priceCzk: 1600, isActive: true, clinicServiceId: 'sv-a' },
+        { id: 'act-2', name: 'Spiroergometrie', durationMinutes: 45, priceCzk: null, isActive: true, clinicServiceId: 'sv-b' },
+      ],
+      warnings: [],
+    });
+    const user = userEvent.setup();
+    await openQuick(user);
+
+    expect(await screen.findByText('Nejdřív vyberte službu.')).toBeInTheDocument();
+    await pickOption(user, 'Služba', 'Zátěžové testy');
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
+    await user.click(screen.getByRole('combobox', { name: 'Prohlídka, na kterou volal' }));
+    const listbox = await screen.findByRole('listbox');
+    const offered = within(listbox).getAllByRole('option');
+    expect(offered).toHaveLength(1);
+    expect(offered[0]).toHaveTextContent(/Spiroergometrie/);
   });
 
   it('registers without a date of birth and hands over the completion link', async () => {
