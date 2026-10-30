@@ -18,6 +18,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useIsPhone } from "../../layout/useDevice";
 import { activitiesApi } from "../../api/activities";
+import { calendarsApi } from "../../api/calendars";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import { workingHoursApi } from "../../api/workingHours";
 import { PARTNER_TYPE_NAMES } from "../../api/bookingContracts";
@@ -185,9 +186,21 @@ export function NewPartnerOrderDialog({
     staleTime: 5 * 60 * 1000,
   });
 
+  /* The calendar runs one služba: offer only that služba's činnosti. */
+  const calendarsQuery = useQuery({
+    queryKey: ["calendars"],
+    queryFn: calendarsApi.list,
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+  const serviceId = (calendarsQuery.data ?? []).find((c) => c.id === calendarId)?.clinicServiceId ?? null;
+
   const activities = useMemo(
-    () => (activitiesQuery.data?.activities ?? []).filter((a) => a.isActive),
-    [activitiesQuery.data],
+    () =>
+      (activitiesQuery.data?.activities ?? []).filter(
+        (a) => a.isActive && (serviceId === null || a.clinicServiceId === serviceId),
+      ),
+    [activitiesQuery.data, serviceId],
   );
 
   /* "62 sportovců" from the drawer becomes one line to choose the činnost for. */

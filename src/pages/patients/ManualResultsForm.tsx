@@ -19,7 +19,7 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  Alert, Autocomplete, Box, Button, IconButton, InputAdornment, Stack, TextField, Typography,
+  Alert, Autocomplete, Box, Button, IconButton, InputAdornment, MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import { Add, DeleteOutlined } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
@@ -27,6 +27,7 @@ import toast from 'react-hot-toast';
 import { diagnosticsApi } from '../../api/diagnostics';
 import type { CreateSessionRequest, DiagnosticSession } from '../../api/diagnostics';
 import { activitiesApi } from '../../api/activities';
+import { clinicServicesApi } from '../../api/clinicServices';
 import type { Patient } from '../../api/patients';
 import PatientPicker from '../../components/patients/PatientPicker';
 import { SectionLabel, SoftCard } from '../../components/ui';
@@ -97,9 +98,30 @@ export default function ManualResultsForm({ patientId, session, onSaved, onCance
     queryFn: () => activitiesApi.list(),
     staleTime: 5 * 60_000,
   });
+  /* Služba first, then its činnosti (a handful of služby, a long list of činnosti). */
+  const services = useQuery({
+    queryKey: ['clinic-services'],
+    queryFn: () => clinicServicesApi.list(),
+    staleTime: 5 * 60_000,
+  });
+  const [serviceId, setServiceId] = useState('');
+  const activeActivities = useMemo(
+    () => (activities.data?.activities ?? []).filter((a) => a.isActive !== false),
+    [activities.data],
+  );
+  const serviceOptions = useMemo(
+    () => (services.data ?? [])
+      .filter((sv) => sv.isActive && activeActivities.some((a) => a.clinicServiceId === sv.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'cs')),
+    [services.data, activeActivities],
+  );
+  const serviceGate = serviceOptions.length > 1;
+  const shownActivities = serviceGate
+    ? activeActivities.filter((a) => a.clinicServiceId === serviceId)
+    : activeActivities;
   const protocolOptions = useMemo(
-    () => distinct([...(history.data ?? []).map((s) => s.protocolType), ...(activities.data?.activities ?? []).map((a) => a.name)]),
-    [history.data, activities.data],
+    () => distinct([...(history.data ?? []).map((s) => s.protocolType), ...shownActivities.map((a) => a.name)]),
+    [history.data, shownActivities],
   );
   const deviceOptions = useMemo(
     () => distinct((history.data ?? []).map((s) => s.device)),
@@ -219,6 +241,18 @@ export default function ManualResultsForm({ patientId, session, onSaved, onCance
               helperText={errors.measuredOn}
               slotProps={{ inputLabel: { shrink: true }, input: { sx: { minHeight: 44 } } }}
             />
+            {serviceGate && (
+              <TextField
+                select
+                label="Služba"
+                value={serviceId}
+                onChange={(e) => setServiceId(e.target.value)}
+                helperText={serviceId === '' ? 'Vyberte službu, nabídneme její činnosti.' : undefined}
+                slotProps={{ input: { sx: { minHeight: 44 } } }}
+              >
+                {serviceOptions.map((sv) => <MenuItem key={sv.id} value={sv.id}>{sv.name}</MenuItem>)}
+              </TextField>
+            )}
             {suggested('protocol', 'Typ protokolu', protocolOptions)}
             {suggested('device', 'Přístroj', deviceOptions)}
           </Box>

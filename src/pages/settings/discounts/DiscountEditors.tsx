@@ -126,22 +126,50 @@ export function TierEditor({
 
 /* ── Package discounts ── */
 
-export interface ActivityChoice { id: string; name: string; isActive: boolean }
+export interface ActivityChoice { id: string; name: string; isActive: boolean; clinicServiceId?: string | null }
+export interface ServiceChoice { id: string; name: string }
 
 export function PackageEditor({
-  rows, errors, activities, onChange,
-}: { rows: PackageRow[]; errors: DiscountErrors['packages']; activities: ActivityChoice[]; onChange: (rows: PackageRow[]) => void }) {
+  rows, errors, activities, services = [], onChange,
+}: { rows: PackageRow[]; errors: DiscountErrors['packages']; activities: ActivityChoice[]; services?: ServiceChoice[]; onChange: (rows: PackageRow[]) => void }) {
   const size = useFieldSize();
+  /* Služba first, then its činnosti. Only when more than one služba has činnosti; otherwise one list. */
+  const serviceOptions = services.filter((sv) => activities.some((a) => a.isActive && a.clinicServiceId === sv.id));
+  const serviceGate = serviceOptions.length > 1;
+  const [pickedService, setPickedService] = useState<Record<string, string>>({});
+  const serviceOf = (row: PackageRow) =>
+    pickedService[row.key] ?? activities.find((a) => a.id === row.activityId)?.clinicServiceId ?? '';
   const edit = (key: string, patch: Partial<PackageRow>) => onChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const position = (row: PackageRow) => rows.findIndex((r) => r.key === row.key) + 1;
   const used = new Set(rows.map((r) => r.activityId).filter((id) => id !== ''));
   const free = activities.filter((a) => a.isActive && !used.has(a.id));
   const nameOf = (id: string) => activities.find((a) => a.id === id)?.name ?? 'Činnost, která už neexistuje';
 
+  const serviceField = (row: PackageRow) => (
+    <TextField
+      select
+      size={size}
+      value={serviceOf(row)}
+      onChange={(e) => {
+        setPickedService((prev) => ({ ...prev, [row.key]: e.target.value }));
+        const current = activities.find((a) => a.id === row.activityId);
+        if (current && current.clinicServiceId !== e.target.value) edit(row.key, { activityId: '' });
+      }}
+      label={size === 'medium' ? 'Služba' : undefined}
+      fullWidth
+      slotProps={{ select: { native: true }, htmlInput: { 'aria-label': `Služba balíčku ${position(row)}` } }}
+      sx={{ minWidth: 160 }}
+    >
+      <option value="">Vyberte službu</option>
+      {serviceOptions.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}</option>)}
+    </TextField>
+  );
+
   const activityField = (row: PackageRow) => (
     <TextField
       select
       size={size}
+      disabled={serviceGate && serviceOf(row) === ''}
       value={row.activityId}
       onChange={(e) => edit(row.key, { activityId: e.target.value })}
       error={errors[row.key]?.activity !== undefined}
@@ -153,7 +181,7 @@ export function PackageEditor({
     >
       <option value="">Vyberte činnost</option>
       {row.activityId !== '' && !free.some((a) => a.id === row.activityId) && <option value={row.activityId}>{nameOf(row.activityId)}</option>}
-      {free.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+      {free.filter((a) => !serviceGate || a.clinicServiceId === serviceOf(row)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
     </TextField>
   );
   const percentField = (row: PackageRow) => (
@@ -179,6 +207,7 @@ export function PackageEditor({
   );
 
   const columns: DataColumn<PackageRow>[] = [
+    ...(serviceGate ? [{ key: 'service', header: 'Služba', tablet: true, cell: serviceField } as DataColumn<PackageRow>] : []),
     { key: 'activity', header: 'Činnost', tablet: true, cell: activityField },
     { key: 'percent', header: 'Sleva', tablet: true, cell: percentField },
     { key: 'actions', header: 'Akce', tablet: true, align: 'right', cell: removeButton },
@@ -207,6 +236,7 @@ export function PackageEditor({
       renderCard={(row) => (
         <Stack spacing={1.5}>
           <Typography sx={TYPE.itemName}>{row.activityId === '' ? 'Nová sleva' : nameOf(row.activityId)}</Typography>
+          {serviceGate && serviceField(row)}
           {activityField(row)}
           {percentField(row)}
           {removeButton(row)}

@@ -83,7 +83,7 @@ describe('the manual entry', () => {
 
     expect(container.querySelector(`form[data-layout="${layout}"]`)).not.toBeNull();
     /* a picker, not a box for a raw patient id */
-    expect(screen.getByLabelText(/^Pacient/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Pacient/ })).toBeInTheDocument();
     expect(screen.queryByLabelText(/ID pacienta/)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/^VO₂max/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Uložit hodnoty' })).toBeInTheDocument();
@@ -97,6 +97,7 @@ describe('the manual entry', () => {
     await user.click(screen.getByRole('button', { name: 'Ruční zápis' }));
     await user.click(screen.getByRole('button', { name: 'Průvodce' }));
 
-    expect(screen.getByLabelText(/ID pacienta/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Pacient/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/ID pacienta/)).not.toBeInTheDocument();
   });
 });

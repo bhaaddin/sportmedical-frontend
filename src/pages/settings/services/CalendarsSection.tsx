@@ -59,13 +59,15 @@ export default function CalendarsSection({ service }: { service: ClinicService }
     .filter((c) => c.clinicServiceId === service.id)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const first = mine.find((c) => c.isActive) ?? mine[0];
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
         <Typography sx={{ ...TYPE.caption, flex: 1, minWidth: 200 }}>
           Kalendář provozuje jednu službu. Přiřazení změníte tlačítkem Upravit u služby v seznamu.
         </Typography>
-        <Button variant="outlined" onClick={() => navigate('/working-hours')} sx={{ minHeight: 44 }}>Pracovní doba</Button>
+        <Button variant="outlined" onClick={() => navigate('/working-hours', { state: first ? { calendarId: first.id } : undefined })} sx={{ minHeight: 44 }}>Pracovní doba</Button>
         <Button variant="outlined" onClick={() => navigate('/calendars')} sx={{ minHeight: 44 }}>Všechny kalendáře</Button>
       </Stack>
 

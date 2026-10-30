@@ -160,6 +160,26 @@ describe('Kalendáře of a služba', () => {
     expect(screen.queryByText('Jiná služba')).not.toBeInTheDocument();
   });
 
+  it('opens Pracovní doba on the služba own calendar', async () => {
+    const { MemoryRouter, Routes, Route, useLocation } = await import('react-router-dom');
+    const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+    const { render } = await import('@testing-library/react');
+    const Where = () => <span data-testid="state">{JSON.stringify((useLocation().state as unknown) ?? null)}</span>;
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={['/nastaveni/sluzby/s1']}>
+          <Routes>
+            <Route path="/working-hours" element={<Where />} />
+            <Route path="*" element={<CalendarsSection service={service as never} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByText('Ordinace A');
+    await userEvent.click(screen.getByRole('button', { name: 'Pracovní doba' }));
+    expect(JSON.parse((await screen.findByTestId('state')).textContent ?? 'null')).toEqual({ calendarId: 'c1' });
+  });
+
   it('marks the weekdays the current period works, and no other', async () => {
     mount();
     const card = await screen.findByTestId('calendar-c1');
