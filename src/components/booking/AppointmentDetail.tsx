@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -57,7 +57,8 @@ import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
-import { AppointmentExamination } from "./AppointmentExamination";
+/* Its own chunk: the calendar's bundle does not carry the diagnostics client (planner budget). */
+const AppointmentExamination = lazy(() => import("./AppointmentExamination").then((m) => ({ default: m.AppointmentExamination })));
 import { useCompletionLink } from "./quick/useCompletionLink";
 import { QuickPendingCard } from "./quick/QuickPendingCard";
 import { missingConsentsLine } from "./patient/consentNames";
@@ -946,7 +947,11 @@ function DetailBody({
             </Box>
           ) : null}
 
-          {hasPatient ? <AppointmentExamination patientId={appointment.patientId} appointmentId={appointment.id} /> : null}
+          {hasPatient ? (
+            <Suspense fallback={null}>
+              <AppointmentExamination patientId={appointment.patientId} appointmentId={appointment.id} />
+            </Suspense>
+          ) : null}
 
           {/* The patient's personal portal link, issuable straight from the booking. */}
           {hasPatient ? (
