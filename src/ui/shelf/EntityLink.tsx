@@ -19,7 +19,7 @@ import { Box, Fade, Paper, Popper, Skeleton, Typography } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../../auth/usePermission';
 import { StatusChip } from '../../components/ui/StatusChip';
-import { ENTITY_LABEL, entityTarget, mayOpen, refKey, type EntityRef } from './entities';
+import { ENTITY_LABEL, entityHref, entityTarget, mayOpen, refKey, type EntityRef } from './entities';
 import { ENTITY_ICON, ENTITY_TONE, EntityBadge } from './entityMeta';
 import { toneOf } from './shelfStyle';
 import { DESIGN, darkOf } from '../../theme';
@@ -175,7 +175,7 @@ export function EntityChip({ entity, peek = true, onNavigate, size = 'md' }: Com
       <Box
         component={RouterLink}
         ref={setAnchorEl}
-        to={target.to}
+        to={entityHref(entity)}
         state={target.state}
         data-entity={entity.kind}
         aria-describedby={open ? popId : undefined}
@@ -211,7 +211,7 @@ export function EntityLink({ entity, children, peek = true, onNavigate }: Common
       <Box
         component={RouterLink}
         ref={setAnchorEl}
-        to={target.to}
+        to={entityHref(entity)}
         state={target.state}
         data-entity={entity.kind}
         aria-describedby={open ? popId : undefined}

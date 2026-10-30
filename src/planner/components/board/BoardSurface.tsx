@@ -12,6 +12,7 @@
  *               (`planning.selectedCategoryId !== null`) or one of those gestures runs, this component
  *               keeps its hands off the board.
  */
+import { handoffFromSearch } from '../../handoffFromSearch';
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Button, ClickAwayListener, Paper, Popover, Popper, useTheme } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
@@ -785,7 +786,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
    *   `date`           moves the board to that day ("Zobrazit v kalendáři" from the club reservations);
    *   `serviceId`      shows only that služba ("Nová objednávka -> Vybrat v kalendáři").
    */
-  const handoff = nav.state as { newAppointment?: unknown; patientId?: unknown; activityId?: unknown; openClubOrder?: unknown; date?: unknown; serviceId?: unknown; appointmentId?: unknown } | null;
+  const handoff = handoffFromSearch(nav.search, nav.state, nav.key) as { newAppointment?: unknown; patientId?: unknown; activityId?: unknown; openClubOrder?: unknown; date?: unknown; serviceId?: unknown; appointmentId?: unknown } | null;
   const handled = useRef({ newAppointment: null as unknown, club: null as string | null, date: null as string | null, service: null as string | null, appointment: null as string | null });
   const newAppointmentKey = typeof handoff?.newAppointment === 'number' ? handoff.newAppointment : null;
   const landingPatient = typeof handoff?.patientId === 'string' ? handoff.patientId : undefined;

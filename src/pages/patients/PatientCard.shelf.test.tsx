@@ -150,7 +150,7 @@ describe('Související', () => {
 
     const appointments = await within(related).findByRole('link', { name: /Termín: .*Kontrola/ });
     expect(appointments).toHaveAttribute('href', '/kalendar/k1/termin/w1');
-    expect(await within(related).findByRole('link', { name: 'Faktura: FA-1' })).toHaveAttribute('href', '/billing');
+    expect(await within(related).findByRole('link', { name: 'Faktura: FA-1' })).toHaveAttribute('href', '/billing?invoice=i1');
     expect(await within(related).findByRole('link', { name: 'Dokument: Výpis' })).toHaveAttribute('href', '/patients/p1/dokumenty');
     expect(await within(related).findByRole('link', { name: 'Klub: FC Sparta' })).toHaveAttribute('href', '/clubs/c1');
     expect(within(related).getByText('Souhlasy')).toBeInTheDocument();
