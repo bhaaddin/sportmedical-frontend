@@ -96,6 +96,7 @@ describe('after the sign-in', () => {
   it('never follows a foreign address', async () => {
     expect((await signIn('/login?next=https%3A%2F%2Fevil.example')).textContent).toBe('/prehled');
     cleanup();
+    localStorage.removeItem('token'); // the first sign-in stored one; a signed-in person is sent on without the form
     expect((await signIn('/login?next=%2F%2Fevil.example')).textContent).toBe('/prehled');
   });
 });
@@ -127,5 +128,21 @@ describe('loginRedirect (pure)', () => {
     expect(afterLoginPath('')).toBe('/prehled');
     expect(afterLoginPath('?next=%2Fclubs')).toBe('/clubs');
     expect(afterLoginPath('?next=%2F%2Fevil')).toBe('/prehled');
+  });
+});
+
+describe('the sign-in for someone already signed in', () => {
+  it('sends them on instead of showing the form', async () => {
+    localStorage.setItem('token', 't');
+    render(
+      <MemoryRouter initialEntries={['/login?next=%2Fpatients']}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<output data-testid="where">arrived</output>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId('where')).toBeInTheDocument();
+    localStorage.removeItem('token');
   });
 });

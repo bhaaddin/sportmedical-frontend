@@ -46,6 +46,7 @@ import {
 import { EventAvailable, InfoOutlined, PersonAdd, PersonOutlined } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { activitiesApi } from '../api/activities';
+import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { clinicServicesApi } from '../api/clinicServices';
 import { parsePhoneValue } from '../components/ui/countryCodes';
 import type { ClinicService } from '../api/clinicServices';
@@ -268,6 +269,9 @@ export default function PatientRegistration() {
 
   /** The completion link after a quick registration — the success state. */
   const [issued, setIssued] = useState<IssuedRegistration | null>(null);
+  /* Anything typed and not yet registered: leaving the page asks first. */
+  const pristineForm = useRef(JSON.stringify({ ...form, mode: '' }));
+  useUnsavedGuard(issued === null && JSON.stringify({ ...form, mode: '' }) !== pristineForm.current);
   /* Ticked by a person with the signed paper in hand; never preselected. */
   const [consents, setConsents] = useState<OnSiteConsentSelection>(EMPTY_ON_SITE_CONSENTS);
 
@@ -1103,7 +1107,7 @@ export default function PatientRegistration() {
                 <Box
                   key={candidate.patientId}
                   role="listitem"
-                  data-similar=""
+                  data-similar="" data-keeps-page=""
                   sx={{ px: 1.75, py: 1, display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}
                 >
                   <EntityChip

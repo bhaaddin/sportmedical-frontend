@@ -44,6 +44,7 @@ import {
 } from '../../components/public/kit';
 import { LANDING_PATH, PORTAL_SIGN_IN_PATH } from '../../components/public/PublicHeader';
 import { shownPrice } from '../../components/booking/grid/appointmentPrice';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 /**
  * "Cena: 1 600 Kč" - what the patient pays (Etapa 12, "ceny všude"). The agreed
@@ -454,6 +455,7 @@ function Section({ id, title, children, action }: { id?: string; title: string; 
 }
 
 export default function PatientPortal() {
+  usePageTitle('Můj portál');
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const device = useDevice();

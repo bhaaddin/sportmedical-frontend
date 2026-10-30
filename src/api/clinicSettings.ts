@@ -38,16 +38,21 @@ const publicClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-/**
- * Never throws. A public page that cannot reach this still has to render: the
- * clinic's telephone number is a nice-to-have on a booking form, and losing the
- * whole screen over it would be the wrong trade.
- */
-export const readPublicClinic = async (): Promise<PublicClinic> => {
+const CLINIC_TTL_MS = 5 * 60_000;
+let clinicInFlight: Promise<PublicClinic> | null = null;
+let clinicCached: { at: number; value: PublicClinic } | null = null;
+
+/** Forgets the shared answer (tests, and after the clinic's own settings are saved). */
+export const resetPublicClinicCache = (): void => {
+  clinicInFlight = null;
+  clinicCached = null;
+};
+
+const fetchPublicClinicOnce = async (): Promise<PublicClinic> => {
   try {
     const { data } = await publicClient.get<PublicClinic>('/api/public/clinic');
 
-    return {
+    const value: PublicClinic = {
       name: data.name ?? '',
       email: data.email ?? '',
       phone: data.phone ?? '',
@@ -57,9 +62,31 @@ export const readPublicClinic = async (): Promise<PublicClinic> => {
         ? { openingHours: data.openingHours.trim() }
         : {}),
     };
+    clinicCached = { at: Date.now(), value };
+    return value;
   } catch {
     return { name: '', email: '', phone: '', address: '', bookingEnabled: true };
   }
+};
+
+/**
+ * Never throws. A public page that cannot reach this still has to render: the
+ * clinic's telephone number is a nice-to-have on a booking form, and losing the
+ * whole screen over it would be the wrong trade.
+ *
+ * One request serves every caller: concurrent calls share the request in flight
+ * and a good answer is reused for five minutes, so a page, its layout and its
+ * footer no longer ask the server four or five times. A failed answer is not
+ * kept - the next caller tries again.
+ */
+export const readPublicClinic = (): Promise<PublicClinic> => {
+  if (clinicCached !== null && Date.now() - clinicCached.at < CLINIC_TTL_MS) {
+    return Promise.resolve(clinicCached.value);
+  }
+  if (clinicInFlight === null) {
+    clinicInFlight = fetchPublicClinicOnce().finally(() => { clinicInFlight = null; });
+  }
+  return clinicInFlight;
 };
 
 /* ── What an administrator may write ──────────────────────────────── */
@@ -101,6 +128,7 @@ export const readSettings = async (keys: string[]): Promise<Record<string, strin
 export const saveSettings = async (values: Record<string, string>): Promise<void> => {
   // The endpoint takes a plain key/value map, not a list of rows.
   await client.put('/api/settings/bulk', values);
+  resetPublicClinicCache();
 };
 
 /** The keys the public-details screen owns. */
@@ -117,3 +145,6 @@ export const PUBLIC_CLINIC_KEYS = {
 
 /** The server refuses a longer text with a 400. */
 export const OPENING_HOURS_MAX_LENGTH = 200;
+
+/* Tests start every case with no remembered answer (see src/test/setup.ts). */
+(globalThis as { __smResetPublicClinic?: () => void }).__smResetPublicClinic = resetPublicClinicCache;

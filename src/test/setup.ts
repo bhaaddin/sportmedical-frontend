@@ -15,6 +15,7 @@ import { configure } from '@testing-library/react';
 configure({ asyncUtilTimeout: 10_000 });
 
 /* The notification bells keep the last list for a few seconds; a test must never start from the previous test's. */
+afterEach(() => (globalThis as { __smResetPublicClinic?: () => void }).__smResetPublicClinic?.());
 afterEach(() => (globalThis as { __smResetNotificationFeed?: () => void }).__smResetNotificationFeed?.());
 
 /*

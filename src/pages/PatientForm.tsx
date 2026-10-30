@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUnsavedGuard } from "../hooks/useUnsavedGuard";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -236,6 +237,9 @@ export default function PatientForm() {
   const [savingAll, setSavingAll] = useState(false);
   const [insuranceOpen, setInsuranceOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
+
+  /* Edited and not yet saved: leaving the page asks first. */
+  useUnsavedGuard(editedDemographics !== null || editedProfile !== null);
 
   const load = () => {
     setEditedDemographics(null);

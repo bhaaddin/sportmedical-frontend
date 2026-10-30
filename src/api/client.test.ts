@@ -67,7 +67,7 @@ describe('401', () => {
     expect(localStorage.getItem('permissions')).toBeNull();
     expect(localStorage.getItem('settings.openSection')).toBe('ucet');
     expect(stop).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe(SESSION_EXPIRED_PATH);
+    expect(window.location.href).toBe(`${SESSION_EXPIRED_PATH}&next=%2Fpatients`);
   });
 
   it('leaves a public page alone when nobody was signed in', async () => {
@@ -131,12 +131,28 @@ describe('no answer', () => {
     expect(recovered).toHaveBeenCalledTimes(1);
   });
 
-  it('counts a proxy saying the API is down as no answer', async () => {
+  it('counts a proxy saying the API is down as no answer when /health/live fails too', async () => {
     client.defaults.adapter = answer(502);
 
     await expect(client.get('/api/patients')).rejects.toBeInstanceOf(AxiosError);
 
-    expect(connection.getState()).toBe('unreachable');
+    await vi.waitFor(() => expect(connection.getState()).toBe('unreachable'));
+  });
+
+  it('does NOT raise the banner for 503/504 on one request while /health/live is green', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response('ok', { status: 200 }));
+    for (const status of [503, 504]) {
+      client.defaults.adapter = answer(status);
+      await expect(client.get('/api/patients')).rejects.toBeInstanceOf(AxiosError);
+    }
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(connection.getState()).toBe('online');
+  });
+
+  it('a 500 is an error of that request, not a missing server', async () => {
+    client.defaults.adapter = answer(500);
+    await expect(client.get('/api/patients')).rejects.toBeInstanceOf(AxiosError);
+    expect(connection.getState()).toBe('online');
   });
 
   it('is cleared by the next request that gets any answer', async () => {

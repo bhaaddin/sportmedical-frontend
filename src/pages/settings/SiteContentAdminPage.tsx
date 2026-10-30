@@ -45,7 +45,7 @@ import { FaqSection } from './siteContent/FaqSection';
 import { ConfirmDialog, type ConfirmRequest } from './siteContent/ConfirmDialog';
 import { MEDIA_STORAGE_PATH } from './siteContent/MediaUpload';
 import { useAdminSiteContent, useSiteMutation } from './siteContent/useSiteContentAdmin';
-import { useUnsavedGuard } from './siteContent/useUnsavedGuard';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   FAQ_ID, PARTNERS_ID, buildPages, countSlots, draftChanges, draftProblem, isDirty, isMediaSlot, matchesQuery,
   type AdminPage, type SlotDraft, type SlotPage,

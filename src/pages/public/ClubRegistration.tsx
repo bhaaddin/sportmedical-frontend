@@ -47,6 +47,7 @@ import {
 import { PhoneField } from '../../components/ui/PhoneField';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
 import { useSlotTexts } from '../../site/useSlotTexts';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const SLOT_KEYS = [
   'formulare.club.closed',
@@ -194,6 +195,7 @@ function TimePill({ slot, selected, onPick }: { slot: ClubSlot; selected: boolea
 }
 
 export default function ClubRegistration() {
+  usePageTitle('Registrace klubu');
   const txt = useSlotTexts(SLOT_KEYS);
   const cal = withCalDefaults(txt);
   const device = useDevice();

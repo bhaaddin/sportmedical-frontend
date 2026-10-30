@@ -80,7 +80,7 @@ export function useDocumentTitle(crumbs: Crumb[]): void {
   const trail = crumbs.map((c) => c.label).join(' › ');
   useEffect(() => {
     const here = crumbs.length ? crumbs[crumbs.length - 1].label : 'SportMedical';
-    document.title = `${here} · SportMedical`;
+    document.title = here === 'SportMedical' ? 'SportMedical' : `${here} · SportMedical`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trail]);
 }

@@ -13,6 +13,7 @@
    Phone: one field per row, "Přihlásit se" pinned at the bottom of the screen.
    ══════════════════════════════════════════════════════════════ */
 
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
@@ -33,6 +34,7 @@ import {
 export const portalPath = (token: string): string => `/portal/${encodeURIComponent(token)}`;
 
 export default function PatientSignIn() {
+  usePageTitle('Přihlášení do portálu');
   const txt = useSlotTexts(['formulare.portal.signin.sub', 'formulare.portal.signin.no-password', 'formulare.portal.signin.forgot'] as const);
   const navigate = useNavigate();
   const phone = useIsPhone();

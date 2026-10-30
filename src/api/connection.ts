@@ -84,6 +84,18 @@ export function reportUnreachable(): void {
   scheduleProbe();
 }
 
+/**
+ * A gateway answered 502/503/504 for one request. That alone does not say the server is gone (one slow or overloaded
+ * endpoint answers like that while /health/live is green), so the banner has ONE source: only a failing /health/live
+ * marks the server unreachable. No flapping on a single bad answer.
+ */
+export function reportGatewayError(): void {
+  void probe().then((ok) => {
+    if (ok) reportReachable();
+    else reportUnreachable();
+  });
+}
+
 /** Something answered. Ends the retry loop and announces the recovery. */
 export function reportReachable(): void {
   if (timer !== null) {
