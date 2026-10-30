@@ -23,10 +23,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper,
+  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper,
   Stack, TextField, Typography, useMediaQuery,
 } from '@mui/material';
-import { Add, Search } from '@mui/icons-material';
+import { Add, Close, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { billingApi } from '../api/billing';
 import type { Invoice, InvoicePaymentMethod } from '../api/billing';
@@ -43,7 +43,7 @@ import NewInvoiceFlow from '../components/billing/NewInvoiceFlow';
 import RejectInvoiceDialog from '../components/billing/RejectInvoiceDialog';
 import { czk } from './billing/money';
 import {
-  doklady, filterFromState, isClub, matchesFilter, matchesSearch, monthIn, monthYear, statusOf, summarize, customerOf,
+  doklady, filterFromState, isClub, matchesFilter, matchesPatient, matchesSearch, patientFilterFromState, monthIn, monthYear, statusOf, summarize, customerOf,
   PAYMENT_METHOD_LABEL,
 } from './billing/invoiceView';
 import type { InvoiceFilter } from './billing/invoiceView';
@@ -86,12 +86,16 @@ export default function Billing() {
   /* ── Filters ── */
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<InvoiceFilter>('all');
+  /* A patient's "Otevřít ve Fakturaci": the list narrowed to that patient until the chip is removed. */
+  const [patientFilter, setPatientFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<InvoiceSortKey>('issueDateUtc');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   /* ── Dialogs ── */
   /* `null` closed; otherwise what the new-document flow was opened with. */
   const [flow, setFlow] = useState<{ nav: BillingNavState | null } | null>(null);
+  /* The prefill of a document that was opened and not yet issued: closing the flow keeps it, issuing clears it. */
+  const [unfinished, setUnfinished] = useState<BillingNavState | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const [payment, setPayment] = useState<{ amount: string; method: InvoicePaymentMethod; note: string }>({
     amount: '', method: 'Cash', note: '',
@@ -120,11 +124,16 @@ export default function Billing() {
 
   useEffect(() => { load(); }, [load]);
 
+  const patientFilterName = useMemo(
+    () => (patientFilter === null ? '' : invoices.find((inv) => inv.patientId === patientFilter)?.patientName ?? ''),
+    [invoices, patientFilter],
+  );
+
   const hasClubs = useMemo(() => invoices.some(isClub), [invoices]);
 
   /* ── Filtered & sorted data ── */
   const filteredInvoices = useMemo(() => {
-    const result = invoices.filter((inv) => matchesSearch(inv, search) && matchesFilter(inv, filter, now));
+    const result = invoices.filter((inv) => matchesSearch(inv, search) && matchesFilter(inv, filter, now) && matchesPatient(inv, patientFilter));
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...result].sort((a, b) => {
       switch (sortBy) {
@@ -140,7 +149,7 @@ export default function Billing() {
           return (a.invoiceNumber ?? '').localeCompare(b.invoiceNumber ?? '', 'cs') * dir;
       }
     });
-  }, [invoices, search, filter, sortBy, sortDir, now]);
+  }, [invoices, search, filter, patientFilter, sortBy, sortDir, now]);
 
   /* ── KPI stats ── */
   const stats = useMemo(() => summarize(invoices, now), [invoices, now]);
@@ -164,17 +173,19 @@ export default function Billing() {
     if (loading || handled.current === location.key) return;
     const state = readNavState(location.state);
     const askedFilter = filterFromState(location.state);
-    if (!hasPrefill(state) && askedFilter === null) return;
+    const askedPatient = patientFilterFromState(location.state);
+    if (!hasPrefill(state) && askedFilter === null && askedPatient === null) return;
     handled.current = location.key;
     /* Spent: a reload must not open the dialog again. */
     navigate(location.pathname, { replace: true, state: null });
     if (askedFilter !== null) setFilter(askedFilter);
+    if (askedPatient !== null) { setPatientFilter(askedPatient); setSearch(''); }
     if (state.invoiceId !== undefined) {
       setOpenId(state.invoiceId);
       /* The document must be in the list it is opened in. */
-      if (askedFilter === null) { setFilter('all'); setSearch(''); }
+      if (askedFilter === null) { setFilter('all'); setSearch(''); setPatientFilter(null); }
     }
-    if (wantsNewInvoice(state)) setFlow({ nav: state });
+    if (wantsNewInvoice(state)) { setUnfinished(state); setFlow({ nav: state }); }
   }, [loading, location.key, location.state, location.pathname, navigate]);
 
   /* A link to one document brings it into view. */
@@ -286,7 +297,7 @@ export default function Billing() {
     return groups.map((g) => ({ ...g, items: [] }));
   }, [invoices, now, canApprove]);
 
-  const primaryAction = { label: 'Nový doklad', icon: <Add />, onClick: () => setFlow({ nav: null }) };
+  const primaryAction = { label: 'Nový doklad', icon: <Add />, onClick: () => setFlow({ nav: unfinished }) };
   const emptyText = invoices.length === 0 ? 'Zatím žádné doklady.' : 'Žádný doklad neodpovídá hledání.';
   const ready = !loading && !loadFailed;
   const shown = `Zobrazeno ${filteredInvoices.length} z ${doklady(invoices.length)}`;
@@ -400,6 +411,18 @@ export default function Billing() {
         onRetry={load}
         controls={ready ? filters : undefined}
       >
+        {patientFilter !== null && (
+          <Box sx={{ mb: 1.5, flexShrink: 0 }}>
+            <Chip
+              color="primary"
+              variant="outlined"
+              label={`Pacient: ${patientFilterName || 'vybraný pacient'}`}
+              onDelete={() => setPatientFilter(null)}
+              deleteIcon={<Close aria-label="Zrušit filtr pacienta" />}
+              sx={{ minHeight: 44, borderRadius: 22 }}
+            />
+          </Box>
+        )}
         <TextField
           fullWidth
           placeholder="Číslo dokladu, pacient nebo klub"
@@ -454,7 +477,7 @@ export default function Billing() {
         open={flow !== null}
         nav={flow?.nav ?? null}
         onClose={() => setFlow(null)}
-        onCreated={() => { void reload().catch(() => toast.error('Seznam dokladů se nepodařilo obnovit')); }}
+        onCreated={() => { setUnfinished(null); void reload().catch(() => toast.error('Seznam dokladů se nepodařilo obnovit')); }}
       />
 
       {/* ── Reject ── */}

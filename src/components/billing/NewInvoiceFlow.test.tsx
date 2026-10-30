@@ -21,6 +21,8 @@ const getAllClubs = vi.fn();
 vi.mock('../../api/clubs', () => ({ clubsApi: { getById: getClub, getAll: getAllClubs } }));
 const listActivities = vi.fn();
 vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
+const listServices = vi.hoisted(() => vi.fn());
+vi.mock('../../api/clinicServices', () => ({ clinicServicesApi: { list: listServices } }));
 vi.mock('../../api/calendars', () => ({ calendarsApi: { list: vi.fn().mockResolvedValue([]) } }));
 const listOrders = vi.fn();
 vi.mock('../../api/partnerOrders', () => ({ partnerOrdersApi: { list: listOrders } }));
@@ -87,6 +89,7 @@ beforeEach(() => {
   ]);
   listActivities.mockReset().mockResolvedValue({ activities: ACTIVITIES, warnings: [] });
   listOrders.mockReset().mockResolvedValue([]);
+  listServices.mockReset().mockResolvedValue([]);
   onClose.mockReset();
   onCreated.mockReset();
 });
@@ -417,5 +420,50 @@ describe('three layouts', () => {
     choose(/^Osoba/);
     expect(dialog()).toHaveClass('MuiDialog-paperWidthLg');
     expect(screen.getByLabelText('Rozpis ceny')).toBeInTheDocument();
+  });
+});
+
+describe('služba first, then its činnosti', () => {
+  const service = (id: string, name: string, sortOrder: number) => ({
+    id, name, description: '', sortOrder, isActive: true, activities: 1, calendars: 1, colorHex: null,
+  });
+  const TWO = [
+    activity('a1', 'Komplexní prohlídka', 2200, { sortOrder: 1, clinicServiceId: 's1' }),
+    activity('a2', 'Spiroergometrie', 4000, { sortOrder: 2, clinicServiceId: 's2' }),
+  ];
+  beforeEach(() => {
+    listServices.mockResolvedValue([service('s1', 'Prohlídky', 1), service('s2', 'Diagnostika', 2)]);
+    listActivities.mockResolvedValue({ activities: TWO, warnings: [] });
+  });
+
+  it('asks for the služba, lists only its činnosti', async () => {
+    renderFlow();
+    choose(/^Osoba/);
+    const select = await screen.findByRole('combobox', { name: 'Služba' });
+    expect(screen.getByText('Nejdřív vyberte službu.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Činnosti z ceníku' })).not.toBeInTheDocument();
+
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByRole('option', { name: 'Diagnostika' }));
+    const group = await screen.findByRole('group', { name: 'Činnosti z ceníku' });
+    expect(within(group).getAllByRole('button')).toHaveLength(1);
+    expect(within(group).getByText('Spiroergometrie')).toBeInTheDocument();
+  });
+
+  it('preselects the služba of the činnost of the visit', async () => {
+    getPatient.mockResolvedValue({ id: 'p9', firstName: 'Jan', lastName: 'Novák' });
+    renderFlow({ patientId: 'p9', activityId: 'a2' });
+    const group = await screen.findByRole('group', { name: 'Činnosti z ceníku' });
+    expect(within(group).getByText('Spiroergometrie')).toBeInTheDocument();
+    expect(within(group).queryByText('Komplexní prohlídka')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Služba' })).toHaveTextContent('Diagnostika');
+  });
+
+  it('shows one list and no služba select when only one služba has činnosti', async () => {
+    listActivities.mockResolvedValue({ activities: [TWO[0]], warnings: [] });
+    renderFlow();
+    choose(/^Osoba/);
+    await screen.findByRole('group', { name: 'Činnosti z ceníku' });
+    expect(screen.queryByRole('combobox', { name: 'Služba' })).not.toBeInTheDocument();
   });
 });

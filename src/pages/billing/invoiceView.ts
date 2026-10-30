@@ -23,6 +23,21 @@ export function filterFromState(raw: unknown): InvoiceFilter | null {
   return typeof value === 'string' && (INVOICE_FILTERS as readonly string[]).includes(value) ? (value as InvoiceFilter) : null;
 }
 
+/**
+ * The patient whose invoices another screen asks Fakturace to narrow the list to: `state.filterPatientId`.
+ * A separate key from `patientId` on purpose - that one opens the new-document flow.
+ */
+export function patientFilterFromState(raw: unknown): string | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const value = (raw as Record<string, unknown>).filterPatientId;
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/** True when no patient narrowing is on, or the invoice is that patient's. */
+export function matchesPatient(inv: Invoice, patientId: string | null): boolean {
+  return patientId === null || inv.patientId === patientId;
+}
+
 /** How the recipient type is called on the screen. */
 export const RECIPIENT_LABEL: Record<RecipientType, string> = {
   Person: 'Osoba',

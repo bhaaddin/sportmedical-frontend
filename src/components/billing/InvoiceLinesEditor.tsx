@@ -3,9 +3,11 @@
  * many. The price shown beside a činnost is read from the ceník through the
  * činnost; what the line costs after discounts is the server's quote.
  */
-import { Box, Button, ButtonBase, IconButton, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, ButtonBase, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { Add, Check, Remove } from '@mui/icons-material';
 import type { Activity } from '../../api/bookingContracts';
+import type { ClinicService } from '../../api/clinicServices';
+import { serviceChoices } from '../../pages/billing/invoicePrefill';
 import type { DraftLine } from '../../pages/billing/invoicePrefill';
 import { czk } from '../../pages/billing/money';
 import { ACCENT_SOFT, TONE_CSS } from '../ui';
@@ -20,9 +22,16 @@ export default function InvoiceLinesEditor({
   onRetry,
   onToggle,
   onQuantity,
+  services = [],
+  serviceId = '',
+  onServiceChange,
 }: {
   /** Činnosti that can be billed: active and with a price in the ceník. */
-  activities: Pick<Activity, 'id' | 'name' | 'durationMinutes' | 'priceCzk'>[];
+  activities: Pick<Activity, 'id' | 'name' | 'durationMinutes' | 'priceCzk' | 'clinicServiceId'>[];
+  /** Služby, to choose from first when more than one has činnosti; the list shows only that služba's činnosti. */
+  services?: ClinicService[];
+  serviceId?: string;
+  onServiceChange?: (serviceId: string) => void;
   lines: DraftLine[];
   loading: boolean;
   failed: boolean;
@@ -31,6 +40,9 @@ export default function InvoiceLinesEditor({
   onQuantity: (activityId: string, quantity: number) => void;
 }) {
   const nameOf = (id: string) => activities.find((a) => a.id === id)?.name ?? 'Činnost z ceníku';
+  const gate = serviceChoices(services, activities);
+  const serviceGate = gate.length > 1 && onServiceChange !== undefined;
+  const shown = serviceGate ? activities.filter((a) => a.clinicServiceId === serviceId) : activities;
 
   return (
     <Box sx={{ display: 'grid', gap: 1.5 }}>
@@ -40,12 +52,25 @@ export default function InvoiceLinesEditor({
           <Button size="small" variant="outlined" onClick={onRetry}>Zkusit znovu</Button>
         </Box>
       )}
+      {serviceGate && (
+        <TextField
+          select
+          label="Služba"
+          value={serviceId}
+          onChange={(e) => onServiceChange?.(e.target.value)}
+          helperText={serviceId === '' ? 'Nejdřív vyberte službu.' : undefined}
+          fullWidth
+        >
+          {gate.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+        </TextField>
+      )}
       {!failed && !loading && activities.length === 0 && (
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Ceník je prázdný — žádná činnost nemá cenu.
         </Typography>
       )}
 
+      {(!serviceGate || serviceId !== '') && (
       <Box
         role="group"
         aria-label="Činnosti z ceníku"
@@ -61,7 +86,7 @@ export default function InvoiceLinesEditor({
           borderRadius: 3,
         }}
       >
-        {activities.map((a) => {
+        {shown.map((a) => {
           const selected = lines.some((l) => l.activityId === a.id);
           return (
             <ButtonBase
@@ -95,6 +120,7 @@ export default function InvoiceLinesEditor({
           );
         })}
       </Box>
+      )}
 
       {lines.length > 0 && (
         <Stack spacing={1} aria-label="Vybrané položky" role="group">

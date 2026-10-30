@@ -48,7 +48,7 @@ export default function PatientInvoicesPage() {
   const owed = open.reduce((sum, inv) => sum + inv.remainingCzk, 0);
   const overdue = useMemo(() => {
     const group = overdueInvoices({ now, invoices });
-    return group === null ? null : { ...group, action: { label: 'Otevřít ve Fakturaci', to: '/billing', state: { filter: 'overdue' } } };
+    return group === null ? null : { ...group, action: { label: 'Otevřít ve Fakturaci', to: '/billing', state: { filter: 'overdue', filterPatientId: id } } };
   }, [now, invoices]);
 
   const openInvoice = (inv: Invoice) => {
