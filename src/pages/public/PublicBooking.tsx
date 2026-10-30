@@ -51,6 +51,7 @@ import { fillText } from '../../site/fillText';
 import SlotPicker from './booking/SlotPicker';
 import type { DaySlots } from './booking/SlotPicker';
 import { addDays, isoOf, mondayOf, weekOf } from './booking/weekGrid';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 /** How far ahead the day list asks. The calendar's own horizon still applies. */
 const HORIZON_DAYS = 60;
@@ -80,6 +81,7 @@ function Waiting({ text }: { text: string }) {
 }
 
 export default function PublicBooking() {
+  usePageTitle('Objednání');
   const navigate = useNavigate();
   const device = useDevice();
 

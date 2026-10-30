@@ -47,6 +47,7 @@ import {
 } from './clubOrder/model';
 import type { FieldKey, OrderState } from './clubOrder/model';
 import { toggleDate } from '../../components/clubs/orders/dayOffer';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const QUOTE_DELAY_MS = 350;
 
@@ -87,6 +88,7 @@ type Load =
 export const PORTAL_REFRESH_MS = 60_000;
 
 export default function ClubOrderForm() {
+  usePageTitle('Objednávka pro klub');
   const { token = '' } = useParams<{ token: string }>();
   const clinic = usePublicClinic();
   const t = useSlotTexts(PORTAL_SLOT_KEYS);

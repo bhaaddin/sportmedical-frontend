@@ -8,6 +8,7 @@
    at the bottom of the screen.
    ══════════════════════════════════════════════════════════════ */
 
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
@@ -36,6 +37,7 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 export default function FeedbackPage() {
+  usePageTitle('Zpětná vazba');
   const subtitle = useSlotText('formulare.feedback.sub');
   const { token = '' } = useParams();
 

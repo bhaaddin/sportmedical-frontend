@@ -23,6 +23,8 @@ export function useUnsavedGuard(dirty: boolean): void {
       const anchor = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (anchor === null || anchor === undefined) return;
       if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      /* A link that opens elsewhere by its own code (data-keeps-page) does not leave this page. */
+      if (anchor.closest('[data-keeps-page]') !== null) return;
       const href = anchor.getAttribute('href') ?? '';
       if (href === '' || href.startsWith('#')) return;
       if (!window.confirm(UNSAVED_MESSAGE)) {

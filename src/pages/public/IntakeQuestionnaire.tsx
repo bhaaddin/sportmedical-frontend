@@ -121,6 +121,7 @@ import {
 import { useConsentSettings } from '../../api/consentSettings';
 import { useSlotTexts } from '../../site/useSlotTexts';
 import { fillText } from '../../site/fillText';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 /* ── Brand: the public identity, components/public/brand.ts (V-Web2) ── */
 
@@ -322,6 +323,7 @@ function splitE164(e164: string): { region: string; national: string } | null {
 }
 
 export default function IntakeQuestionnaire() {
+  usePageTitle('Dotazník');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [derived, setDerived] = useState<Derived>(NOTHING_DERIVED);
 

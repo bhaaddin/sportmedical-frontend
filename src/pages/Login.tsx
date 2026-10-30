@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, TextField, Button, Alert,
@@ -12,6 +12,7 @@ import { DESIGN, SoftCard } from '../components/ui';
 import { safeNextPath } from '../components/shell/loginRedirect';
 import { SiteLink } from '../web/SiteLink';
 import { SITE_HOME_PATH, STAFF_HOME_PATH, isPublicSitePath } from '../web/sitePaths';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 /** What the sign-in says while the sleeping server wakes up (it keeps trying on its own). */
 export const WAKING_MESSAGE =
@@ -27,6 +28,7 @@ export const SESSION_EXPIRED_MESSAGE =
  * button. Nothing moves and nothing glows - the calm is the point.
  */
 export default function Login() {
+  usePageTitle('Přihlášení');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('reason') === 'expired';
@@ -45,6 +47,15 @@ export default function Login() {
   /* Two-factor flow: set once the password was right but a code is also needed. */
   const [secondFactorToken, setSecondFactorToken] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+
+  /* Already signed in: the sign-in has nothing to offer, go on to where the person was heading. */
+  useEffect(() => {
+    if (sessionExpired || localStorage.getItem('token') === null) return;
+    const target = safeNextPath(searchParams.get('next')) ?? STAFF_HOME_PATH;
+    if (isPublicSitePath(target)) window.location.assign(target);
+    else navigate(target, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const finishLogin = (res: any) => {
     localStorage.setItem('token', res.accessToken);

@@ -21,6 +21,7 @@ import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
+import { useUnsavedGuard } from "../../hooks/useUnsavedGuard";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { clinicServicesApi } from "../../api/clinicServices";
@@ -422,6 +423,8 @@ export function NewAppointmentDialog({
   /* ── What, a note, and the two checkboxes ── */
   const [activityId, setActivityId] = useState("");
   const [note, setNote] = useState("");
+  /* A note typed and not yet booked: reloading or following a link asks first. */
+  useUnsavedGuard(open && note.trim() !== "");
   const [sendSms, setSendSms] = useState(false);
   /* R15c (g): the desk's confirmation choice is remembered per user in this browser; off until it was ever chosen */
   const userId = useMemo(() => storedUserId(), []);

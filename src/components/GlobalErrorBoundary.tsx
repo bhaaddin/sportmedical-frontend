@@ -9,7 +9,17 @@
    - Timestamped error for debugging
    ══════════════════════════════════════════════════════════════ */
 import { Component, type ReactNode } from 'react';
+import { connection } from '../api/connection';
 import { ErrorOutlined, Refresh, ContentCopy, RestartAlt, BugReport } from '@mui/icons-material';
+
+/** A lazy screen whose file could not be fetched (offline, or a new deploy removed the old file). */
+export function isChunkLoadError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /dynamically imported module|Importing a module script failed|Loading chunk|Loading CSS chunk/i.test(message);
+}
+
+const CHUNK_RELOAD_KEY = 'sm.chunkReloadAt';
+const CHUNK_RELOAD_GAP_MS = 60_000;
 
 interface Props {
   children: ReactNode;
@@ -39,6 +49,19 @@ export default class GlobalErrorBoundary extends Component<Props, State> {
     };
   }
 
+  private stopRecovery: (() => void) | null = null;
+
+  componentDidMount() {
+    /* When the server is back after a gap, a screen that failed only because its file could not be fetched tries again. */
+    this.stopRecovery = connection.onRecovered(() => {
+      if (this.state.hasError && isChunkLoadError(this.state.error)) this.handleRetry();
+    });
+  }
+
+  componentWillUnmount() {
+    this.stopRecovery?.();
+  }
+
   static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
@@ -48,6 +71,17 @@ export default class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (isChunkLoadError(error)) {
+      /* One reload picks up the current files; a second failure within a minute is left to the buttons and to reconnect. */
+      try {
+        const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? '0');
+        if (Date.now() - last > CHUNK_RELOAD_GAP_MS && navigator.onLine !== false) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+          window.location.reload();
+          return;
+        }
+      } catch { /* storage blocked: fall through to the buttons */ }
+    }
     const stack = errorInfo.componentStack || '';
     console.error('[GlobalErrorBoundary]', error, errorInfo);
     this.setState({ errorInfo: stack });

@@ -1,7 +1,8 @@
 import axios, { type AxiosError } from 'axios';
-import { reportReachable, reportUnreachable } from './connection';
+import { reportGatewayError, reportReachable, reportUnreachable } from './connection';
 import { clearLocalSession } from '../auth/localSession';
 import { socketService } from '../services/socketService';
+import { safeNextPath } from '../components/shell/loginRedirect';
 import { installRequestPolicy } from './requestPolicy';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
@@ -61,7 +62,9 @@ function endExpiredSession(): void {
   void socketService.stop();
 
   if (!window.location.pathname.startsWith('/login')) {
-    window.location.href = SESSION_EXPIRED_PATH;
+    /* One redirect, back to the same screen afterwards. Only the path is carried, never the query (it may hold a name). */
+    const back = safeNextPath(window.location.pathname);
+    window.location.href = back === null || back === '/' ? SESSION_EXPIRED_PATH : `${SESSION_EXPIRED_PATH}&next=${encodeURIComponent(back)}`;
   }
 }
 
@@ -97,7 +100,8 @@ client.interceptors.response.use(
   },
   (err: AxiosError) => {
     if (isUnreachable(err)) {
-      reportUnreachable();
+      if (err.response) reportGatewayError();
+      else reportUnreachable();
       return Promise.reject(err);
     }
 

@@ -61,6 +61,7 @@ import { BRAND } from '../../components/public/brand';
 import { NoticePane, PageTitle, Pane, Panel, PublicMain } from '../../components/public/kit';
 import type { ReactNode } from 'react';
 import type { SxProps, Theme } from '@mui/material/styles';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 /* The artboards' white panel; the content keeps its own spacing. */
 function Card({ children, sx }: { children: ReactNode; sx?: SxProps<Theme> }) {
@@ -116,6 +117,7 @@ export function bookingPriceLine(booking: ManagedBooking, offerPriceCzk: number 
 }
 
 export default function ManageBooking() {
+  usePageTitle('Správa objednávky');
   const { token = '' } = useParams();
 
   const [booking, setBooking] = useState<ManagedBooking | null>(null);
