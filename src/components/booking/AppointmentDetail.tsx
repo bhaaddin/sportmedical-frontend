@@ -253,6 +253,7 @@ function DetailBody({
   const queryClient = useQueryClient();
   const mayEdit = usePermission("bookings.edit");
   const mayCancel = usePermission("bookings.cancel");
+  const mayViewPatients = usePermission("patients.view");
 
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [cancelling, setCancelling] = useState(false);
@@ -947,7 +948,7 @@ function DetailBody({
             </Box>
           ) : null}
 
-          {hasPatient ? (
+          {hasPatient && mayViewPatients ? (
             <Suspense fallback={null}>
               <AppointmentExamination patientId={appointment.patientId} appointmentId={appointment.id} />
             </Suspense>

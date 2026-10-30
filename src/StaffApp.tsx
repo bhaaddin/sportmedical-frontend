@@ -447,7 +447,7 @@ export default function StaffApp() {
             <Route path="faktury" element={<RequirePermission of="billing.manage"><PatientInvoicesPage /></RequirePermission>} />
           </Route>
           {/* Opened from the patient's card (Výsledky tab, Přehled); not a rail section any more. */}
-          <Route path="/diagnostics/new" element={<DiagnosticForm />} />
+          <Route path="/diagnostics/new" element={<RequirePermission of="patients.view"><DiagnosticForm /></RequirePermission>} />
           {/* The retired Výsledky section: its screens are gone, old links land on the overview. */}
           {RETIRED_PATHS.map((path) => <Route key={path} path={path} element={<Navigate to="/prehled" replace />} />)}
           <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
