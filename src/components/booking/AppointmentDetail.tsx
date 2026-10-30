@@ -91,6 +91,7 @@ import {
   type PaperworkRow,
 } from "./appointmentEdit";
 import { AgreedPriceField } from "./price/AgreedPriceField";
+import { useAppointmentPaymentState } from "../../api/payments";
 import { amountText, priceLine, priceView } from "./price/agreedPrice";
 
 /**
@@ -1098,6 +1099,10 @@ function PaymentFact({
   const navigate = useNavigate();
   const view = paymentView(row?.paymentState ?? null);
   const invoiceId = row?.invoiceId ?? null;
+  /* The ledger's word on top of the invoice's: a transfer that waits, a partly paid visit. Silent when the server has no ledger. */
+  const ledger = useAppointmentPaymentState(appointment.id).data ?? null;
+  const waiting = ledger?.pendingPaymentId != null;
+  const left = ledger !== null && ledger.status === 'partial' && ledger.dueCzk > 0 ? ledger.dueCzk : null;
   return (
     <Box>
       <SectionLabel sx={{ mb: 0.25 }}>Platba</SectionLabel>
@@ -1108,6 +1113,9 @@ function PaymentFact({
       ) : (
         <Stack sx={{ alignItems: "flex-start", gap: 0.5 }}>
           <StatusChip tone={view.tone}>{view.label}</StatusChip>
+          {waiting && <StatusChip tone="beige" size="sm">{ledger?.pendingMethod === "Online" ? "Čeká na online platbu" : "Čeká na převod"}</StatusChip>}
+          {ledger?.needsReview && <StatusChip tone="red" size="sm">Platba ke kontrole</StatusChip>}
+          {left !== null && <Typography variant="caption" sx={{ color: "text.secondary" }}>Zbývá {formatCzk(left)}</Typography>}
           {invoiceId ? (
             <Button
               size="small"

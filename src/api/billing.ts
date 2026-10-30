@@ -182,8 +182,14 @@ export const billingApi = {
   recordPayment: async (
     invoiceId: string,
     data: { amountCzk: number; method: InvoicePaymentMethod; note?: string },
+    /* One key per opened dialog: a second click or a retry never records the money twice. */
+    idempotencyKey?: string,
   ): Promise<Invoice> => {
-    const res = await client.post(`/api/billing/invoices/${invoiceId}/payment`, data);
+    const res = await client.post(
+      `/api/billing/invoices/${invoiceId}/payment`,
+      data,
+      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
+    );
     return unwrap<Invoice>(res.data);
   },
 
