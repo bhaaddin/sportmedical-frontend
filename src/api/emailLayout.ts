@@ -20,6 +20,9 @@ const layoutSchema = z.object({
 
 const renderedSchema = z.object({ subject: z.string(), bodyHtml: z.string() });
 
+/* Whether every e-mail about a termín carries the patient's own "Změnit nebo zrušit termín" button. */
+const selfServiceSchema = z.object({ enabled: z.boolean().default(true) });
+
 export type EmailLayout = z.infer<typeof layoutSchema>;
 export type RenderedLayout = z.infer<typeof renderedSchema>;
 
@@ -37,6 +40,12 @@ export const emailLayoutApi = {
 
   save: (layout: EmailLayout): Promise<EmailLayout> =>
     request(async () => parseResponse(layoutSchema, (await client.put('/api/email-templates/layout', layout)).data)),
+
+  selfService: (): Promise<boolean> =>
+    request(async () => parseResponse(selfServiceSchema, (await client.get('/api/email-templates/self-service')).data).enabled),
+
+  saveSelfService: (enabled: boolean): Promise<boolean> =>
+    request(async () => parseResponse(selfServiceSchema, (await client.put('/api/email-templates/self-service', { enabled })).data).enabled),
 
   /** A sample e-mail in the given header and footer, before they are saved. */
   preview: (layout: EmailLayout): Promise<RenderedLayout> =>

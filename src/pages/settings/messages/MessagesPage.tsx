@@ -21,6 +21,7 @@ import { CalendarReminders } from './CalendarReminders';
 import { LayoutEditor } from './LayoutEditor';
 import { AutoRows, CustomRows, GroupLabel, TEMPLATES_KEY } from './MessageRows';
 import { NOT_DEPLOYED_TEXT, customOnly, groupBuiltIn, isNotDeployed } from './messagesModel';
+import { SelfServiceSwitch } from './SelfServiceSwitch';
 import { SendingStatus } from './SendingStatus';
 import { TemplateEditor } from './TemplateEditor';
 
@@ -97,6 +98,12 @@ export default function MessagesPage() {
       {notDeployed || !mayMessages ? null : (
       <SettingsBoard id="email-layout" title="Hlavička a patička" hint="Jak vypadá začátek a konec každého e-mailu">
         <LayoutEditor onToast={setToast} />
+      </SettingsBoard>
+      )}
+
+      {notDeployed || !mayMessages ? null : (
+      <SettingsBoard id="email-self-service" title="Změna termínu pacientem" hint="Tlačítko v e-mailu, kterým si pacient termín přesune nebo zruší">
+        <SelfServiceSwitch onToast={setToast} />
       </SettingsBoard>
       )}
 

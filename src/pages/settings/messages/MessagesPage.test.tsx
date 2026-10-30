@@ -1,6 +1,6 @@
 /* Zprávy: groups, the on/off switch, a custom message, the alarm chips, and the calm notice on a server without the endpoints. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
@@ -56,6 +56,23 @@ beforeEach(() => {
   localStorage.setItem('permissions', JSON.stringify(['communication.manage']));
   setViewport(VIEWPORTS.desktop);
   put.mockResolvedValue({ data: null });
+});
+
+describe('Změna termínu pacientem', () => {
+  it('shows the switch on and turns the patient button off with one click', async () => {
+    serve(LIST);
+    const base = get.getMockImplementation()!;
+    get.mockImplementation((url: string) => (url === '/api/email-templates/self-service'
+      ? Promise.resolve({ data: { success: true, data: { enabled: true } } })
+      : base(url)));
+    put.mockImplementation((url: string, body: unknown) => Promise.resolve({ data: { success: true, data: body } }));
+    renderPage();
+    const toggle = await screen.findByRole('switch', { name: /Pacient může termín sám změnit nebo zrušit/ });
+    await waitFor(() => expect(toggle).toBeChecked());
+    fireEvent.click(toggle);
+    await waitFor(() => expect(put).toHaveBeenCalledWith('/api/email-templates/self-service', { enabled: false }));
+    await waitFor(() => expect(toggle).not.toBeChecked());
+  });
 });
 
 describe('Zprávy', () => {
