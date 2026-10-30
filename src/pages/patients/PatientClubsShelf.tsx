@@ -5,7 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { Box, Stack, Typography } from '@mui/material';
-import { Shelf, EntityChip } from '../../ui/shelf';
+import { Shelf, EntityChip, cardSurface } from '../../ui/shelf';
 import { patientClubsApi, patientClubsKey, type PatientClubMembership } from '../../api/patientClubs';
 import { formatDateOnly } from '../../utils/time';
 
@@ -29,7 +29,7 @@ export default function PatientClubsShelf({ patientId }: { patientId: string }) 
   if (rows.length === 0) return null;
   return (
     <Shelf id="clubs" title="Kluby" count={rows.length} layout="free" stagger={false}>
-      <Stack spacing={1.25} component="ul" aria-label="Kluby pacienta" sx={{ listStyle: 'none', m: 0, p: 2 }}>
+      <Stack spacing={1.25} component="ul" aria-label="Kluby pacienta" sx={(t) => ({ ...cardSurface(t, false), listStyle: 'none', m: 0, p: 2 })}>
         {rows.map((m) => (
           <Box component="li" key={m.memberId} sx={{ opacity: m.isActive ? 1 : 0.7 }}>
             <EntityChip entity={{ kind: 'club', id: m.clubId, label: m.clubName }} />
