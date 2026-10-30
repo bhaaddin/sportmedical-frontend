@@ -55,10 +55,13 @@ export default function PayDialog({
   const [qrState, setQrState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [qrError, setQrError] = useState('');
   const key = useRef(newKey());
+  /* The body the key was last sent with: the same key only for a retry of the identical body. */
+  const sent = useRef('');
 
   useEffect(() => {
     if (invoice === null) return;
     key.current = newKey();
+    sent.current = '';
     setForm({ amount: String(invoice.remainingCzk), method: isClub(invoice) ? 'Transfer' : 'Cash', note: '' });
     setQr(null);
     setQrState('idle');
@@ -73,6 +76,9 @@ export default function PayDialog({
     setSaving(true);
     try {
       const note = form.note.trim();
+      const signature = JSON.stringify([amount, form.method, note]);
+      if (sent.current !== '' && sent.current !== signature) key.current = newKey();
+      sent.current = signature;
       await billingApi.recordPayment(
         invoice.id,
         { amountCzk: amount, method: form.method, ...(note !== '' ? { note } : {}) },

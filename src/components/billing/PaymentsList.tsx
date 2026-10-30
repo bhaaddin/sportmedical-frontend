@@ -15,8 +15,8 @@ import {
 } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { PAYMENTS_KEY, paymentsApi, usePayments, usePaymentsReconciliation } from '../../api/payments';
-import type { Payment } from '../../api/payments';
+import { PAYMENTS_KEY, paymentsApi, usePayments, usePaymentsPaged, usePaymentsReconciliation } from '../../api/payments';
+import type { Payment, PaymentFilter } from '../../api/payments';
 import type { Invoice, InvoicePaymentMethod } from '../../api/billing';
 import { toBookingError } from '../../api/apiError';
 import { FilterChips } from '../ui';
@@ -34,11 +34,12 @@ const messageOf = (error: unknown, fallback: string): string => toBookingError(e
 const methodLabel = (p: Payment): string =>
   p.method === 'Online' ? 'Online' : PAYMENT_METHOD_LABEL[p.method as InvoicePaymentMethod] ?? p.method;
 
-const matches = (p: Payment, view: View): boolean =>
-  view === 'all' ? true
-    : view === 'pending' ? p.status === 'Pending'
-      : view === 'paid' ? p.status === 'Paid'
-        : p.needsReview;
+/** The chip becomes a server-side filter, so older rows are never cut off by a page. */
+const filterOf = (view: View): PaymentFilter =>
+  view === 'pending' ? { status: 'Pending' }
+    : view === 'paid' ? { status: 'Paid' }
+      : view === 'review' ? { needsReview: true }
+        : {};
 
 /** "Vrátit": the amount (everything by default) and the reason, which is required. */
 function RefundDialog({
@@ -124,20 +125,24 @@ export default function PaymentsList({
   onOpenInvoice: (invoiceId: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const payments = usePayments({});
-  const reconciliation = usePaymentsReconciliation();
   const [view, setView] = useState<View>('all');
+  const payments = usePaymentsPaged(filterOf(view));
+  /* The chip counts come from their own one-row reads (the total), not from the loaded page. */
+  const pendingTotal = usePayments({ status: 'Pending', pageSize: 1 }).data?.total ?? 0;
+  const reviewTotal = usePayments({ needsReview: true, pageSize: 1 }).data?.total ?? 0;
+  const reconciliation = usePaymentsReconciliation();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refunding, setRefunding] = useState<Payment | null>(null);
 
-  const rows = useMemo(() => payments.data?.items ?? [], [payments.data]);
   const shown = useMemo(
-    () => rows.filter((p) => matches(p, view)).sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc)),
-    [rows, view],
+    () => (payments.data?.pages ?? []).flatMap((pg) => pg?.items ?? [])
+      .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc)),
+    [payments.data],
   );
+  const total = payments.data?.pages[0]?.total ?? shown.length;
   const numberOf = useMemo(() => new Map(invoices.map((i) => [i.id, i.invoiceNumber])), [invoices]);
-  const reviewCount = rows.filter((p) => p.needsReview).length;
-  const pendingCount = rows.filter((p) => p.status === 'Pending').length;
+  const reviewCount = reviewTotal;
+  const pendingCount = pendingTotal;
   const drift = reconciliation.data?.drift.length ?? 0;
 
   const options: FilterOption<View>[] = [
@@ -209,13 +214,25 @@ export default function PaymentsList({
 
   const note = (p: Payment) => (p.needsReview && p.reviewReason ? REVIEW_REASON[p.reviewReason] : null);
   const when = (p: Payment) => czDate(p.paidAtUtc ?? p.createdAtUtc);
-  const empty = rows.length === 0 ? 'Zatím žádné platby.' : 'V tomto výběru nejsou žádné platby.';
+  const empty = view === 'all' ? 'Zatím žádné platby.' : 'V tomto výběru nejsou žádné platby.';
+
+  const moreRow = payments.hasNextPage ? (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap', py: 1.5, flexShrink: 0 }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zobrazeno {shown.length} z {total}</Typography>
+      <Button variant="outlined" size={size} sx={btn} disabled={payments.isFetchingNextPage} onClick={() => void payments.fetchNextPage()}>
+        {payments.isFetchingNextPage ? 'Načítám…' : 'Zobrazit další'}
+      </Button>
+    </Box>
+  ) : null;
+  const failed = payments.isError && shown.length === 0 ? (
+    <Typography role="status" variant="body2" sx={{ color: 'warning.main', mb: 1.5 }}>Platby se nepodařilo načíst. Zkuste to za chvíli.</Typography>
+  ) : null;
 
   return (
     <Shelf
       id="payments"
       title="Platby"
-      count={payments.isSuccess ? shown.length : undefined}
+      count={payments.isSuccess ? total : undefined}
       layout="free"
       grow
       loading={payments.isLoading}
@@ -226,6 +243,7 @@ export default function PaymentsList({
           U {drift} {drift === 1 ? 'dokladu' : 'dokladů'} se součet plateb liší od dokladu. Zkontrolujte je.
         </Typography>
       )}
+      {failed}
       {phone ? (
         <Stack spacing={1.5}>
           {shown.length === 0 && <Typography sx={{ color: 'text.secondary', textAlign: 'center', py: 3 }}>{empty}</Typography>}
@@ -246,6 +264,7 @@ export default function PaymentsList({
               {actions(p)}
             </Paper>
           ))}
+          {moreRow}
         </Stack>
       ) : (
         <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
@@ -293,6 +312,7 @@ export default function PaymentsList({
               </TableBody>
             </Table>
           </Box>
+          {moreRow}
         </Paper>
       )}
 

@@ -3,10 +3,10 @@
    The payment ledger beside the invoices: a payment is one record with a
    method and a status; a transfer waits (Pending) until the money is seen.
    The backend (branch web/pay) may not be live yet - every read answers
-   `null` / `[]` on a 404 or a refusal, so a screen can hide the feature
+   `null` / `[]` on a 404 or 403 (other failures are thrown), so a screen can hide the feature
    instead of failing. Provider-neutral: no online provider is chosen.
    ══════════════════════════════════════════════════════════════ */
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import client from './client';
 
 export type PaymentMethod = 'Cash' | 'Card' | 'Transfer' | 'ClubBilling' | 'Online';
@@ -110,12 +110,14 @@ const unwrap = <T>(body: unknown): T => {
   return (envelope !== null && typeof envelope === 'object' && 'data' in envelope ? envelope.data : body) as T;
 };
 
-/** A read that answers `fallback` when the endpoint is not there (404), not allowed (403) or not answering. */
+/** A read that answers `fallback` only when the endpoint is not there (404) or not allowed (403); any other failure (5xx, network, 401) is thrown so the query retries and keeps its last data. */
 async function soft<T>(read: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await read();
-  } catch {
-    return fallback;
+  } catch (error) {
+    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+    if (status === 404 || status === 403) return fallback;
+    throw error;
   }
 }
 
@@ -166,6 +168,22 @@ export function usePayments(filter: PaymentFilter, enabled = true) {
   return useQuery({
     queryKey: [...PAYMENTS_KEY, 'list', filter],
     queryFn: () => paymentsApi.list(filter),
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+/** The ledger read page by page (server-side filter); `data.pages[0] === null` means "no ledger here". */
+export function usePaymentsPaged(filter: Omit<PaymentFilter, 'page'>, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: [...PAYMENTS_KEY, 'paged', filter],
+    queryFn: ({ pageParam }) => paymentsApi.list({ ...filter, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) => {
+      if (last === null) return undefined;
+      const loaded = all.reduce((n, p) => n + (p?.items.length ?? 0), 0);
+      return loaded < last.total && last.items.length > 0 ? all.length + 1 : undefined;
+    },
     enabled,
     staleTime: 15_000,
   });
