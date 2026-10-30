@@ -8,7 +8,7 @@
  * A cancelled block stays visible, muted and without actions: the history of
  * what the club had is worth more than a list that forgets.
  */
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from '@mui/material';
 import { ContentCopy, FileDownloadOutlined } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,11 +29,13 @@ import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
 import { ExportGate } from '../ui/ExportGate';
-import { EntityChip, safeLabel } from '../../ui/shelf';
 import { usePermission } from '../../auth/usePermission';
-import { LinkAthleteDialog } from './LinkAthleteDialog';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText, downloadAthletesCsv, sortAthletes } from './athleteList';
 import type { SortDirection } from './athleteList';
+
+/* Own chunks: the calendar's bundle does not carry the shelf chip or the patient picker (planner budget). */
+const AthletePatientChip = lazy(() => import('./AthletePatientChip').then((m) => ({ default: m.AthletePatientChip })));
+const LinkAthleteDialog = lazy(() => import('./LinkAthleteDialog').then((m) => ({ default: m.LinkAthleteDialog })));
 
 const mono = '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
 
@@ -55,11 +57,17 @@ export function ClubBlockPanel({
   const [dialog, setDialog] = useState<null | 'edit' | 'cancel' | RangeMode>(null);
   const root = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
-  const mayLink = usePermission('bookings.edit') && usePermission('patients.view');
+  const mayEditBookings = usePermission('bookings.edit');
+  const mayViewPatients = usePermission('patients.view');
+  const mayLink = mayEditBookings && mayViewPatients;
   const [linking, setLinking] = useState<{ id: string; name: string } | null>(null);
   const linkCell = (a: { id: string; name: string; patientId?: string; status: string }) => {
     if (a.patientId !== undefined) {
-      return <EntityChip entity={{ kind: 'patient', id: a.patientId, label: safeLabel(a.name, 'patient') || 'Pacient' }} size="sm" />;
+      return (
+        <Suspense fallback={<span>Pacient</span>}>
+          <AthletePatientChip patientId={a.patientId} name={a.name} />
+        </Suspense>
+      );
     }
     if (!mayLink || a.status === 'Cancelled') return null;
     return (
@@ -348,6 +356,7 @@ export function ClubBlockPanel({
       ) : null}
 
       {linking !== null ? (
+        <Suspense fallback={null}>
         <LinkAthleteDialog
           blockId={block.id}
           athleteId={linking.id}
@@ -359,6 +368,7 @@ export function ClubBlockPanel({
             void queryClient.invalidateQueries({ queryKey: ['club-blocks', 'detail', block.id] });
           }}
         />
+        </Suspense>
       ) : null}
 
       {dialog === 'shorten' || dialog === 'extend' ? (

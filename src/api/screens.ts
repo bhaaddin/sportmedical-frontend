@@ -12,73 +12,21 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 import client from './client';
-import { dayAppointmentListSchema } from './bookingContracts';
-import { toOrder } from './clubOrders';
 import { patientClubsKey, readPatientClubs, type PatientClubMembership } from './patientClubs';
 import { withContacts, type Patient } from './patients';
 import type { DocumentTemplate, PatientDocument } from './documents';
+import { attempt, dataOf, makeMemo, sectionsOf } from './screenCore';
+import { overviewMemo } from './overviewScreen';
 
-const BACKOFF_MS = 60_000;
-const UNSUPPORTED_MS = 10 * 60_000;
-
-type Section = { data?: unknown; error?: unknown } | null | undefined;
-
-const dataOf = (section: Section): unknown =>
-  section === null || section === undefined || typeof section !== 'object' || section.data === null ? undefined : section.data;
-
-/** What a screen route taught us about the server, remembered for this tab. */
-function makeMemo(name: string) {
-  const key = `sm.screen.${name}.unsupportedUntil`;
-  const read = (): number => {
-    try {
-      const at = Number(window.sessionStorage.getItem(key));
-      return Number.isFinite(at) ? at : 0;
-    } catch {
-      return 0;
-    }
-  };
-  let blockedUntil = read();
-  return {
-    blocked: (): boolean => Date.now() < blockedUntil,
-    reset: (): void => {
-      blockedUntil = 0;
-      try { window.sessionStorage.removeItem(key); } catch { /* nothing stored */ }
-    },
-    learn: (error: unknown): void => {
-      const response = (error as { response?: { status?: number; data?: { code?: unknown } } } | undefined)?.response;
-      const status = response?.status;
-      if (status === 401 || status === 403) return;
-      if (status === 404 && typeof response?.data?.code === 'string') return;
-      const unsupported = status === 404 || status === 405;
-      blockedUntil = Date.now() + (unsupported ? UNSUPPORTED_MS : BACKOFF_MS);
-      if (unsupported) {
-        try { window.sessionStorage.setItem(key, String(blockedUntil)); } catch { /* this load asks once more */ }
-      }
-    },
-  };
-}
+export { OVERVIEW_PERMISSION, overviewScreenBlocked, seedOverviewScreen } from './overviewScreen';
 
 const patientMemo = makeMemo('patient');
-const overviewMemo = makeMemo('overview');
 
 /** Test hook: forget what was learned about the server. */
 export function resetScreensForTests(): void {
   patientMemo.reset();
   overviewMemo.reset();
 }
-
-const sectionsOf = (body: unknown): Record<string, Section> | null => {
-  const sections = (body as { sections?: unknown } | null)?.sections;
-  return sections !== null && typeof sections === 'object' ? (sections as Record<string, Section>) : null;
-};
-
-const attempt = <T,>(run: () => T | undefined): T | undefined => {
-  try {
-    return run();
-  } catch {
-    return undefined;
-  }
-};
 
 /* ── The patient screen ── */
 
@@ -142,61 +90,3 @@ export function seedPatientClubs(queryClient: QueryClient, patientId: string, cl
   if (clubs !== undefined) queryClient.setQueryData(patientClubsKey(patientId), clubs);
 }
 
-/* ── The overview screen ── */
-
-export const OVERVIEW_PERMISSION = 'patients.view';
-
-export function overviewScreenBlocked(): boolean {
-  return overviewMemo.blocked();
-}
-
-/**
- * Seeds the owner's Přehled keys (the week, the club orders asked for, the names of today's registered patients) from one
- * request. Resolves with whether anything was seeded; never rejects. The account and the notifications keep their own readers.
- */
-export async function seedOverviewScreen(
-  queryClient: QueryClient,
-  range: { from: string; to: string; today: string },
-  options: { weekKey: readonly unknown[]; mayViewPatients: boolean },
-): Promise<boolean> {
-  if (overviewMemo.blocked()) return false;
-  try {
-    const res = await client.get('/api/v1/screens/overview', { params: { from: range.from, to: range.to, today: range.today } });
-    const sections = sectionsOf(res.data);
-    if (sections === null) return false;
-    let seeded = false;
-    const week = attempt(() => {
-      const raw = dataOf(sections.week);
-      return raw === undefined ? undefined : dayAppointmentListSchema.parse(raw);
-    });
-    if (week !== undefined) {
-      queryClient.setQueryData(options.weekKey, week);
-      seeded = true;
-    }
-    if (options.mayViewPatients) {
-      const orders = attempt(() => {
-        const raw = dataOf(sections.clubOrders);
-        return Array.isArray(raw) ? raw.map(toOrder) : undefined;
-      });
-      if (orders !== undefined) {
-        queryClient.setQueryData(['shelf', 'club-orders', 'Requested'], orders);
-        seeded = true;
-      }
-      const patients = attempt(() => {
-        const raw = dataOf(sections.patients);
-        return raw !== undefined && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : undefined;
-      });
-      if (patients !== undefined) {
-        for (const [id, dto] of Object.entries(patients)) {
-          if (dto !== null && typeof dto === 'object' && (dto as { id?: unknown }).id === id) {
-            queryClient.setQueryData(['patient', id], withContacts(dto as Patient));
-          }
-        }
-      }
-    }
-    return seeded;
-  } catch (error) {
-    overviewMemo.learn(error);
-    return false;
-  }
-}

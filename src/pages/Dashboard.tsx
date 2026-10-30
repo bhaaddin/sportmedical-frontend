@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { overviewScreenBlocked, seedOverviewScreen } from '../api/screens';
+import { overviewScreenBlocked, seedOverviewScreen } from '../api/overviewScreen';
 import { usePermission } from '../auth/usePermission';
 import type { DayAppointment } from '../api/bookingContracts';
 import DayOverviewPage from './booking/DayOverviewPage';
