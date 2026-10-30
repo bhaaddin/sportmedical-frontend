@@ -138,6 +138,8 @@ interface BookingPrefill {
   initialEnd?: string;
   initialActivityId?: string;
   initialServiceId?: string;
+  initialQuick?: boolean;
+  initialQuickDraft?: PickInGridKept['quickDraft'];
   /** The patient's card said "Objednat termín": the dialog opens with them chosen. */
   initialPatientId?: string;
   /** R17: booked into the lunch slot (`into-lunch`): the day's lunch goes, the booking comes. */
@@ -620,6 +622,9 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, columns],
   );
 
+  /* Read by the selection callback, which is created before the booking state below. */
+  const repickRef = useRef(false);
+  const bookSelectionRef = useRef<(sel: PendingSelection) => void>(() => undefined);
   const [offeredAsk, setOfferedAsk] = useState<{ club: string; orderId: string | null; x: number; y: number; go: () => void } | null>(null);
   const selection = useBoardSelection({
     boardRef,
@@ -645,6 +650,10 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         setOfferedAsk({ club: offered.clubName?.trim() || 'klub', orderId: offered.clubOrderId ?? null, x: sel.x, y: sel.y, go: () => setPending(next) });
         return;
       }
+      if (repickRef.current) {
+        bookSelectionRef.current(next);
+        return;
+      }
       setPending(next);
     },
   });
@@ -655,14 +664,19 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
      desk closes the dialog to pick another time in the grid, and goes once the booking is made or the desk cancels:
      the desk is still talking to the same person about the same thing. */
   const carried = useRef<PickInGridKept>({});
+  /* "Vybrat v kalendáři": the board is picking a new time for the booking it came from. One tap on a free place books
+     there - no menu, no blocking, no club - and the bar says for whom; "Zpět" returns to the booking as it was. */
+  const [repick, setRepick] = useState<{ label: string; back: BookingPrefill } | null>(null);
   const openBooking = useCallback((prefill: BookingPrefill) => {
     if (prefill.initialPatientId) carried.current = { ...carried.current, patientId: prefill.initialPatientId };
     const keep = carried.current;
+    setRepick(null);
     setBooking((c) => ({
       key: (c?.key ?? 0) + 1,
       prefill: {
         ...prefill,
         ...(keep.patientId ? { initialPatientId: prefill.initialPatientId ?? keep.patientId } : {}),
+        ...(keep.quickDraft && !keep.patientId ? { initialQuick: true, initialQuickDraft: keep.quickDraft } : {}),
         ...(keep.serviceId && !prefill.initialServiceId ? { initialServiceId: keep.serviceId } : {}),
         ...(keep.activityId ? { initialActivityId: keep.activityId } : {}),
       },
@@ -723,17 +737,22 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     if (after) setGapAsk({ ...ask, q: after, sel: { ...ask.sel, range: chosen } });
     else bookAt(ask.sel, chosen, ask.anchor);
   };
-  const chooseBook = () => {
-    if (!pending || !pending.calendarId) return;
+  const bookSelection = (sel: PendingSelection) => {
+    if (!sel.calendarId) return;
     const anchor = selectionAnchor();
-    const { slot, step: boardStep } = gapThresholds(pending);
-    const q = firstGapQuestion(gapBusyOf(pending), pending.range, slot, boardStep);
+    const { slot, step: boardStep } = gapThresholds(sel);
+    const q = firstGapQuestion(gapBusyOf(sel), sel.range, slot, boardStep);
     if (!q) {
-      bookAt(pending, pending.range, anchor);
+      bookAt(sel, sel.range, anchor);
       return;
     }
-    setGapAsk({ q, x: pending.x, y: pending.y, sel: pending, anchor });
+    setGapAsk({ q, x: sel.x, y: sel.y, sel, anchor });
     setPending(null);
+  };
+  repickRef.current = repick !== null;
+  bookSelectionRef.current = bookSelection;
+  const chooseBook = () => {
+    if (pending) bookSelection(pending);
   };
   const chooseBlock = () => {
     if (!pending || !pending.calendarId) return;
@@ -1450,6 +1469,23 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       <PlanFxHost />
 
       {/* ---- everything below is real-size MUI, portalled out of the stage ---- */}
+      {repick ? (
+        <Paper
+          role="status"
+          data-testid="repick-bar"
+          elevation={8}
+          sx={{
+            position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1400,
+            display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1, borderRadius: 3,
+            maxWidth: 'calc(100vw - 24px)', border: '1px solid', borderColor: 'primary.main',
+          }}
+        >
+          <span style={{ fontSize: 14, lineHeight: 1.3 }}>
+            Klepněte na nový čas{repick.label ? <> pro <b>{repick.label}</b></> : null}
+          </span>
+          <Button size="small" sx={{ minHeight: 44, flexShrink: 0 }} onClick={() => openBooking(repick.back)}>Zpět</Button>
+        </Paper>
+      ) : null}
       <SelectionPopover
         anchor={pending ? { x: pending.x, y: pending.y } : null}
         title={pending ? spanLabel(pending.range) : ''}
@@ -1677,12 +1713,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         <NewAppointmentDialog
           key={booking.key}
           open
-          onClose={() => { carried.current = {}; setBooking(null); }}
+          onClose={() => { carried.current = {}; setRepick(null); setBooking(null); }}
           onBooked={() => { carried.current = {}; void refreshCalendar(); }}
           onPickInGrid={(kept) => {
             carried.current = { ...carried.current, ...kept };
+            setRepick({ label: kept.label ?? '', back: booking.prefill });
             setBooking(null);
-            showNotice({ text: carried.current.patientId ? 'Vyberte v kalendáři jiný čas. Pacient zůstane vybraný.' : 'Vyberte v kalendáři jiný čas. Co jste vybrali, zůstane.', tone: 'info' });
           }}
           onFindNextFree={nextFree.findForDialog}
           {...booking.prefill}

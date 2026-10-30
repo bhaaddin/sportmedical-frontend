@@ -34,7 +34,7 @@ vi.mock('../components/booking/NewAppointmentDialog', () => ({
   NewAppointmentDialog: (props: Record<string, unknown>) => (
     <div role="dialog" aria-label="Nová objednávka" data-testid="new-appointment" data-props={JSON.stringify(props)}>
       <button type="button" onClick={() => (props.onPickInGrid as (kept: object) => void)({})}>Vybrat v kalendáři</button>
-      <button type="button" onClick={() => (props.onPickInGrid as (kept: object) => void)({ patientId: 'p7', serviceId: 's2', activityId: 'a2' })}>Vybrat v kalendáři s výběrem</button>
+      <button type="button" onClick={() => (props.onPickInGrid as (kept: object) => void)({ patientId: 'p7', serviceId: 's2', activityId: 'a2', label: 'Jan Novák · Komplexní' })}>Vybrat v kalendáři s výběrem</button>
       <button type="button" onClick={props.onClose as () => void}>Zrušit</button>
     </div>
   ),
@@ -308,10 +308,13 @@ describe('/planovani takes what other screens hand over by router state', () => 
     mount({ state: { newAppointment: 3, patientId: 'p9' } });
     fireEvent.click(within(await screen.findByTestId('new-appointment', undefined, { timeout: 3000 })).getByRole('button', { name: 'Vybrat v kalendáři' }));
     await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
+    /* Picking a new time: one tap books there - no menu with Zablokovat / klub in between. */
+    expect(screen.getByTestId('repick-bar')).toBeInTheDocument();
     drag(3, 13 * 60, 14 * 60);
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    expect(screen.queryByRole('menuitem', { name: /Zablokovat/ })).toBeNull();
     const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
     expect(props).toMatchObject({ initialPatientId: 'p9', initialStart: '2026-12-10T13:00' });
+    expect(screen.queryByTestId('repick-bar')).toBeNull();
 
     fireEvent.click(within(screen.getByTestId('new-appointment')).getByRole('button', { name: 'Zrušit' }));
     await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
@@ -327,10 +330,19 @@ describe('/planovani takes what other screens hand over by router state', () => 
     fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
     fireEvent.click(within(await screen.findByTestId('new-appointment')).getByRole('button', { name: 'Vybrat v kalendáři s výběrem' }));
     await waitFor(() => expect(screen.queryByTestId('new-appointment')).toBeNull());
+    expect(screen.getByTestId('repick-bar')).toHaveTextContent('Jan Novák · Komplexní');
     drag(3, 13 * 60, 14 * 60);
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
     const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
     expect(props).toMatchObject({ initialPatientId: 'p7', initialServiceId: 's2', initialActivityId: 'a2' });
+  });
+
+  it('"Zpět" on the picking bar returns to the booking as it was', async () => {
+    mount({ state: { newAppointment: 4, patientId: 'p9' } });
+    const before = JSON.parse((await screen.findByTestId('new-appointment', undefined, { timeout: 3000 })).dataset.props!);
+    fireEvent.click(within(screen.getByTestId('new-appointment')).getByRole('button', { name: 'Vybrat v kalendáři' }));
+    fireEvent.click(within(await screen.findByTestId('repick-bar')).getByRole('button', { name: 'Zpět' }));
+    const after = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
+    expect(after).toMatchObject({ initialPatientId: 'p9', initialStart: before.initialStart, initialCalendarId: before.initialCalendarId });
   });
 
   it('a link to one termín (state.appointmentId) opens it', async () => {

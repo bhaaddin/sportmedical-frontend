@@ -71,7 +71,7 @@ import {
 import { QuickBookedPanel, type QuickBookedView } from "./quick/QuickBookedPanel";
 import { completionUrl, formatDeadline } from "./quick/quickBooking";
 import { usePatientCard } from "./patient/patientCard";
-import { toHit, type PatientHit } from "./patient/patientTypeahead";
+import { displayName, toHit, type PatientHit } from "./patient/patientTypeahead";
 import { patientsApi } from "../../api/patients";
 import {
   EMPTY_QUICK_DRAFT,
@@ -244,6 +244,10 @@ export interface PickInGridKept {
   patientId?: string;
   serviceId?: string;
   activityId?: string;
+  /** A new caller's facts typed in "Rychlá registrace", so nothing has to be typed twice. */
+  quickDraft?: QuickPatientDraft;
+  /** Who and what, in words, for the calendar's "Vyberte nový čas pro …" bar. */
+  label?: string;
 }
 
 interface NewAppointmentDialogProps {
@@ -277,6 +281,8 @@ interface NewAppointmentDialogProps {
    * quick-registration mode, with the činnost already chosen when one is given.
    */
   initialQuick?: boolean;
+  /** The new caller's facts kept across "Vybrat v kalendáři". */
+  initialQuickDraft?: QuickPatientDraft;
   initialActivityId?: string;
   /**
    * The služba the caller had chosen ("Nová objednávka" starts with one). The
@@ -332,6 +338,7 @@ export function NewAppointmentDialog({
   initialEnd,
   initialPatientId,
   initialQuick = false,
+  initialQuickDraft,
   initialActivityId,
   initialServiceId,
   intoLunch = false,
@@ -379,7 +386,8 @@ export function NewAppointmentDialog({
   const [onSiteConsents, setOnSiteConsents] = useState<OnSiteConsentSelection>(EMPTY_ON_SITE_CONSENTS);
   const [quick, setQuick] = useState<QuickPatientDraft>(() => ({
     ...EMPTY_QUICK_DRAFT,
-    activityId: initialActivityId ?? "",
+    ...initialQuickDraft,
+    activityId: initialActivityId ?? initialQuickDraft?.activityId ?? "",
   }));
   const [eventName, setEventName] = useState("");
   /* What the desk sees once a quick registration went through. */
@@ -1085,10 +1093,16 @@ export function NewAppointmentDialog({
   const pickInGrid = () => {
     setChangeAnchor(null);
     const keptActivity = mode === "quick" ? quick.activityId : activityId;
+    const who = mode === "database" && patient !== null
+      ? displayName(patient)
+      : mode === "quick" ? quick.name.trim() : "";
+    const what = activities.find((a) => a.id === keptActivity)?.name ?? "";
     const kept: PickInGridKept = {
       ...(mode === "database" && patient !== null ? { patientId: patient.id } : {}),
+      ...(mode === "quick" ? { quickDraft: quick } : {}),
       ...(pickedServiceId !== "" ? { serviceId: pickedServiceId } : {}),
       ...(keptActivity ? { activityId: keptActivity } : {}),
+      ...(who || what ? { label: [who, what].filter(Boolean).join(" · ") } : {}),
     };
     resetBooking();
     if (onPickInGrid) onPickInGrid(kept);
