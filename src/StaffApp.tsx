@@ -70,6 +70,7 @@ const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage
 const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTemplatesPage'));
 const MessagesPage = lazy(() => import('./pages/settings/messages/MessagesPage'));
+const OutboxPage = lazy(() => import('./pages/settings/outbox/OutboxPage'));
 const TwoFactorPage = lazy(() => import('./pages/settings/TwoFactorPage'));
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
@@ -504,6 +505,7 @@ export default function StaffApp() {
           <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
           <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
           <Route path="/nastaveni/zpravy" element={<RequirePermission of={MESSAGES_PERMISSIONS}><MessagesPage /></RequirePermission>} />
+          <Route path="/nastaveni/fronta-emailu" element={<RequirePermission of="settings.clinic.manage"><OutboxPage /></RequirePermission>} />
           {/* Šablony, E-mail and Připomínky became one screen, Zprávy; the old addresses keep working. */}
           {['sablony-emailu', 'email', 'pripominky'].map((old) => (
             <Route key={old} path={`/nastaveni/${old}`} element={<Navigate to="/nastaveni/zpravy" replace />} />

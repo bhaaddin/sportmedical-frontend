@@ -55,8 +55,8 @@ describe('the router asks for the permission the menu lists', () => {
 describe('who sees what in the second half of Nastavení', () => {
   const OPEN_TO_EVERYBODY = ['hodnoceni-pacientu', 'dvoufazove'];
 
-  it('shows an owner (every permission) all 19 screens', () => {
-    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(19);
+  it('shows an owner (every permission) all 20 screens', () => {
+    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(20);
     expect(idsFor(ALL_PERMISSIONS)).toEqual(myItems.map((x) => x.item.id).sort());
   });
 
@@ -72,11 +72,11 @@ describe('who sees what in the second half of Nastavení', () => {
     expect(idsFor([permission])).toEqual([...OPEN_TO_EVERYBODY, ...extra].sort());
   });
 
-  it('settings.clinic.manage opens the 14 administration screens, Zprávy (reminders, sending) and neither single-permission one', () => {
+  it('settings.clinic.manage opens the 15 administration screens, Zprávy (reminders, sending) and neither single-permission one', () => {
     const ids = idsFor(['settings.clinic.manage']);
-    expect(ids).toHaveLength(17);
+    expect(ids).toHaveLength(18);
     for (const closed of ['zdravotni-dotaznik', 'tym']) expect(ids).not.toContain(closed);
-    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy', 'zpravy']) {
+    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy', 'zpravy', 'fronta-emailu']) {
       expect(ids).toContain(open);
     }
   });
