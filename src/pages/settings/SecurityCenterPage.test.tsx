@@ -487,7 +487,7 @@ describe('who sees it at all', () => {
     expect(idsFor([])).not.toContain('zabezpeceni-zalohy');
     expect(idsFor(['users.manage'])).not.toContain('zabezpeceni-zalohy');
     expect(idsFor(['settings.clinic.manage'])).toContain('zabezpeceni-zalohy');
-    expect(SETTINGS_SECTIONS.find((s) => s.items.some((i) => i.id === 'zabezpeceni-zalohy'))?.id).toBe('system');
+    expect(SETTINGS_SECTIONS.find((s) => s.items.some((i) => i.id === 'zabezpeceni-zalohy'))?.id).toBe('administrace');
   });
 
   it('is found by what a person would type', () => {

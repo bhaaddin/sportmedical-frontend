@@ -1,23 +1,37 @@
 import type { Permission } from '../../auth/usePermission';
 
 /*
- * What sits in Nastavení, as data rather than as markup.
+ * What sits in Nastavení and Administrace, as data rather than as markup.
  *
  * Kept apart from the screen so the shape can be checked without a browser:
  * that nothing is listed twice, that every destination is a route that exists,
  * and - the one that matters - that nothing dead is offered.
  *
- * Three levels, never more (Matko's decision 2, Etapa 2): the hub (/settings),
- * a group (/settings/:group) and one item (its own route). The groups are the
- * Etapa 2 brief's, in its order: Provoz, Služby a ceny, Kluby, Komunikace,
- * Dokumenty, Vzhled webu, Systém. The same list draws the settings sidebar the
- * shell shows, the tiles of the hub, the rows of a group page and the search.
+ * Two areas (Matko, 1. 11. 2026: "Nastavení je moc složité"):
+ *  - daily   Nastavení (/nastaveni): one plain page. The `common` screens are listed directly under four headings
+ *            (Provoz, Služby a ceny, Komunikace a dokumenty, Kluby); the rest of the daily screens sit in one
+ *            collapsed list; "Můj účet a zabezpečení" is the row on top and is for everybody.
+ *  - admin   Administrace (/administrace): users and rights, security, the clinic's own data, the public site,
+ *            the connections and the records of what changed. Seen ONLY by somebody who may manage users or the
+ *            clinic (`canSeeAdmin`): no menu entry, no search hit, and a direct address is the normal "no access".
+ *
+ * ONE list: the area and the `common` flag are fields of the item, not a second list. Every older address keeps
+ * working (`to` and `aliases`; /settings and /settings/:group redirect to the right area - `areaPath`).
  *
  * Where the brief named two items for one screen (Hromadné objednávky + Blokace
  * pro kluby, SMS a e-maily + Šablony zpráv, Uživatelé a práva + Tým +
  * Zaměstnanci) they are ONE honest item here - a second row to the same screen
  * is the "looks the same and shows nothing new" complaint again.
  */
+
+/** Which of the two pages an item lives on. */
+export type SettingsArea = 'daily' | 'admin';
+
+/** Seeing the Administrace at all needs ANY of these (the server asks for the same on its screens). */
+export const ADMIN_PERMISSIONS: readonly Permission[] = ['users.manage', 'settings.clinic.manage'];
+
+/** The id of the row on top of Nastavení. */
+export const ACCOUNT_ITEM_ID = 'dvoufazove';
 
 /** The icon a group tile wears - a name, resolved to a component by the hub. */
 export type SettingsGroupIcon =
@@ -30,6 +44,10 @@ export type SettingsGroupIcon =
   | 'system';
 
 export interface SettingsItem {
+  /** Nastavení (daily) or Administrace (admin). Set from the section. */
+  area: SettingsArea;
+  /** Shown directly on the Nastavení page (the rest of the daily screens sit in "Další nastavení"). */
+  common?: boolean;
   /** Stable id - used for the open/closed memory and for tests. */
   id: string;
   label: string;
@@ -79,6 +97,7 @@ export interface SettingsItem {
 
 export interface SettingsSection {
   id: string;
+  area: SettingsArea;
   label: string;
   /** What this whole group is for, in the words somebody would use. */
   description: string;
@@ -86,7 +105,12 @@ export interface SettingsSection {
   items: SettingsItem[];
 }
 
-export const SETTINGS_SECTIONS: SettingsSection[] = [
+
+/** An item as written in the list below; `area` is filled in from its section. */
+type RawItem = Omit<SettingsItem, 'area'>;
+type RawSection = Omit<SettingsSection, 'items' | 'area'> & { area: SettingsArea; items: RawItem[] };
+
+const RAW_SECTIONS: RawSection[] = [
   {
     /*
      * Running the week, first: the hours, the pauses, the days the clinic is
@@ -94,12 +118,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
      * themselves and the clinic's own details.
      */
     id: 'provoz',
+    area: 'daily',
     label: 'Provoz',
     description: 'Kdy se pracuje, kdy ne, jak se kreslí kalendář a kdo je ordinace',
     icon: 'provoz',
     items: [
       {
         id: 'pracovni-doba',
+        common: true,
         label: 'Otevírací doba',
         description: 'Hodiny podle dnů v týdnu, obědová pauza, kdo slouží a co se který den dělá',
         to: '/working-hours',
@@ -114,6 +140,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
          * everybody signed in, as blocking time is.
          */
         id: 'blokovany-cas',
+        common: true,
         label: 'Pauzy a přestávky',
         description: 'Jednorázové pauzy a blokovaný čas — servis přístroje, porada, školení; pravidelný oběd je v otevírací době',
         to: '/blokovany-cas',
@@ -126,6 +153,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
          * day. Somebody looking for "why is that Monday shut" wants this first.
          */
         id: 'svatky',
+        common: true,
         label: 'Svátky a dovolené',
         description: 'Státní svátky, dny kdy přesto pracujeme, a vlastní volno ordinace',
         to: '/svatky',
@@ -134,6 +162,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         id: 'nepritomnosti',
+        common: true,
         label: 'Nepřítomnost zaměstnanců',
         description: 'Dovolená, nemoc, školení — kdy kdo chybí',
         to: '/nepritomnosti',
@@ -174,19 +203,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         id: 'kalendare',
+        common: true,
         label: 'Kalendáře',
         description: 'Seznam kalendářů, kdo do kterého vidí, období a pracovní doba',
         to: '/calendars',
         keywords: ['kalendář', 'kalendáře', 'viditelnost', 'kdo vidí', 'období', 'cyklus'],
-        requires: 'settings.clinic.manage',
-      },
-      {
-        /* Who the clinic is: name, contacts, what the public sees. */
-        id: 'verejny-web',
-        label: 'Údaje ordinace',
-        description: 'Název, adresa, telefon, firemní údaje a co se ukazuje pacientům',
-        to: '/admin',
-        keywords: ['ordinace', 'název', 'adresa', 'telefon', 'faktura', 'ičo', 'dič', 'plátce dph', 'firemní údaje', 'fakturační údaje', 'web', 'veřejný web', 'logo', 'kontakt'],
         requires: 'settings.clinic.manage',
       },
     ],
@@ -198,12 +219,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
      * row, not two rows to one screen.
      */
     id: 'sluzby-a-ceny',
+    area: 'daily',
     label: 'Služby a ceny',
     description: 'Co ordinace nabízí, jak dlouho to trvá, co to stojí a jakou barvu to má',
     icon: 'sluzby',
     items: [
       {
         id: 'sluzby',
+        common: true,
         label: 'Služby',
         description: 'Co ordinace dělá — činnosti patří pod službu a kalendář službu provozuje',
         to: '/nastaveni/sluzby',
@@ -220,6 +243,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         id: 'cenik',
+        common: true,
         label: 'Ceník',
         description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
         to: '/nastaveni/cenik',
@@ -249,49 +273,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
   {
     /*
-     * The clubs' side of the configuration: the time held for them, the links
-     * their athletes register through and the rules of those links.
+     * What the clinic says to people and what the patient fills in and signs. Templates, the clinic's own messages, the
+     * calendar file, the reminder and the sending status are ONE screen, Zprávy (it replaced Šablony, E-mail and
+     * Připomínky; their addresses are aliases). The e-mail queue is administration (see below).
      */
-    id: 'kluby',
-    label: 'Kluby',
-    description: 'Hromadné objednávky pro kluby, odkazy pro jejich sportovce a pravidla kolem nich',
-    icon: 'kluby',
-    items: [
-      {
-        /*
-         * One item for the two names the brief gave it: "Hromadné objednávky"
-         * and "Blokace pro kluby" are the same screen (PartnerOrdersPage),
-         * which the club work extends with the block calculator.
-         */
-        id: 'blokace-klubu',
-        label: 'Hromadné objednávky a blokace',
-        description: 'Časy držené pro klub, registrační odkazy pro sportovce a lhůty, kdy se místa uvolní',
-        to: '/vyhrazeni',
-        keywords: ['klub', 'kluby', 'hromadná objednávka', 'hromadné', 'blokace', 'blokace pro kluby', 'registrační odkaz', 'odkaz pro sportovce', 'vyhrazení', 'držená místa', 'lhůta', 'faktura klubu', 'plátce'],
-      },
-      {
-        id: 'nastaveni-klubu',
-        label: 'Nastavení klubů',
-        description: 'Jak dlouho platí registrační odkaz klubu a od kolika sportovců se upozorňuje na malou skupinu',
-        to: '/nastaveni/kluby',
-        scope: 'clubs',
-        keywords: ['klub', 'kluby', 'platnost odkazu', 'registrační odkaz', 'minimální počet', 'sportovci', 'dny'],
-        requires: 'settings.clinic.manage',
-      },
-    ],
-  },
-  {
-    /*
-     * What the clinic says to people. Templates, the clinic's own messages, the calendar file, the reminder and the
-     * sending status are ONE screen, Zprávy (it replaced Šablony, E-mail and Připomínky; their addresses are aliases).
-     */
-    id: 'komunikace',
-    label: 'Komunikace',
-    description: 'Zprávy, které ordinace připravuje pro pacienty a personál, a kdy se mají připomínat',
+    id: 'komunikace-a-dokumenty',
+    area: 'daily',
+    label: 'Komunikace a dokumenty',
+    description: 'Zprávy pacientům a klubům, dotazník, souhlasy a to, co pacient dokládá',
     icon: 'komunikace',
     items: [
       {
         id: 'zpravy',
+        common: true,
         label: 'Zprávy',
         description: 'E-maily pacientům a klubům: zapnout, upravit nebo napsat vlastní, upozornění v kalendáři, připomínky a odesílání',
         to: '/nastaveni/zpravy',
@@ -301,15 +295,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace', 'vlastní zpráva', 'hromadná zpráva', 'posun dne', 'hráči', 'kalendář', 'alarm', 'smtp', 'brevo', 'odesílání', 'poskytovatel', 'spf', 'dkim', 'dmarc', 'doména', 'zkušební e-mail', 'fronta', 'připomínka', 'připomenutí', 'upomínka', 'hodin před termínem'],
       },
       {
-        id: 'fronta-emailu',
-        label: 'Fronta e-mailů',
-        description: 'Které e-maily čekají, odešly nebo selhaly; selhané jde odeslat znovu nebo zrušit',
-        to: '/nastaveni/fronta-emailu',
-        scope: null,
-        requires: 'settings.clinic.manage',
-        keywords: ['fronta', 'e-maily', 'email', 'neodešlo', 'selhalo', 'odeslat znovu', 'zrušit odeslání', 'odchozí pošta', 'outbox'],
-      },
-      {
         id: 'hodnoceni-pacientu',
         label: 'Hodnocení pacientů',
         description: 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nezveřejňuje',
@@ -317,14 +302,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         scope: null,
         keywords: ['hodnocení', 'recenze', 'zpětná vazba', 'feedback', 'spokojenost', 'hvězdičky'],
       },
-    ],
-  },
-  {
-    id: 'dokumenty',
-    label: 'Dokumenty',
-    description: 'Co pacient vyplňuje, podepisuje a dokládá — dotazník, souhlasy, šablony a pravidla',
-    icon: 'dokumenty',
-    items: [
       {
         /*
          * The questions a patient actually answers. They lived in the browser
@@ -332,6 +309,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
          * deploy. This is the screen that ended that.
          */
         id: 'zdravotni-dotaznik',
+        common: true,
         label: 'Vstupní dotazník',
         description: 'Dotazníky pro pacienty — nový dotazník, otázky, zapnutí a vypnutí a který je výchozí',
         to: '/dotaznik-nastaveni',
@@ -341,24 +319,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         /*
-         * Only the marketing consent is the clinic's own to show or hide and
-         * to word. The treatment consent (zákon) and the per-činnost
-         * report/club consents are not a screen's to switch off.
-         */
-        id: 'souhlasy',
-        label: 'Souhlasy a GDPR',
-        description: 'Marketingový souhlas na objednávkovém formuláři — zda se ukáže a jak zní; zákonné souhlasy zůstávají vždy zapnuté',
-        to: '/nastaveni/souhlasy',
-        scope: 'consent',
-        keywords: ['souhlas', 'gdpr', 'marketing', 'marketingový souhlas', 'podpis', 'objednávkový formulář', 'newsletter'],
-        requires: 'settings.clinic.manage',
-      },
-      {
-        /*
          * Above the rules, because a rule points at one of these and the
          * owner met them in the wrong order.
          */
         id: 'dokumenty-sablony',
+        common: true,
         label: 'Dokumenty, šablony a hlavičky',
         description: 'Druhy dokumentů, které ordinace vede — název, popis a co se používá',
         to: '/dokumenty-sablony',
@@ -411,35 +376,72 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
-    id: 'vzhled-webu',
-    label: 'Vzhled webu',
-    description: 'Texty, fotky a videa veřejného webu a kam se nahrávají',
-    icon: 'web',
+    /*
+     * The clubs' side of the configuration: the time held for them, the links
+     * their athletes register through and the rules of those links.
+     */
+    id: 'kluby',
+    area: 'daily',
+    label: 'Kluby',
+    description: 'Hromadné objednávky pro kluby, odkazy pro jejich sportovce a pravidla kolem nich',
+    icon: 'kluby',
     items: [
       {
-        id: 'media-a-texty',
-        label: 'Média a texty',
-        description: 'Texty, fotky a videa na veřejném webu, partneři a časté dotazy — vše bez zásahu do kódu',
-        to: '/nastaveni/media-a-texty',
-        scope: null,
-        keywords: ['web', 'texty', 'fotky', 'video', 'obrázky', 'partneři', 'faq', 'časté dotazy', 'úvodní stránka', 'obsah'],
-        requires: 'settings.clinic.manage',
+        /*
+         * One item for the two names the brief gave it: "Hromadné objednávky"
+         * and "Blokace pro kluby" are the same screen (PartnerOrdersPage),
+         * which the club work extends with the block calculator.
+         */
+        id: 'blokace-klubu',
+        label: 'Hromadné objednávky a blokace',
+        description: 'Časy držené pro klub, registrační odkazy pro sportovce a lhůty, kdy se místa uvolní',
+        to: '/vyhrazeni',
+        keywords: ['klub', 'kluby', 'hromadná objednávka', 'hromadné', 'blokace', 'blokace pro kluby', 'registrační odkaz', 'odkaz pro sportovce', 'vyhrazení', 'držená místa', 'lhůta', 'faktura klubu', 'plátce'],
       },
       {
-        id: 'uloziste-medii',
-        label: 'Úložiště médií',
-        description: 'Kam se nahrávají fotky a videa — přístupové údaje k úložišti a zda je zapnuté',
-        to: '/nastaveni/uloziste-medii',
-        scope: 'media',
-        keywords: ['cloudinary', 'úložiště', 'média', 'nahrávání', 'fotky', 'video', 'klíč', 'cloud'],
+        id: 'nastaveni-klubu',
+        common: true,
+        label: 'Nastavení klubů',
+        description: 'Jak dlouho platí registrační odkaz klubu a od kolika sportovců se upozorňuje na malou skupinu',
+        to: '/nastaveni/kluby',
+        scope: 'clubs',
+        keywords: ['klub', 'kluby', 'platnost odkazu', 'registrační odkaz', 'minimální počet', 'sportovci', 'dny'],
         requires: 'settings.clinic.manage',
       },
     ],
   },
   {
-    id: 'system',
-    label: 'Systém',
-    description: 'Kdo smí co, jak je účet chráněný, napojení na jiné systémy a co se kdy změnilo',
+    /* Personal, not administrative: every signed-in user secures their own account here. */
+    id: 'ucet',
+    area: 'daily',
+    label: 'Můj účet',
+    description: 'Vaše heslo, dvoufázové ověření a přihlášená zařízení',
+    icon: 'system',
+    items: [
+      {
+        /*
+         * Personal, not administrative: every signed-in user secures their
+         * own account here, so no `requires`.
+         */
+        id: 'dvoufazove',
+        label: 'Můj účet a zabezpečení',
+        description: 'Dvoufázové ověření, přihlášená zařízení a odhlášení všude jinde',
+        to: '/nastaveni/zabezpeceni',
+        scope: null,
+        keywords: ['moje heslo', 'heslo', 'relace', 'zařízení', 'odhlásit', '2fa', 'dvoufázové', 'dvoufaktorové', 'přihlášení', 'ověření', 'kód', 'authenticator', 'bezpečnost', 'účet'],
+      },
+    ],
+  },
+  {
+    /*
+     * Administration: who may do what, how the account is protected, the clinic's own data, the public site, the
+     * connections and the records of what changed. Shown only to somebody who may manage users or the clinic
+     * (`canSeeAdmin`); the rest of the app does not mention it.
+     */
+    id: 'administrace',
+    area: 'admin',
+    label: 'Administrace',
+    description: 'Uživatelé a práva, zabezpečení, údaje ordinace, web, napojení a záznamy změn',
     icon: 'system',
     items: [
       {
@@ -458,16 +460,22 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'users.manage',
       },
       {
-        /*
-         * Personal, not administrative: every signed-in user secures their
-         * own account here, so no `requires`.
-         */
-        id: 'dvoufazove',
-        label: 'Zabezpečení',
-        description: 'Dvoufázové ověření — chraňte svůj účet jednorázovým kódem z ověřovací aplikace',
-        to: '/nastaveni/zabezpeceni',
+        id: 'zabezpeceni-zalohy',
+        label: 'Zabezpečení a zálohy',
+        description: 'Skutečný stav záloh, účtů a prostředí; odhlášení lidí, klíče pro hlášení záloh, export konfigurace a návod k obnově',
+        to: '/nastaveni/zabezpeceni-a-zalohy',
         scope: null,
-        keywords: ['heslo', '2fa', 'dvoufázové', 'dvoufaktorové', 'přihlášení', 'ověření', 'kód', 'authenticator', 'bezpečnost', 'účet'],
+        keywords: ['záloha', 'zálohy', 'zálohování', 'obnova', 'backup', 'restore', 'bezpečnost', '2fa', 'dvoufázové', 'odhlásit', 'klíč', 'šifrování', 'gdpr', 'únik'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'bezpecnostni-pravidla',
+        label: 'Bezpečnostní pravidla',
+        description: 'Zda se má administrace znovu potvrzovat heslem, vyžadovat dvoufázové ověření nebo se po nečinnosti zamknout',
+        to: '/nastaveni/bezpecnostni-pravidla',
+        scope: 'security',
+        keywords: ['bezpečnost', 'pravidla', 'potvrdit heslem', 'znovu potvrdit', 'dvoufázové', '2fa', 'zamknout', 'nečinnost', 'uzamčení', 'administrace', 'heslo'],
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'firma-a-faktury',
@@ -479,6 +487,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        /* Who the clinic is: name, contacts, what the public sees. */
+        id: 'verejny-web',
+        label: 'Údaje ordinace',
+        description: 'Název, adresa, telefon, firemní údaje a co se ukazuje pacientům',
+        to: '/admin',
+        keywords: ['ordinace', 'název', 'adresa', 'telefon', 'faktura', 'ičo', 'dič', 'plátce dph', 'firemní údaje', 'fakturační údaje', 'web', 'veřejný web', 'logo', 'kontakt'],
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'integrace',
         label: 'Integrace',
         description: 'Napojení na ADAM — adresa, uživatel a heslo; MEDISTAR je ukončen',
@@ -486,6 +503,47 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         scope: 'integrations',
         keywords: ['adam', 'medistar', 'napojení', 'integrace', 'api', 'přihlašovací údaje', 'zařízení', 'přístroj'],
         requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'media-a-texty',
+        label: 'Média a texty',
+        description: 'Texty, fotky a videa na veřejném webu, partneři a časté dotazy — vše bez zásahu do kódu',
+        to: '/nastaveni/media-a-texty',
+        scope: null,
+        keywords: ['web', 'texty', 'fotky', 'video', 'obrázky', 'partneři', 'faq', 'časté dotazy', 'úvodní stránka', 'obsah'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'uloziste-medii',
+        label: 'Úložiště médií',
+        description: 'Kam se nahrávají fotky a videa — přístupové údaje k úložišti a zda je zapnuté',
+        to: '/nastaveni/uloziste-medii',
+        scope: 'media',
+        keywords: ['cloudinary', 'úložiště', 'média', 'nahrávání', 'fotky', 'video', 'klíč', 'cloud'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        /*
+         * Only the marketing consent is the clinic's own to show or hide and
+         * to word. The treatment consent (zákon) and the per-činnost
+         * report/club consents are not a screen's to switch off.
+         */
+        id: 'souhlasy',
+        label: 'Souhlasy a GDPR',
+        description: 'Marketingový souhlas na objednávkovém formuláři — zda se ukáže a jak zní; zákonné souhlasy zůstávají vždy zapnuté',
+        to: '/nastaveni/souhlasy',
+        scope: 'consent',
+        keywords: ['souhlas', 'gdpr', 'marketing', 'marketingový souhlas', 'podpis', 'objednávkový formulář', 'newsletter'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'fronta-emailu',
+        label: 'Fronta e-mailů',
+        description: 'Které e-maily čekají, odešly nebo selhaly; selhané jde odeslat znovu nebo zrušit',
+        to: '/nastaveni/fronta-emailu',
+        scope: null,
+        requires: 'settings.clinic.manage',
+        keywords: ['fronta', 'e-maily', 'email', 'neodešlo', 'selhalo', 'odeslat znovu', 'zrušit odeslání', 'odchozí pošta', 'outbox'],
       },
       {
         id: 'historie-zmen',
@@ -506,15 +564,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
-        id: 'zabezpeceni-zalohy',
-        label: 'Zabezpečení a zálohy',
-        description: 'Skutečný stav záloh, účtů a prostředí; odhlášení lidí, klíče pro hlášení záloh, export konfigurace a návod k obnově',
-        to: '/nastaveni/zabezpeceni-a-zalohy',
-        scope: null,
-        keywords: ['záloha', 'zálohy', 'zálohování', 'obnova', 'backup', 'restore', 'bezpečnost', '2fa', 'dvoufázové', 'odhlásit', 'klíč', 'šifrování', 'gdpr', 'únik'],
-        requires: 'settings.clinic.manage',
-      },
-      {
         id: 'zdravi',
         label: 'Zdraví systému',
         description: 'Chyby, přihlášená zařízení a stav služeb',
@@ -527,12 +576,28 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
 ];
 
+/** Every section, each item stamped with its section's area. */
+export const SETTINGS_SECTIONS: SettingsSection[] = RAW_SECTIONS.map((section) => ({
+  ...section,
+  items: section.items.map((item) => ({ ...item, area: section.area })),
+}));
+
+/** May this person see the Administrace at all? Nobody else is told it exists. */
+export function canSeeAdmin(held: ReadonlySet<string> | readonly string[]): boolean {
+  const has = held instanceof Set ? (p: string) => held.has(p) : (p: string) => (held as readonly string[]).includes(p);
+  return ADMIN_PERMISSIONS.some(has);
+}
+
 /**
- * The settings this person may actually open.
+ * The settings this person may actually open, optionally of one area.
  *
  * Takes the effective permissions the SERVER sent at sign-in: the role's
  * defaults with that person's own grants and revocations already applied. The
  * Owner holds every permission, so the Owner sees every item.
+ *
+ * The Administrace is one more gate on top of an item's own: without
+ * `users.manage` or `settings.clinic.manage` NONE of its items is returned, so
+ * no menu, search or palette built from this ever mentions it.
  *
  * A section left with nothing in it disappears rather than standing empty — a
  * heading over no rows reads like a screen that failed to load.
@@ -542,17 +607,22 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
  */
 export function visibleSections(
   held: ReadonlySet<string> | readonly string[],
+  area?: SettingsArea,
 ): SettingsSection[] {
   const permissions = held instanceof Set ? held : new Set(held);
+  const admin = canSeeAdmin(permissions);
 
-  return SETTINGS_SECTIONS.map((section) => ({
-    ...section,
-    items: section.items.filter(
-      (item) =>
-        (item.requires === undefined || permissions.has(item.requires)) &&
-        (item.requiresAny === undefined || item.requiresAny.some((p) => permissions.has(p))),
-    ),
-  })).filter((section) => section.items.length > 0);
+  return SETTINGS_SECTIONS
+    .filter((section) => (area === undefined || section.area === area) && (section.area !== 'admin' || admin))
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) =>
+          (item.requires === undefined || permissions.has(item.requires)) &&
+          (item.requiresAny === undefined || item.requiresAny.some((p) => permissions.has(p))),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 }
 
 /**
@@ -657,15 +727,31 @@ export function allDestinations(): string[] {
   return SETTINGS_SECTIONS.flatMap((s) => s.items.map((i) => i.to));
 }
 
-/** The address of a group's own page: /settings/:group. */
-export function groupPath(sectionId: string): string {
-  return `/settings/${sectionId}`;
+/** The address of an area's page. */
+export const AREA_PATH: Record<SettingsArea, string> = { daily: '/nastaveni', admin: '/administrace' };
+export const AREA_LABEL: Record<SettingsArea, string> = { daily: 'Nastavení', admin: 'Administrace' };
+
+export function areaPath(area: SettingsArea): string {
+  return AREA_PATH[area];
 }
 
-/** A group by its id (the last segment of /settings/:group), or null. */
+/**
+ * Where an old /settings/:group address now lives. The groups that held administration go to the Administrace page
+ * (a person without the right gets the ordinary "no access" there), every other one - and any unknown id - to Nastavení.
+ */
+export function legacyGroupPath(groupId: string | undefined): string {
+  return groupId === 'system' || groupId === 'vzhled-webu' || groupId === 'administrace' ? AREA_PATH.admin : AREA_PATH.daily;
+}
+
+/** The area a section stands in, by its id; null if unknown. */
 export function sectionById(id: string | undefined): SettingsSection | null {
   if (id === undefined) return null;
   return SETTINGS_SECTIONS.find((s) => s.id === id) ?? null;
+}
+
+/** The page of the area a section stands in - what "back" means from one of its screens. */
+export function groupPath(sectionId: string): string {
+  return AREA_PATH[sectionById(sectionId)?.area ?? 'daily'];
 }
 
 /** The change-history scope an item's saves are written under. */
@@ -697,6 +783,23 @@ export function settingsItemAt(
     }
   }
   return null;
+}
+
+/** Is this one of the two plain pages (Nastavení, Administrace) - where the page itself is the list and no side list is drawn? */
+export function isAreaHub(pathname: string): boolean {
+  return pathname === AREA_PATH.daily || pathname === AREA_PATH.admin;
+}
+
+/**
+ * Which area an address belongs to: the Administrace page and every admin screen are 'admin', Nastavení and every
+ * other settings screen are 'daily', anything else is null.
+ */
+export function areaAt(pathname: string): SettingsArea | null {
+  if (pathname === AREA_PATH.admin || pathname.startsWith(AREA_PATH.admin + '/')) return 'admin';
+  const here = settingsItemAt(pathname);
+  if (here !== null) return here.item.area;
+  if (pathname === '/settings' || pathname.startsWith('/settings/') || pathname === AREA_PATH.daily) return 'daily';
+  return pathname.startsWith('/nastaveni/') ? 'daily' : null;
 }
 
 /** "1 položka", "3 položky", "7 položek" - the count on a group's tile. */

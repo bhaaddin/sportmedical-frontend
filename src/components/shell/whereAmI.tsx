@@ -18,6 +18,7 @@ import { ActionBar } from './ActionBar';
 import { PlannerMenuSlot } from './SidebarSlot';
 import { clubIdOfRoute, clubPageIdOfRoute, clubPagePath, isPlannerRoute } from './plannerRoutes';
 import type { SettingsItemAt } from './settingsTypes';
+import { AREA_LABEL, areaAt, areaPath } from '../../pages/settings/catalogue';
 import type { MenuEntry } from './shellTypes';
 
 export interface Crumb {
@@ -38,9 +39,9 @@ export function computeCrumbs({
 }): Crumb[] {
   const crumbs: Crumb[] = [];
   if (settingsHere !== null) {
-    crumbs.push({ label: 'Nastavení', to: '/settings' }, { label: settingsHere.section.label }, { label: settingsHere.item.label });
-  } else if (pathname === '/settings' || pathname.startsWith('/settings/') || pathname.startsWith('/nastaveni/')) {
-    crumbs.push({ label: 'Nastavení' });
+    crumbs.push({ label: AREA_LABEL[settingsHere.item.area], to: areaPath(settingsHere.item.area) }, { label: settingsHere.item.label });
+  } else if (areaAt(pathname) !== null) {
+    crumbs.push({ label: AREA_LABEL[areaAt(pathname) ?? 'daily'] });
   } else if (patientId !== null) {
     const section = PATIENT_SECTIONS.find((s) => sectionPath(patientId, s) === pathname);
     crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Karta pacienta', to: `/patients/${patientId}` });

@@ -23,6 +23,10 @@ import {
   groupPath,
   sectionById,
   itemCountLabel,
+  canSeeAdmin,
+  legacyGroupPath,
+  areaAt,
+  areaPath,
 } from './catalogue';
 
 /* Vite hands us the file's text; `node:fs` would need Node types this project
@@ -149,10 +153,10 @@ describe('what each person sees', () => {
   });
 
   it('drops a section entirely once nothing in it is hers', () => {
-    /* Vzhled webu is all behind settings.clinic.manage; Systém keeps Zabezpečení, which is everybody's own. */
+    /* The Administrace is all behind users.manage / settings.clinic.manage; Můj účet keeps the security screen, which is everybody's own. */
     const ids = visibleSections(RECEPTIONIST).map((s) => s.id);
-    expect(ids).not.toContain('vzhled-webu');
-    expect(ids).toContain('system');
+    expect(ids).not.toContain('administrace');
+    expect(ids).toContain('ucet');
   });
 
   /*
@@ -352,8 +356,9 @@ describe('the sidebar and the settings do not overlap', () => {
   /* Nastavení itself is the one entry that belongs in the sidebar and is not
      a row inside Nastavení. */
   it('keeps the way into the settings in the sidebar', () => {
-    expect(sidebarPaths).toContain('/settings');
-    expect(allDestinations()).not.toContain('/settings');
+    expect(sidebarPaths).toContain('/nastaveni');
+    expect(allDestinations()).not.toContain('/nastaveni');
+    expect(allDestinations()).not.toContain('/administrace');
   });
 });
 
@@ -441,15 +446,16 @@ describe('the smart search', () => {
  * brief's, and every old destination is still reachable from one of them.
  */
 describe('the groups', () => {
-  it('are the brief\'s seven, in its order', () => {
+  it('are the four daily headings, then the account row and the Administrace', () => {
     expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual([
-      'Provoz', 'Služby a ceny', 'Kluby', 'Komunikace', 'Dokumenty', 'Vzhled webu', 'Systém',
+      'Provoz', 'Služby a ceny', 'Komunikace a dokumenty', 'Kluby', 'Můj účet', 'Administrace',
     ]);
   });
 
-  it('have a page of their own at /settings/:group', () => {
-    expect(groupPath('provoz')).toBe('/settings/provoz');
-    expect(sectionById('system')?.label).toBe('Systém');
+  it('no longer have a page of their own: a group leads to the page of its area', () => {
+    expect(groupPath('provoz')).toBe('/nastaveni');
+    expect(groupPath('administrace')).toBe('/administrace');
+    expect(sectionById('administrace')?.label).toBe('Administrace');
     expect(sectionById('nope')).toBeNull();
     expect(sectionById(undefined)).toBeNull();
   });
@@ -504,5 +510,92 @@ describe('the groups', () => {
     const all = allDestinations();
     expect(new Set(all).size).toBe(all.length);
     expect(SETTINGS_SECTIONS.flatMap((s) => s.items).filter((i) => i.to === '/staff-management')).toHaveLength(1);
+  });
+});
+
+/*
+ * Two areas, one list (Matko, 1. 11. 2026): Nastavení for the daily work, Administrace for the rest. The area and the
+ * `common` flag are fields of the catalogue's items.
+ */
+describe('the two areas', () => {
+  const items = SETTINGS_SECTIONS.flatMap((s) => s.items);
+
+  it('give every item one area, the area of its section', () => {
+    for (const section of SETTINGS_SECTIONS) {
+      for (const item of section.items) expect(item.area, item.id).toBe(section.area);
+    }
+  });
+
+  it('put exactly the decided screens in the Administrace', () => {
+    expect(items.filter((i) => i.area === 'admin').map((i) => i.id).sort()).toEqual([
+      'audit', 'bezpecnostni-pravidla', 'fronta-emailu', 'firma-a-faktury', 'historie-zmen', 'integrace', 'media-a-texty',
+      'souhlasy', 'tym', 'uloziste-medii', 'verejny-web', 'zabezpeceni-zalohy', 'zdravi',
+    ].sort());
+  });
+
+  it('flag exactly the decided screens as the most used', () => {
+    expect(items.filter((i) => i.common === true).map((i) => i.id).sort()).toEqual([
+      'blokovany-cas', 'cenik', 'dokumenty-sablony', 'kalendare', 'nastaveni-klubu', 'nepritomnosti', 'pracovni-doba',
+      'sluzby', 'svatky', 'zdravotni-dotaznik', 'zpravy',
+    ].sort());
+    expect(items.filter((i) => i.area === 'admin' && i.common === true)).toEqual([]);
+  });
+
+  it('keep the rest of the daily screens for the closed list', () => {
+    const rest = items.filter((i) => i.area === 'daily' && i.common !== true && i.id !== 'dvoufazove').map((i) => i.id).sort();
+    expect(rest).toEqual([
+      'barvy-sluzeb', 'blokace-klubu', 'cinnosti', 'dochazka', 'hodnoceni-pacientu', 'odkaz-registrace', 'pravidla-dokumentu',
+      'rychla-registrace', 'slevy', 'udaje-pacienta', 'vyjimky', 'vzhled-kalendare', 'zmeny-rezervaci',
+    ].sort());
+  });
+
+  it('give everybody the account row, named "Můj účet a zabezpečení"', () => {
+    const own = visibleSections([]).flatMap((s) => s.items).find((i) => i.id === 'dvoufazove');
+    expect(own?.label).toBe('Můj účet a zabezpečení');
+    expect(own?.requires).toBeUndefined();
+  });
+
+  it('shows the Administrace only to somebody holding users.manage or settings.clinic.manage', () => {
+    expect(canSeeAdmin([])).toBe(false);
+    expect(canSeeAdmin(RECEPTIONIST)).toBe(false);
+    expect(canSeeAdmin(['questionnaires.manage', 'communication.manage', 'roles.manage'])).toBe(false);
+    expect(canSeeAdmin(['users.manage'])).toBe(true);
+    expect(canSeeAdmin(new Set(['settings.clinic.manage']))).toBe(true);
+
+    for (const held of [[], RECEPTIONIST, ['questionnaires.manage', 'communication.manage']]) {
+      expect(visibleSections(held).some((s) => s.area === 'admin')).toBe(false);
+      expect(searchSettingsItems(visibleSections(held), 'audit').map((h) => h.item.area)).not.toContain('admin');
+      expect(visibleSections(held, 'admin')).toEqual([]);
+    }
+    expect(visibleSections(['users.manage'], 'admin').flatMap((s) => s.items.map((i) => i.id))).toEqual(['tym']);
+  });
+
+  it('can narrow to one area', () => {
+    expect(visibleSections(EVERYTHING, 'daily').every((s) => s.area === 'daily')).toBe(true);
+    expect(visibleSections(EVERYTHING, 'admin').every((s) => s.area === 'admin')).toBe(true);
+  });
+
+  it('keep every older address alive', () => {
+    expect(legacyGroupPath('provoz')).toBe('/nastaveni');
+    expect(legacyGroupPath('komunikace')).toBe('/nastaveni');
+    expect(legacyGroupPath('dokumenty')).toBe('/nastaveni');
+    expect(legacyGroupPath('system')).toBe('/administrace');
+    expect(legacyGroupPath('vzhled-webu')).toBe('/administrace');
+    expect(legacyGroupPath('neznama')).toBe('/nastaveni');
+    expect(legacyGroupPath(undefined)).toBe('/nastaveni');
+    expect(areaAt('/administrace')).toBe('admin');
+    expect(areaAt('/staff-management/anything')).toBe('admin');
+    expect(areaAt('/admin')).toBe('admin');
+    expect(areaAt('/working-hours')).toBe('daily');
+    expect(areaAt('/nastaveni')).toBe('daily');
+    expect(areaAt('/settings/system')).toBe('daily');
+    expect(areaAt('/patients')).toBeNull();
+    expect(areaPath('admin')).toBe('/administrace');
+  });
+
+  it('finds the security rules by what a person would type', () => {
+    const all = visibleSections(EVERYTHING);
+    expect(searchSettingsItems(all, 'potvrdit heslem')[0]?.item.id).toBe('bezpecnostni-pravidla');
+    expect(searchSettingsItems(all, 'nečinnost')[0]?.item.id).toBe('bezpecnostni-pravidla');
   });
 });

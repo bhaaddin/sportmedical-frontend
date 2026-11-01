@@ -26,6 +26,7 @@ import { useDevice } from '../../layout/useDevice';
 import { isPlannerRoute } from './plannerRoutes';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { entryState, mainEntries, shortLabel } from './shellModel';
+import { areaAt, isAreaHub } from '../../pages/settings/catalogue';
 import { RAIL_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
 import type { ShellNav } from './shellTypes';
 
@@ -166,9 +167,11 @@ export function IconRail({ nav }: { nav: ShellNav }) {
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', pt: 0.5 }}>
           {mainEntries(nav.menu).map((entry) => {
             const state = entryState(nav, entry);
-            const settingsEntry = entry.path === '/settings';
-            const isHere = settingsEntry ? nav.settingsMode && nav.pathname === '/settings' : here(entry.path);
-            const inArea = !isHere && (settingsEntry ? nav.settingsMode : state.inSection && !nav.settingsMode);
+            const settingsEntry = entry.path === '/nastaveni' || entry.path === '/administrace';
+            /* Nastavení and Administrace are two entries of the same shell mode: the one whose area the screen is in is lit. */
+            const sameArea = settingsEntry && nav.settingsMode && (areaAt(nav.pathname) === 'admin') === (entry.path === '/administrace');
+            const isHere = settingsEntry ? sameArea && nav.pathname === entry.path : here(entry.path);
+            const inArea = !isHere && (settingsEntry ? sameArea : state.inSection && !nav.settingsMode);
             return (
               <RailIcon
                 key={entry.path}
@@ -210,7 +213,7 @@ export function IconRail({ nav }: { nav: ShellNav }) {
       </Box>
 
       {/* Desktop: the settings' own list stands beside the rail; tablet: the same list is in the drawer. */}
-      {nav.settingsMode && desktop && <SettingsSide nav={nav} />}
+      {nav.settingsMode && desktop && !isAreaHub(nav.pathname) && <SettingsSide nav={nav} />}
       <NavDrawer nav={nav} open={open} onClose={() => setOpen(false)} />
     </>
   );

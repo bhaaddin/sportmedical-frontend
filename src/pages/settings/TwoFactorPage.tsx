@@ -19,6 +19,8 @@ import type { TwoFactorSetup } from '../../api/twoFactor';
 import { errorText } from '../../components/booking/errorText';
 import { SettingsScreen } from './SettingsFrame';
 import { SettingsBoard } from './SettingsBoard';
+import MySessions from './security/MySessions';
+import { setTwoFactorRequired } from '../../auth/adminChallenge';
 
 export default function TwoFactorPage() {
   const { t } = useTranslation();
@@ -43,7 +45,7 @@ export default function TwoFactorPage() {
   });
   const confirm = useMutation({
     mutationFn: () => twoFactorApi.confirm(code.trim()),
-    onSuccess: (r) => { setRecoveryCodes(r.recoveryCodes); setSetup(null); setCode(''); void refreshStatus(); },
+    onSuccess: (r) => { setRecoveryCodes(r.recoveryCodes); setTwoFactorRequired(false); setSetup(null); setCode(''); void refreshStatus(); },
   });
   const disable = useMutation({
     mutationFn: () => twoFactorApi.disable(disableCode.trim()),
@@ -52,8 +54,8 @@ export default function TwoFactorPage() {
 
   return (
     <SettingsScreen
-      title="Zabezpečení"
-      subtitle="Dvoufázové ověření — k heslu přidá jednorázový kód z ověřovací aplikace. Platí jen pro váš účet."
+      title="Můj účet a zabezpečení"
+      subtitle="Dvoufázové ověření a zařízení, kde jste přihlášený/á. Platí jen pro váš účet."
       aside={
         <Box component="ol" sx={{ m: 0, pl: 2.5, display: 'grid', gap: 1, fontSize: 14, color: 'text.primary' }}>
           <li>Zapnete ověření a do aplikace v telefonu opíšete klíč.</li>
@@ -186,6 +188,7 @@ export default function TwoFactorPage() {
             </Stack>
           )}
       </SettingsBoard>
+      <Box sx={{ mt: 3 }}><MySessions /></Box>
     </SettingsScreen>
   );
 }

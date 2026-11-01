@@ -33,12 +33,13 @@ import { usePermissions } from '../../auth/usePermission';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
 import { FIT_SCROLL_SX } from '../../components/ui/fit';
 import { RecentChanges } from '../../components/settings/RecentChanges';
+import { useHiddenSettingsIds, withoutHidden } from './availability';
 import {
   DESKTOP_UP, SETTINGS_MAX_WIDTH, TYPE, focusRing, settingsGrey, settingsHover, settingsLine, settingsSelected,
 } from '../../components/settings/settingsStyle';
 import { CARD_RADIUS, MUTED_SX, TARGET_SX, cardSurface, railSx, toneOf } from '../../ui/shelf/shelfStyle';
 import {
-  groupPath, scopeOf, searchSections, settingsItemAt, visibleSections,
+  AREA_LABEL, areaAt, areaPath, groupPath, scopeOf, searchSections, settingsItemAt, visibleSections,
   type SettingsItem, type SettingsSection,
 } from './catalogue';
 
@@ -74,9 +75,13 @@ export function SettingsNav({
   const [ownQuery, setOwnQuery] = useState('');
   const q = query ?? ownQuery;
   const setQuery = onQueryChange ?? setOwnQuery;
-  const sections = searchSections(visibleSections(usePermissions()), q);
+  /* The nav lists the screens of the area the person is in (Nastavení or Administrace), never both. */
+  const area = areaAt(location.pathname) ?? 'daily';
+  const hidden = useHiddenSettingsIds();
+  const sections = searchSections(withoutHidden(visibleSections(usePermissions(), area), hidden), q);
   const here = settingsItemAt(location.pathname);
-  const hereGroup = /^\/settings\/([a-z0-9-]+)$/.exec(location.pathname)?.[1];
+  /* On the area's own page the big search box is the page's; the nav does not draw a second one. */
+  const onHub = location.pathname === areaPath(area);
   /*
    * The groups fold (Matko, 4. 10. 2026: "Provoz must not be permanently
    * expanded"): every heading is a disclosure button, all closed except the
@@ -84,7 +89,7 @@ export function SettingsNav({
    * open one - and while a search is typed the matching groups are all shown
    * open. Per visit only; nothing is stored.
    */
-  const currentGroup = here?.section.id ?? hereGroup ?? null;
+  const currentGroup = here?.section.id ?? null;
   const [openId, setOpenId] = useState<string | null>(currentGroup);
   useEffect(() => { setOpenId(currentGroup); }, [currentGroup]);
   const searching = q.trim() !== '';
@@ -113,24 +118,26 @@ export function SettingsNav({
             }
       }
     >
-      <TextField
-        fullWidth
-        size="small"
-        value={q}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Hledat v nastavení"
-        slotProps={{
-          htmlInput: { 'aria-label': 'Hledat v nastavení' },
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: settingsGrey }} />
-              </InputAdornment>
-            ),
-          },
-        }}
-        sx={{ mb: 1.5 }}
-      />
+      {!onHub && (
+        <TextField
+          fullWidth
+          size="small"
+          value={q}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Hledat v nastavení"
+          slotProps={{
+            htmlInput: { 'aria-label': 'Hledat v nastavení' },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: settingsGrey }} />
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ mb: 1.5 }}
+        />
+      )}
 
       {q !== '' && sections.length === 0 && (
         <Typography sx={[TYPE.caption, { px: 1.5, py: 1 }]}>
@@ -139,7 +146,7 @@ export function SettingsNav({
       )}
 
       {sections.map((section, sectionIndex) => {
-        const expanded = compact || searching || openId === section.id;
+        const expanded = compact || searching || sections.length === 1 || openId === section.id;
         return (
         <Box
           key={section.id}
@@ -156,7 +163,7 @@ export function SettingsNav({
         >
           <Box
             {...(compact
-              ? { component: RouterLink, to: groupPath(section.id), 'aria-current': hereGroup === section.id ? ('page' as const) : undefined }
+              ? { component: RouterLink, to: groupPath(section.id), 'aria-current': here?.section.id === section.id ? ('page' as const) : undefined }
               : {
                   component: 'button',
                   type: 'button',
@@ -376,9 +383,9 @@ export function SettingsBreadcrumb({ title }: { title?: React.ReactNode }) {
 
 function crumbsAt(pathname: string, title?: React.ReactNode): Crumb[] {
   const here = settingsItemAt(pathname);
-  const parts: Crumb[] = [{ label: 'Nastavení', to: '/settings' }];
+  const area = here?.item.area ?? areaAt(pathname) ?? 'daily';
+  const parts: Crumb[] = [{ label: AREA_LABEL[area], to: areaPath(area) }];
   if (here !== null) {
-    parts.push({ label: here.section.label, to: groupPath(here.section.id) });
     parts.push({ label: here.item.label });
   } else if (title !== undefined) {
     parts.push({ label: title });
@@ -555,7 +562,7 @@ function RoutedFrame(props: FrameProps) {
     <FrameLayout
       {...props}
       crumbs={crumbsAt(location.pathname, props.title)}
-      backTo={here !== null ? { label: here.section.label, to: groupPath(here.section.id) } : { label: 'Nastavení', to: '/settings' }}
+      backTo={{ label: AREA_LABEL[here?.item.area ?? areaAt(location.pathname) ?? 'daily'], to: areaPath(here?.item.area ?? areaAt(location.pathname) ?? 'daily') }}
       resolvedRelated={resolvedRelated}
       resolvedScope={resolvedScope}
     />

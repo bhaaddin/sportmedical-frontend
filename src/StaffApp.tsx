@@ -10,11 +10,11 @@
  */
 import { Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Box, Button } from '@mui/material';
-import { Dashboard, People, Settings, CalendarMonth, Receipt, ReceiptLong, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, PersonAdd, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
+import { Dashboard, People, Settings, CalendarMonth, Receipt, ReceiptLong, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, PersonAdd, ListAlt, EventNote, SportsSoccer, Insights, Event, AdminPanelSettings } from '@mui/icons-material';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
 import { patientInPath } from './pages/patients/sections';
-import { settingsItemAt } from './pages/settings/catalogue';
+import { ADMIN_PERMISSIONS, AREA_LABEL, areaAt, areaPath, canSeeAdmin, isAreaHub, settingsItemAt } from './pages/settings/catalogue';
 import { useState, useMemo, lazy, Suspense, useRef, useEffect } from 'react';
 import { SettingsSearchContext } from './components/shell/settingsSearch';
 import { SidebarSlotProvider } from './components/shell/SidebarSlot';
@@ -54,6 +54,10 @@ const PatientHistoryPage = lazy(() => import('./pages/patients/PatientHistoryPag
 const PatientResultsPage = lazy(() => import('./pages/patients/PatientResultsPage'));
 const PatientInvoicesPage = lazy(() => import('./pages/patients/PatientInvoicesPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
+/* The Administrace's door and the confirmation window: chunks of their own, fetched only for somebody who may see the Administrace. */
+const AdminGate = lazy(() => import('./pages/settings/security/AdminGate'));
+const ReconfirmHost = lazy(() => import('./pages/settings/security/ReconfirmHost'));
+const SecurityPolicyPage = lazy(() => import('./pages/settings/SecurityPolicyPage'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const AdminPage = lazy(() => import('./pages/Admin'));
 const CenikPage = lazy(() => import('./pages/Cenik'));
@@ -174,7 +178,8 @@ const menuItems: MenuEntry[] = ([
   { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
   { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
   { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
-  { text: 'Nastavení', icon: <Settings />, path: '/settings' },
+  { text: 'Nastavení', icon: <Settings />, path: '/nastaveni' },
+  { text: 'Administrace', icon: <AdminPanelSettings />, path: '/administrace', requiresAny: ADMIN_PERMISSIONS },
 ] as MenuEntry[]).map((entry) => ({ ...entry, children: MENU_CHILDREN[entry.path] }));
 
 /*
@@ -214,7 +219,9 @@ function isSettingsRoute(pathname: string, settingsHere: ReturnType<typeof setti
     pathname === '/settings' ||
     pathname.startsWith('/settings/') ||
     pathname === '/nastaveni' ||
-    pathname.startsWith('/nastaveni/')
+    pathname.startsWith('/nastaveni/') ||
+    pathname === '/administrace' ||
+    pathname.startsWith('/administrace/')
   );
 }
 
@@ -254,8 +261,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
    * and sections around it would be NotFound too.
    */
   const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;
-  const settingsHere = settingsItemAt(location.pathname);
-  const settingsMode = isSettingsRoute(location.pathname, settingsHere);
+  /* Somebody who may not see the Administrace is not told it exists: its addresses are plain "not found" in the ordinary shell. */
+  const adminHidden = areaAt(location.pathname) === 'admin' && !canSeeAdmin(held);
+  const settingsHere = adminHidden ? null : settingsItemAt(location.pathname);
+  /* The Administrace passes through its gate (two-factor notice, reconfirm up front, idle lock); the rest of the app does not. */
+  const adminArea = areaAt(location.pathname) === 'admin' && canSeeAdmin(held);
+  const settingsMode = !adminHidden && isSettingsRoute(location.pathname, settingsHere);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [settingsQuery, setSettingsQuery] = useState('');
   /* Where "Zpět do aplikace" goes: the last screen that was not a settings one (the staff overview when there was none). */
@@ -268,7 +279,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [settingsMode]);
 
   const visibleMenu = useMemo(() => {
-    const allowed = (entry: MenuEntry) => entry.requires === undefined || held.has(entry.requires);
+    const allowed = (entry: MenuEntry) =>
+      (entry.requires === undefined || held.has(entry.requires)) &&
+      (entry.requiresAny === undefined || entry.requiresAny.some((p) => held.has(p)));
     return menuItems
       .filter(allowed)
       .map((entry) => ({ ...entry, children: entry.children?.filter(allowed) }));
@@ -283,8 +296,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const newAppointment = () => navigate('/planovani', { state: { newAppointment: Date.now() } });
 
   const settingsSearch = useMemo(
-    () => ({ query: settingsQuery, setQuery: setSettingsQuery, inRail: device === 'desktop' }),
-    [settingsQuery, device],
+    () => ({ query: settingsQuery, setQuery: setSettingsQuery, inRail: false }),
+    [settingsQuery],
   );
 
   const nav: ShellNav = {
@@ -301,7 +314,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     onOpenAccountMenu: setAnchorEl,
   };
 
-  const crumbs = computeCrumbs({ pathname: location.pathname, patientId, settingsHere, menu: menuItems });
+  const crumbs = computeCrumbs({ pathname: adminHidden ? '/' : location.pathname, patientId, settingsHere, menu: menuItems });
   useDocumentTitle(crumbs);
 
   const fit = !isPlannerRoute(location.pathname);
@@ -314,10 +327,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   /* The animation library is fetched once the shell has painted, so the first dialog or list already finds it. */
   useEffect(() => warmMotion(), []);
 
+  const body = adminArea ? <Suspense fallback={<PageLoader />}><AdminGate>{children}</AdminGate></Suspense> : children;
   const settingsNeedsFrame = settingsHere !== null && SETTINGS_UNFRAMED.has(settingsHere.item.to);
 
   /* The area's offset is a pixel STRING: sx `ml` with a number is spacing × 8. */
-  const marginLeft = device === 'phone' ? '0px' : `${RAIL_WIDTH + (settingsMode && device === 'desktop' ? SIDEBAR_WIDTH : 0)}px`;
+  const marginLeft = device === 'phone' ? '0px' : `${RAIL_WIDTH + (settingsMode && device === 'desktop' && !isAreaHub(location.pathname) ? SIDEBAR_WIDTH : 0)}px`;
 
   return (
     <SettingsSearchContext.Provider value={settingsSearch}>
@@ -330,11 +344,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {device !== 'phone' && <IconRail nav={nav} />}
           {device === 'phone' && (
             <>
-              <PhoneTopBar nav={nav} crumbs={settingsMode ? [{ label: 'Nastavení' }] : crumbs} />
+              <PhoneTopBar nav={nav} crumbs={settingsMode ? [{ label: AREA_LABEL[areaAt(location.pathname) ?? 'daily'] }] : crumbs} />
               <PhoneBottomBar nav={nav} />
             </>
           )}
-          <AccountMenu anchorEl={anchorEl} onClose={() => setAnchorEl(null)} onOpenSettings={() => navigate('/settings')} />
+          {canSeeAdmin(held) && <Suspense fallback={null}><ReconfirmHost /></Suspense>}
+          <AccountMenu anchorEl={anchorEl} onClose={() => setAnchorEl(null)} onOpenSettings={() => navigate('/nastaveni')} />
 
           <Box
             component="main"
@@ -373,12 +388,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Box sx={{ mb: 2 }}>
                 <Button
                   component={Link as any}
-                  to="/settings"
+                  to={areaPath(settingsHere.item.area)}
                   startIcon={<ArrowBack />}
                   size="small"
                   sx={{ color: 'text.secondary', textTransform: 'none', minHeight: 44 }}
                 >
-                  Nastavení
+                  {AREA_LABEL[settingsHere.item.area]}
                   <Box component="span" sx={{ mx: 0.75, color: 'text.secondary' }}>/</Box>
                   <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
                     {settingsHere.section.label}
@@ -414,9 +429,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   '--bottom-bar-height': '0px',
                 }}
               >
-                {children}
+                {body}
               </Box>
-            ) : children}
+            ) : body}
           </Box>
         </Box>
       </SidebarSlotProvider>
@@ -525,6 +540,10 @@ export default function StaffApp() {
           <Route path="/nastaveni/zabezpeceni-a-zalohy" element={<RequirePermission of="settings.clinic.manage"><SecurityCenterPage /></RequirePermission>} />
           <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
           <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
+          {/* The two plain pages; the old /settings and /settings/:group forward to the area they became (pages/Settings.tsx). */}
+          <Route path="/nastaveni" element={<SettingsPage area="daily" />} />
+          <Route path="/administrace" element={<RequirePermission of={ADMIN_PERMISSIONS}><SettingsPage area="admin" /></RequirePermission>} />
+          <Route path="/nastaveni/bezpecnostni-pravidla" element={<RequirePermission of="settings.clinic.manage"><SecurityPolicyPage /></RequirePermission>} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:group" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />

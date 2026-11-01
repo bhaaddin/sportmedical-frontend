@@ -23,6 +23,7 @@ import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { AppearanceControls } from './AccountMenu';
 import { Trail, type Crumb } from './whereAmI';
 import { childIsActive, isActivePath, sectionGroups, sectionOf, shortLabel } from './shellModel';
+import { areaAt } from '../../pages/settings/catalogue';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { BAR_HEIGHT, activeBg, activeGlow, barGlass, focusRing, primaryIconSx } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
@@ -172,7 +173,9 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
   const entry = (path: string) => nav.menu.find((e) => e.path === path);
   const section = sectionOf(nav);
   const overview = entry(STAFF_HOME_PATH);
-  const settings = entry('/settings');
+  const settings = entry('/nastaveni');
+  const administration = entry('/administrace');
+  const inAdmin = nav.settingsMode && areaAt(nav.pathname) === 'admin';
   /* The screens that belong under the bar's entries - there is no sidebar to show them. */
   const withScreens = bar.filter((e) => (e.children?.length ?? 0) > 0);
 
@@ -306,7 +309,8 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
         ) : (
           <>
         {overview && <SheetLink to={overview.path} active={here(overview.path)} onClick={close}>{overview.text}</SheetLink>}
-        {settings && <SheetLink to={settings.path} active={nav.settingsMode} onClick={close}>{settings.text}</SheetLink>}
+        {settings && <SheetLink to={settings.path} active={nav.settingsMode && !inAdmin} onClick={close}>{settings.text}</SheetLink>}
+        {administration && <SheetLink to={administration.path} active={inAdmin} onClick={close}>{administration.text}</SheetLink>}
 
         {withScreens.map((e) => (
           <Box key={e.path}>

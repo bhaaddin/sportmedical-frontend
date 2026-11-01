@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material';
 import { buildTheme } from '../../theme';
@@ -51,10 +52,12 @@ function renderRail(nav: ShellNav, width = VIEWPORTS.desktop) {
   setViewport(width);
   return render(
     <ThemeProvider theme={buildTheme('#0D5C52', 'dark')}>
-      <MemoryRouter initialEntries={[nav.pathname]}>
-        <IconRail nav={nav} />
-        <Where />
-      </MemoryRouter>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[nav.pathname]}>
+          <IconRail nav={nav} />
+          <Where />
+        </MemoryRouter>
+      </QueryClientProvider>
     </ThemeProvider>,
   );
 }

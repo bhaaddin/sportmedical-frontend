@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
@@ -47,9 +48,11 @@ function renderShell(path: string, width: number) {
   return render(
     <ThemePrefsContext.Provider value={{ accent: '#0D5C52', mode: 'light', setAccent: () => undefined, setMode: () => undefined }}>
       <ThemeProvider theme={buildTheme('#0D5C52', 'light')}>
-        <MemoryRouter initialEntries={[path]}>
-          <Layout><Probe /></Layout>
-        </MemoryRouter>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <MemoryRouter initialEntries={[path]}>
+            <Layout><Probe /></Layout>
+          </MemoryRouter>
+        </QueryClientProvider>
       </ThemeProvider>
     </ThemePrefsContext.Provider>,
   );
@@ -150,7 +153,7 @@ describe('settings sidebar groups', () => {
     renderShell('/working-hours', VIEWPORTS.desktop);
     const nav = settingsNav();
     const provoz = within(nav).getByRole('button', { name: 'Provoz' });
-    const system = within(nav).getByRole('button', { name: 'Systém' });
+    const system = within(nav).getByRole('button', { name: 'Služby a ceny' });
     expect(provoz).toHaveAttribute('aria-expanded', 'true');
     expect(system).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).getByRole('link', { name: 'Otevírací doba' })).toHaveAttribute('aria-current', 'page');

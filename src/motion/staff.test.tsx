@@ -8,6 +8,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MOTION_STORAGE_KEY, resetMotionStoreForTests } from './preference';
 import type { MotionPreference } from './preference';
 
@@ -63,14 +64,20 @@ afterEach(() => {
 });
 
 describe('Nastavení -> Osobní -> Vzhled -> Pohyb', () => {
-  const renderSettings = () =>
-    render(
-      <ThemePrefsProvider>
-        <MemoryRouter initialEntries={['/settings']}>
-          <Settings />
-        </MemoryRouter>
-      </ThemePrefsProvider>,
+  const renderSettings = () => {
+    const view = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ThemePrefsProvider>
+          <MemoryRouter initialEntries={['/nastaveni']}>
+            <Settings />
+          </MemoryRouter>
+        </ThemePrefsProvider>
+      </QueryClientProvider>,
     );
+    /* The look sits in one closed row at the foot of Nastavení. */
+    fireEvent.click(screen.getByRole('button', { name: /Vzhled aplikace a odhlášení/ }));
+    return view;
+  };
 
   it('offers the three states next to the colours, 44 px tall, with the current one pressed', () => {
     setMode(null);

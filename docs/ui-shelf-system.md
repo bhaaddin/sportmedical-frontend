@@ -392,8 +392,8 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 | 44 | `/nepritomnosti` | Nepřítomnosti (347) | **Done (S-5)**: Právě nepřítomní, Plánované, Minulé (cards, worker chip) | Právě nepřítomní, Plánované | worker, availability | A5 | done |
 | 45 | `/svatky` | Svátky a volno (414) | **Done (S-5)**: Rok (board: explanation + year), Nadcházející, Proběhlé (cards with the two switches) | Nadcházející, Rok | calendar, exceptions | A5 | done |
 | 46 | `/nastaveni/barvy-sluzeb` | Barvy služeb (240) | SettingsFrame | Služby s barvou (cards), Kontrast (attention) | služba, činnost | A5 | P3 |
-| 47 | `/settings` | Nastavení - hub (473) | FitPage + SettingsFrame | one shelf per group (cards = settings screens with their current value), Naposledy změněno, Vyžaduje nastavení (attention: missing company data...) | every settings screen, change history | A6 | P1 |
-| 48 | `/settings/:group` | Nastavení - skupina | same | the group's shelf | - | A6 | P1 |
+| 47 | `/nastaveni` (`/settings` forwards) | Nastavení - denní práce | **Done (settings-split)**: ONE plain page - big search, the row "Můj účet a zabezpečení", four headings (Provoz, Služby a ceny, Komunikace a dokumenty, Kluby) with the `common` screens, one closed "Další nastavení", one closed "Vzhled aplikace a odhlášení" | every daily settings screen | A6 | done |
+| 48 | `/administrace` (`/settings/:group` forwards: system and vzhled-webu here, the rest to `/nastaveni`) | Administrace | **Done (settings-split)**: the same plain list + search, "Vyžaduje nastavení" from the security lights; only for `users.manage` / `settings.clinic.manage`; gate (reconfirm, 2FA notice, idle lock) | users, security, company, public site, integrations, change records | A6 | done |
 | 49 | `/nastaveni/udaje-pacienta` | Údaje o pacientovi (217) | **Done (w5)**: Zobrazené (board, count), Skryté (board, count); save errors above the boards | Karta, Seznam (two boards of fields) | patient card, register | A6 | done |
 | 50 | `/nastaveni/rychla-registrace` | Rychlá registrace (226) | **Done (w5)**: Lhůta na dokončení (board), Datum narození (board); the explainer stays in the aside | Pole, Platnost odkazu | intake, quick link | A6 | done |
 | 51 | `/nastaveni/odkaz-registrace` | Odkaz pro registraci (306) | **Done (w5)**: Platnost a adresa (board), E-mail s odkazem (board); "Kdo se zaregistroval" not built (needs the intake review list, not read by this screen) | Odkaz (board), Kdo se zaregistroval | intake review, patients | A6 | done |
@@ -524,3 +524,23 @@ Files: `pages/settings/SettingsFrame.tsx`, `pages/Settings.tsx`, `pages/settings
 `Settings.shelf.test.tsx` (new), `settings/SettingsFrame.test.tsx`. `scripts/shelf-check.mjs`: settings pages in `PAGE_PATH`
 (`settings`, `settings-system`, `set-firma`, `set-hours`, `set-2fa`) and `MODE=dark|light`. Screenshots: `design/shelf2/`.
 Known: `/working-hours`' own purpose line has two inline text links (výjimkách, svátcích) under 44 px - the screen's text, not the frame.
+
+
+## Nastavení and Administrace (settings-split, 1. 11. 2026)
+
+The owner's complaint was that Settings is too complicated, so the hub and the group pages are replaced by two plain pages
+(`src/pages/Settings.tsx`, rows 47 and 48). The catalogue (`pages/settings/catalogue.ts`) stays the ONE source: every item has an
+`area` (`'daily'` | `'admin'`, set from its section) and the most used daily ones a `common` flag.
+* **Nastavení** (`/nastaveni`): search, "Můj účet a zabezpečení" (for everybody), the `common` screens under four headings, one closed
+  "Další nastavení", one closed "Vzhled aplikace a odhlášení" (the old Osobní). One list per heading, not tiles in tiles.
+* **Administrace** (`/administrace`): only for `users.manage` or `settings.clinic.manage` (`canSeeAdmin`). For everybody else there is no
+  rail or menu entry, no search or palette hit, the side list does not name it, and the address is the ordinary "no access".
+* **Old addresses**: every item keeps its `to` and `aliases`; `/settings` forwards to `/nastaveni`, `/settings/:group` to the area its group
+  became (`legacyGroupPath`).
+* **Bezpečnostní pravidla** (`/nastaveni/bezpecnostni-pravidla`, API `/api/v1/settings/security-policy`, `/api/v1/session/reconfirm`): three
+  plain switches, all off. `security/AdminGate` (shell wrapper around the admin area) shows the 2FA notice on a 403
+  `two_factor_required`, asks to reconfirm up front, and locks after the idle minutes; `security/ReconfirmHost` is the window the HTTP client
+  opens on a 403 `reconfirm_required` and retries the request after (`auth/adminChallenge.ts`, `api/client.ts`). A server without the routes
+  (404 / 405 without a problem code, `isRouteMissing`) shows none of it, silently (`pages/settings/availability.ts`).
+* **My sessions** (`security/MySessions`, on Můj účet a zabezpečení): `/api/v1/account/sessions`, revoke one, revoke all others.
+* Real-browser check: `node scripts/settings-split-check.mjs` (mocked API, screenshots in `design/settings-split/`).

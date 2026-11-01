@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTheme } from '@mui/material/styles';
 import Settings from './Settings';
 import { AccentRootVars } from '../AccentRootVars';
@@ -25,15 +26,20 @@ function Probe() {
 }
 
 function renderApp() {
-  return render(
-    <ThemePrefsProvider>
-      <AccentRootVars />
-      <Probe />
-      <MemoryRouter initialEntries={['/settings']}>
-        <Settings />
-      </MemoryRouter>
-    </ThemePrefsProvider>,
+  const view = render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ThemePrefsProvider>
+        <AccentRootVars />
+        <Probe />
+        <MemoryRouter initialEntries={['/nastaveni']}>
+          <Settings />
+        </MemoryRouter>
+      </ThemePrefsProvider>
+    </QueryClientProvider>,
   );
+  /* The look and the account sit in one closed row at the foot of Nastavení; it is opened once, like a person would. */
+  fireEvent.click(screen.getByRole('button', { name: /Vzhled aplikace a odhlášení/ }));
+  return view;
 }
 
 const root = () => document.documentElement;

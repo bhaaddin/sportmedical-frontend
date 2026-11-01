@@ -144,7 +144,7 @@ export function childIsActive(nav: ShellNav, child: MenuEntry, siblings: MenuEnt
 export function sectionOf(nav: ShellNav): MenuEntry | null {
   if (nav.settingsMode) return null;
   for (const entry of mainEntries(nav.menu)) {
-    if (entry.path === '/settings') continue;
+    if (entry.path === '/nastaveni' || entry.path === '/administrace') continue;
     if (entryState(nav, entry).inSection) return entry;
   }
   return null;

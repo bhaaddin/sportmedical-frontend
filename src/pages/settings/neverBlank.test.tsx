@@ -55,18 +55,20 @@ describe.each(Object.entries(VIEWPORTS))('a failed load at %s (%i px)', (_n, wid
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Uživatelé a práva' })).toBeInTheDocument();
     expect(await screen.findByText('Seznam účtů se nepodařilo načíst.')).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Kde jste' })).toHaveTextContent('Systém');
+    expect(screen.getByRole('navigation', { name: 'Kde jste' })).toHaveTextContent('Administrace');
 
     list.mockResolvedValue([{ userId: 'u1', displayName: 'Jana Nová', email: 'j@n.cz', role: 'Staff', isActive: true, mustChangePassword: false, lastLoginAtUtc: null }]);
     await userEvent.setup().click(screen.getByRole('button', { name: /Zkusit znovu/ }));
     expect(await screen.findByText('Jana Nová')).toBeInTheDocument();
   });
 
-  it('Zabezpečení keeps its title and offers Zkusit znovu', async () => {
+  it('Můj účet a zabezpečení keeps its title and offers Zkusit znovu', async () => {
     status.mockRejectedValue(new Error('down'));
+    /* An older server without the sessions routes: that card is simply not there. */
+    get.mockRejectedValue({ response: { status: 404 } });
     render(at('/nastaveni/zabezpeceni', <TwoFactorPage />));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Zabezpečení' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Můj účet a zabezpečení' })).toBeInTheDocument();
     const retry = await screen.findByRole('button', { name: 'Zkusit znovu' });
 
     status.mockResolvedValue({ enabled: false, setupPending: false });

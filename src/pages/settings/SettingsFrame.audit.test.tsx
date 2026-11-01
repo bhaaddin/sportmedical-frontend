@@ -13,7 +13,7 @@ import { setViewport, VIEWPORTS } from '../../test/viewport';
 const get = vi.hoisted(() => vi.fn());
 vi.mock('../../api/client', () => ({ default: { get: (...a: unknown[]) => get(...a) }, client: { get: (...a: unknown[]) => get(...a) } }));
 
-const MINE = ['komunikace', 'dokumenty', 'vzhled-webu', 'system'];
+const MINE = ['komunikace-a-dokumenty', 'ucet', 'administrace'];
 const items = SETTINGS_SECTIONS.filter((s) => MINE.includes(s.id)).flatMap((s) => s.items);
 
 beforeEach(() => {

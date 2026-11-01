@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SettingsNav, SettingsScreen } from './SettingsFrame';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
 
@@ -33,13 +34,12 @@ const renderFrame = (props: Partial<React.ComponentProps<typeof SettingsScreen>>
 describe.each(Object.entries(VIEWPORTS))('the frame at %s (%i px)', (_name, width) => {
   beforeEach(() => setViewport(width));
 
-  it('has the breadcrumb Nastavení / Skupina / Položka, the title and the sentence', () => {
+  it('has the breadcrumb Nastavení / Položka, the title and the sentence', () => {
     renderFrame();
 
     const crumbs = screen.getByRole('navigation', { name: 'Kde jste' });
-    expect(crumbs).toHaveTextContent('Nastavení/Provoz/Otevírací doba');
-    expect(screen.getByRole('link', { name: 'Nastavení' })).toHaveAttribute('href', '/settings');
-    expect(screen.getByRole('link', { name: 'Provoz' })).toHaveAttribute('href', '/settings/provoz');
+    expect(crumbs).toHaveTextContent('Nastavení/Otevírací doba');
+    expect(screen.getByRole('link', { name: 'Nastavení' })).toHaveAttribute('href', '/nastaveni');
     expect(crumbs.querySelector('[aria-current="page"]')).toHaveTextContent('Otevírací doba');
     expect(screen.getByRole('heading', { level: 1, name: 'Otevírací doba' })).toBeInTheDocument();
     expect(screen.getByText('Kdy se v ordinaci pracuje.')).toBeInTheDocument();
@@ -133,21 +133,27 @@ describe('the frame, in particular', () => {
   });
 });
 
+const Wrapped = ({ path, children }: { path: string; children: React.ReactNode }) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+  </QueryClientProvider>
+);
+
 describe('SettingsNav', () => {
   const renderNav = (path: string, props: React.ComponentProps<typeof SettingsNav> = {}) =>
-    render(<MemoryRouter initialEntries={[path]}><SettingsNav {...props} /></MemoryRouter>);
+    render(<Wrapped path={path}><SettingsNav {...props} /></Wrapped>);
 
   it('makes each group heading a disclosure button: the current group open, the others closed', async () => {
     renderNav('/working-hours');
     expect(screen.getByRole('button', { name: 'Provoz' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: 'Systém' })).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Systém' }));
-    expect(screen.getByRole('button', { name: 'Systém' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Služby a ceny' })).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Služby a ceny' }));
+    expect(screen.getByRole('button', { name: 'Služby a ceny' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('keeps the compact (phone) nav as links to the group pages', () => {
-    render(<MemoryRouter initialEntries={['/settings']}><SettingsNav compact /></MemoryRouter>);
-    expect(screen.getByRole('link', { name: 'Systém' })).toHaveAttribute('href', '/settings/system');
+  it('keeps the compact (phone) nav as links to the page of the area', () => {
+    render(<Wrapped path="/nastaveni"><SettingsNav compact /></Wrapped>);
+    expect(screen.getByRole('link', { name: 'Provoz' })).toHaveAttribute('href', '/nastaveni');
   });
 
   it('marks the item you are on', () => {
@@ -158,11 +164,11 @@ describe('SettingsNav', () => {
 
   it('keeps its props: a shared query narrows it, plain and compact still draw', async () => {
     const onQueryChange = vi.fn();
-    const { rerender } = renderNav('/settings', { query: 'sleva', onQueryChange, plain: true });
+    const { rerender } = renderNav('/nastaveni/zpravy', { query: 'sleva', onQueryChange, plain: true });
     expect(screen.getByRole('link', { name: 'Slevy a cenové hladiny' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Otevírací doba' })).not.toBeInTheDocument();
 
-    rerender(<MemoryRouter initialEntries={['/settings']}><SettingsNav compact /></MemoryRouter>);
+    rerender(<Wrapped path="/nastaveni/zpravy"><SettingsNav compact /></Wrapped>);
     expect(screen.getByRole('link', { name: 'Otevírací doba' })).toBeInTheDocument();
 
     await userEvent.setup().type(screen.getByLabelText('Hledat v nastavení'), 'x');

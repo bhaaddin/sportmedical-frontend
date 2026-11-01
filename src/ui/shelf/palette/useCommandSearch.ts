@@ -21,6 +21,7 @@ import { patientsApi } from '../../../api/patients';
 import { usePermissions } from '../../../auth/usePermission';
 import { formatCzk } from '../../../components/booking/grid/appointmentPrice';
 import { searchSettingsItems, visibleSections } from '../../../pages/settings/catalogue';
+import { useHiddenSettingsIds, withoutHidden } from '../../../pages/settings/availability';
 import { addDaysToDateOnly, pragueDateKey } from '../../../utils/time';
 import { PEEK_KEYS } from '../peekKeys';
 import { getMemory, getServerMemory, subscribeMemory } from '../memory';
@@ -144,11 +145,12 @@ export function useCommandSearch(query: string, open: boolean): CommandSearch {
   }, [open, debounced, held, queryClient]);
 
   const statics = useMemo(() => staticCommands(held), [held]);
+  const hiddenSettings = useHiddenSettingsIds();
   const settings = useMemo<Command[]>(() => {
     if (idle) return [];
     /* The catalogue narrows to the screens this person may open (and to the words typed); the generic ranking then orders them
        with everything else, using the catalogue's own keywords. */
-    return searchSettingsItems(visibleSections(held), query)
+    return searchSettingsItems(withoutHidden(visibleSections(held), hiddenSettings), query)
       .slice(0, 12)
       .map((hit) => ({
         id: `settings-${hit.section.id}-${hit.item.id}`,
@@ -158,7 +160,7 @@ export function useCommandSearch(query: string, open: boolean): CommandSearch {
         keywords: hit.item.keywords,
         to: hit.item.to,
       }));
-  }, [held, idle, query]);
+  }, [held, idle, query, hiddenSettings]);
 
   return useMemo(() => {
     if (idle) {

@@ -4,6 +4,7 @@ import { clearLocalSession } from '../auth/localSession';
 import { socketService } from '../services/socketService';
 import { safeNextPath } from '../components/shell/loginRedirect';
 import { installRequestPolicy } from './requestPolicy';
+import { askReconfirm, canAskReconfirm, problemCodeOf, setTwoFactorRequired } from '../auth/adminChallenge';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -86,6 +87,25 @@ export function isUnreachable(error: unknown): boolean {
   return err.response.status === 502 || err.response.status === 503 || err.response.status === 504;
 }
 
+/*
+ * An administrator's request the server wants one more proof for (src/auth/adminChallenge.ts). 'retry' = the person
+ * confirmed in the window, send the same request once more; 'handled' = a notice is up, nothing else to do; null = an
+ * ordinary refusal. A request is retried at most once.
+ */
+/* axios copies unknown config keys into the config of the repeated request, so the mark survives it. */
+type Marked = { reconfirmRetried?: boolean };
+async function challenged(err: AxiosError): Promise<'retry' | 'handled' | null> {
+  const code = problemCodeOf(err.response?.data);
+  if (code === 'two_factor_required') {
+    setTwoFactorRequired(true);
+    return 'handled';
+  }
+  const config = err.config as (typeof err.config & Marked) | undefined;
+  if (code !== 'reconfirm_required' || config === undefined || config.reconfirmRetried === true || !canAskReconfirm()) return null;
+  config.reconfirmRetried = true;
+  return (await askReconfirm()) ? 'retry' : 'handled';
+}
+
 // Unwrap ApiResult + 401 / 403 / network handling
 client.interceptors.response.use(
   (res) => {
@@ -98,7 +118,7 @@ client.interceptors.response.use(
     }
     return res;
   },
-  (err: AxiosError) => {
+  async (err: AxiosError) => {
     if (isUnreachable(err)) {
       if (err.response) reportGatewayError();
       else reportUnreachable();
@@ -112,6 +132,8 @@ client.interceptors.response.use(
 
     if (status === 401 && !isSignIn) {
       endExpiredSession();
+    } else if (status === 403 && (await challenged(err)) === 'retry') {
+      return client.request(err.config as NonNullable<typeof err.config>);
     } else if (status === 403) {
       forbiddenListeners.forEach((listener) => {
         try {

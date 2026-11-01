@@ -17,6 +17,8 @@ export interface MenuEntry {
   /* `requires` is the permission the server checks behind that screen; an
      entry the signed-in employee does not hold is not drawn. */
   requires?: Permission;
+  /* Drawn when the person holds ANY of these (the Administrace: users.manage or settings.clinic.manage). */
+  requiresAny?: readonly Permission[];
   /** The screens that belong under this one; shown under the entry that is open. */
   children?: MenuEntry[];
   /** Router state handed to the target (a shortcut such as "Klubová objednávka"). */

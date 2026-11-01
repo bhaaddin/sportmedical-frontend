@@ -40,6 +40,8 @@ export interface Command {
   /** Extra words that find it ("rezervace" finds "Nová objednávka"). */
   keywords?: readonly string[];
   requires?: Permission;
+  /** Shown when the person holds ANY of these (the Administrace). */
+  requiresAny?: readonly Permission[];
   entity?: EntityRef;
   /** Added to the score (an action the desk uses all day sits above a page of the same name). */
   boost?: number;
@@ -154,6 +156,7 @@ const PAGES: readonly Command[] = [
   { id: 'page-clubs', group: 'page', label: 'Kluby a týmy', hint: 'Hromadné objednávky a odkazy pro sportovce', to: '/clubs' },
   { id: 'page-billing', group: 'page', label: 'Fakturace', hint: 'Doklady a platby', to: '/billing', requires: 'billing.manage', keywords: ['faktury', 'platby'] },
   { id: 'page-settings', group: 'page', label: 'Nastavení', hint: 'Konfigurace kliniky', to: '/settings', keywords: ['konfigurace'] },
+  { id: 'page-administration', group: 'page', label: 'Administrace', hint: 'Uživatelé, zabezpečení, údaje ordinace', to: '/administrace', requiresAny: ['users.manage', 'settings.clinic.manage'], keywords: ['uživatelé', 'práva', 'zabezpečení', 'záloha', 'audit'] },
   ...(Object.entries(SECTION_CHILDREN) as [string, (typeof SECTION_CHILDREN)['/billing']][]).flatMap(([parent, children]) =>
     children
       .filter((child) => child.shortcut !== true)
@@ -172,7 +175,8 @@ const PAGES: readonly Command[] = [
 
 /** Actions and pages the person may open (one row per address; the first label wins a duplicate). */
 export function staticCommands(held: readonly string[]): Command[] {
-  const allowed = (c: Command) => c.requires === undefined || held.includes(c.requires);
+  const allowed = (c: Command) =>
+    (c.requires === undefined || held.includes(c.requires)) && (c.requiresAny === undefined || c.requiresAny.some((p) => held.includes(p)));
   const seen = new Set<string>();
   const out: Command[] = [];
   for (const c of [...ACTIONS, ...PAGES]) {

@@ -17,6 +17,7 @@ import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { SettingsNav } from '../../pages/settings/SettingsFrame';
+import { AREA_LABEL, areaAt } from '../../pages/settings/catalogue';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf } from './shellModel';
 import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
@@ -349,7 +350,7 @@ export function SidebarBody({
           Zpět do aplikace
         </ButtonBase>
         <Box component="h2" data-testid="section-title" sx={{ m: 0, px: '13px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '28px' }}>
-          Nastavení
+          {AREA_LABEL[areaAt(nav.pathname) ?? 'daily']}
         </Box>
         <SidebarScrollArea>
           <SettingsNav plain query={nav.settingsQuery} onQueryChange={nav.onSettingsQueryChange} />
@@ -432,7 +433,7 @@ export function NavDrawer({
       transitionDuration={{ enter: 150, exit: 120 }}
       slotProps={{
         paper: {
-          'aria-label': nav.settingsMode ? 'Nastavení — menu' : 'Menu',
+          'aria-label': nav.settingsMode ? `${AREA_LABEL[areaAt(nav.pathname) ?? 'daily']} — menu` : 'Menu',
           role: 'dialog',
           sx: {
             width: SIDEBAR_WIDTH,

@@ -1,5 +1,5 @@
 /*
- * Audit of the second half of Nastavení (Komunikace, Dokumenty, Vzhled webu, Systém):
+ * Audit of the second half of Nastavení (Komunikace a dokumenty, Můj účet and the whole Administrace):
  * what each role may open, that the menu and the router agree about it, where each
  * screen's change history is filed, and what the hub search finds.
  */
@@ -15,7 +15,7 @@ import {
   type SettingsItem,
 } from './catalogue';
 
-const MINE = ['komunikace', 'dokumenty', 'vzhled-webu', 'system'];
+const MINE = ['komunikace-a-dokumenty', 'ucet', 'administrace'];
 const myItems = SETTINGS_SECTIONS.filter((s) => MINE.includes(s.id)).flatMap((s) => s.items.map((i) => ({ section: s, item: i })));
 const byId = (id: string): SettingsItem => {
   const hit = myItems.find((x) => x.item.id === id);
@@ -55,8 +55,8 @@ describe('the router asks for the permission the menu lists', () => {
 describe('who sees what in the second half of Nastavení', () => {
   const OPEN_TO_EVERYBODY = ['hodnoceni-pacientu', 'dvoufazove'];
 
-  it('shows an owner (every permission) all 20 screens', () => {
-    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(20);
+  it('shows an owner (every permission) all 22 screens', () => {
+    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(22);
     expect(idsFor(ALL_PERMISSIONS)).toEqual(myItems.map((x) => x.item.id).sort());
   });
 
@@ -72,11 +72,11 @@ describe('who sees what in the second half of Nastavení', () => {
     expect(idsFor([permission])).toEqual([...OPEN_TO_EVERYBODY, ...extra].sort());
   });
 
-  it('settings.clinic.manage opens the 15 administration screens, Zprávy (reminders, sending) and neither single-permission one', () => {
+  it('settings.clinic.manage opens the administration screens, Zprávy (reminders, sending) and neither single-permission one', () => {
     const ids = idsFor(['settings.clinic.manage']);
-    expect(ids).toHaveLength(18);
+    expect(ids).toHaveLength(20);
     for (const closed of ['zdravotni-dotaznik', 'tym']) expect(ids).not.toContain(closed);
-    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy', 'zpravy', 'fronta-emailu']) {
+    for (const open of ['souhlasy', 'dokumenty-sablony', 'pravidla-dokumentu', 'udaje-pacienta', 'rychla-registrace', 'odkaz-registrace', 'media-a-texty', 'uloziste-medii', 'firma-a-faktury', 'integrace', 'historie-zmen', 'audit', 'zdravi', 'zabezpeceni-zalohy', 'zpravy', 'fronta-emailu', 'bezpecnostni-pravidla', 'verejny-web']) {
       expect(ids).toContain(open);
     }
   });
@@ -88,10 +88,10 @@ describe('who sees what in the second half of Nastavení', () => {
     },
   );
 
-  it('drops a whole group when nothing in it is allowed (Vzhled webu for a questionnaire manager)', () => {
+  it('drops a whole group when nothing in it is allowed (the Administrace for a questionnaire manager)', () => {
     const groups = visibleSections(['questionnaires.manage']).map((s) => s.id);
-    expect(groups).not.toContain('vzhled-webu');
-    expect(groups).toContain('dokumenty');
+    expect(groups).not.toContain('administrace');
+    expect(groups).toContain('komunikace-a-dokumenty');
   });
 
   it('accepts a Set as well as an array of permissions', () => {
@@ -117,6 +117,7 @@ describe('where each screen files its changes (Historie změn)', () => {
     ['uloziste-medii', 'media'],
     ['firma-a-faktury', 'company'],
     ['integrace', 'integrations'],
+    ['bezpecnostni-pravidla', 'security'],
   ])('%s is filed under %s', (id, scope) => {
     expect(scopeOf(byId(id))).toBe(scope);
   });
@@ -129,7 +130,7 @@ describe('where each screen files its changes (Historie změn)', () => {
   });
 
   it('an item that says nothing keeps its id as the scope (the rule the other half relies on)', () => {
-    expect(scopeOf({ id: 'x', label: 'x', description: 'x', to: '/x', keywords: [] })).toBe('x');
+    expect(scopeOf({ area: 'daily', id: 'x', label: 'x', description: 'x', to: '/x', keywords: [] })).toBe('x');
   });
 });
 
@@ -187,7 +188,7 @@ describe('the hub search finds the second half by what a person would type', () 
 
   it('searchSections puts a group with a label hit first', () => {
     const result = searchSections(sections, 'komunikace');
-    expect(result[0].id).toBe('komunikace');
+    expect(result[0].id).toBe('komunikace-a-dokumenty');
   });
 });
 
