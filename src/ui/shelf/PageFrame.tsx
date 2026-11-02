@@ -113,8 +113,10 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
         </Breadcrumbs>
       )}
 
-      <Box component="header" sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', gap: 1.5, mb: hasChips ? 1.25 : 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+      <Box component="header" sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', flexWrap: { md: 'wrap' }, gap: 1.5, mb: hasChips ? 1.25 : 2.5 }}>
+        {/* The title keeps at least a readable width: when the actions do not fit beside it they wrap below it,
+            instead of squeezing the name into a column one letter wide. */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: { md: '1 1 320px' } }}>
           {leading}
           <Box sx={{ minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
@@ -124,7 +126,7 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
             {purpose !== undefined && <Typography sx={{ ...MUTED_SX, mt: 0.25, fontSize: 15 }}>{purpose}</Typography>}
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flex: { md: '0 1 auto' }, minWidth: 0 }}>
           {search && !phone && <PaletteTrigger />}
           {actions}
           {primaryAction !== undefined && !phone && <PrimaryButton action={primaryAction} />}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, MenuItem, Stack, TextField, Typography,
+  Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, MenuItem, Stack, TextField,
+  ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -24,20 +25,30 @@ const NOT_DEPLOYED = 'Odesílání zpráv server zatím neumí. Zkuste to po nas
 export default function SendMessageDialog({ target, onClose, onSent }: Props) {
   const { t } = useTranslation();
   const phone = useIsPhone();
+  /* 'written' = typed here, sent once, nothing saved; 'saved' = one of the clinic's own messages from Nastavení - Zprávy. */
+  const [mode, setMode] = useState<'written' | 'saved' | null>(null);
   const [code, setCode] = useState('');
+  const [subject, setSubject] = useState('');
+  const [text, setText] = useState('');
   const [includePlayers, setIncludePlayers] = useState(false);
   const [preview, setPreview] = useState<SendResult | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const list = useQuery({ queryKey: ['email-templates'], queryFn: emailTemplatesApi.list, retry: false });
   const choices = sendableTo(list.data ?? [], target.kind);
+  /* Until somebody picks, a clinic with saved messages starts on them and one without starts on writing. */
+  const current = mode ?? (choices.length > 0 ? 'saved' : 'written');
+  const ready = current === 'written' ? subject.trim() !== '' && text.trim() !== '' : code !== '';
+  const run = (dry: boolean) => (current === 'written'
+    ? emailTemplatesApi.sendWritten(subject, text, toSendTarget(target, includePlayers), dry)
+    : emailTemplatesApi.send(code, toSendTarget(target, includePlayers), dry));
 
   const dryRun = useMutation({
-    mutationFn: () => emailTemplatesApi.send(code, toSendTarget(target, includePlayers), true),
+    mutationFn: () => run(true),
     onSuccess: setPreview,
   });
   const send = useMutation({
-    mutationFn: () => emailTemplatesApi.send(code, toSendTarget(target, includePlayers), false),
+    mutationFn: () => run(false),
     onSuccess: (result) => onSent(result.queued),
     onSettled: () => setConfirming(false),
   });
@@ -46,7 +57,7 @@ export default function SendMessageDialog({ target, onClose, onSent }: Props) {
   const forget = () => { setPreview(null); dryRun.reset(); send.reset(); };
   const failure = (error: unknown): string =>
     (error instanceof BookingApiError && error.kind === 'notFound' ? NOT_DEPLOYED : errorText(error, t));
-  const error = list.error ?? dryRun.error ?? send.error;
+  const error = (current === 'saved' ? list.error : null) ?? dryRun.error ?? send.error;
   const canSend = preview !== null && preview.recipients > 0 && !send.isPending;
 
   return (
@@ -55,23 +66,59 @@ export default function SendMessageDialog({ target, onClose, onSent }: Props) {
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           {error ? <Alert severity={error instanceof BookingApiError && error.kind === 'notFound' ? 'info' : 'error'}>{failure(error)}</Alert> : null}
-          {list.isSuccess && choices.length === 0 ? (
-            <Alert severity="info">
-              Zatím nemáte žádnou vlastní zprávu pro {target.kind === 'club' ? 'kluby' : 'pacienty'}. Napíšete ji v Nastavení - Zprávy.
-            </Alert>
-          ) : null}
-          <TextField
-            select
-            label="Zpráva"
-            value={code}
-            onChange={(e) => { setCode(e.target.value); forget(); }}
-            disabled={list.isPending || choices.length === 0}
+          <ToggleButtonGroup
+            exclusive
             fullWidth
+            size="small"
+            value={current}
+            onChange={(_, next: 'written' | 'saved' | null) => { if (next !== null) { setMode(next); forget(); } }}
+            aria-label="Druh zprávy"
           >
-            {choices.map((choice) => (
-              <MenuItem key={choice.code} value={choice.code} sx={{ minHeight: 44 }}>{choice.name}</MenuItem>
-            ))}
-          </TextField>
+            <ToggleButton value="written" sx={TARGET_SX}>Napsat vlastní</ToggleButton>
+            <ToggleButton value="saved" sx={TARGET_SX}>Uložená zpráva</ToggleButton>
+          </ToggleButtonGroup>
+
+          {current === 'written' ? (
+            <>
+              <TextField
+                label="Předmět"
+                value={subject}
+                onChange={(e) => { setSubject(e.target.value); forget(); }}
+                slotProps={{ htmlInput: { maxLength: 200 } }}
+                fullWidth
+              />
+              <TextField
+                label="Text zprávy"
+                value={text}
+                onChange={(e) => { setText(e.target.value); forget(); }}
+                placeholder={'Dobrý den,\n\n…'}
+                slotProps={{ htmlInput: { maxLength: 10000 } }}
+                multiline
+                minRows={6}
+                fullWidth
+              />
+            </>
+          ) : (
+            <>
+              {list.isSuccess && choices.length === 0 ? (
+                <Alert severity="info">
+                  Zatím nemáte žádnou uloženou zprávu pro {target.kind === 'club' ? 'kluby' : 'pacienty'}. Napište ji tady jako vlastní, nebo si ji uložte v Nastavení - Zprávy.
+                </Alert>
+              ) : null}
+              <TextField
+                select
+                label="Zpráva"
+                value={code}
+                onChange={(e) => { setCode(e.target.value); forget(); }}
+                disabled={list.isPending || choices.length === 0}
+                fullWidth
+              >
+                {choices.map((choice) => (
+                  <MenuItem key={choice.code} value={choice.code} sx={{ minHeight: 44 }}>{choice.name}</MenuItem>
+                ))}
+              </TextField>
+            </>
+          )}
           {target.kind === 'club' ? (
             <FormControlLabel
               control={<Checkbox checked={includePlayers} onChange={(e) => { setIncludePlayers(e.target.checked); forget(); }} sx={{ p: 1.5 }} />}
@@ -94,7 +141,7 @@ export default function SendMessageDialog({ target, onClose, onSent }: Props) {
       <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: 'wrap' }}>
         <Button onClick={onClose} sx={TARGET_SX}>Zavřít</Button>
         <Box sx={{ flexGrow: 1 }} />
-        <Button variant="outlined" disabled={code === '' || dryRun.isPending} onClick={() => dryRun.mutate()} sx={TARGET_SX}>Náhled</Button>
+        <Button variant="outlined" disabled={!ready || dryRun.isPending} onClick={() => dryRun.mutate()} sx={TARGET_SX}>Náhled</Button>
         <Button variant="contained" disabled={!canSend} onClick={() => setConfirming(true)} sx={TARGET_SX}>Odeslat</Button>
       </DialogActions>
 

@@ -183,6 +183,13 @@ export const emailTemplatesApi = {
       const res = await client.post(`/api/email-templates/${encodeURIComponent(code)}/send`, { target, dryRun });
       return parseResponse(sendResultSchema, res.data);
     }),
+
+  /** Sends a message typed on the spot (plain text, no template). Same dry run and result as `send`. */
+  sendWritten: (subject: string, text: string, target: SendTarget, dryRun: boolean): Promise<SendResult> =>
+    request(async () => {
+      const res = await client.post('/api/email-templates/written/send', { target, subject, text, dryRun });
+      return parseResponse(sendResultSchema, res.data);
+    }),
 };
 
 export default emailTemplatesApi;

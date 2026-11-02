@@ -98,4 +98,29 @@ describe('SendMessageButton', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Náhled' }));
     expect(await within(dialog).findByText(/server zatím neumí/i)).toBeInTheDocument();
   });
+  it('starts on "Napsat vlastní" when the clinic has no saved message, and sends the typed text', async () => {
+    const user = userEvent.setup();
+    get.mockResolvedValue({ data: LIST.filter((t) => !t.isCustom) });
+    post.mockImplementation((_url: string, body: { dryRun: boolean }) => Promise.resolve({ data: body.dryRun ? { ...DRY, recipients: 1, skippedWithoutEmail: 0 } : { ...DRY, queued: 1 } }));
+    renderButton({ kind: 'patient', id: 'p1' });
+    await user.click(screen.getByRole('button', { name: 'Poslat zprávu' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Poslat zprávu' });
+
+    expect(within(dialog).getByRole('button', { name: 'Napsat vlastní' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Náhled' })).toBeDisabled();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Předmět' }), 'Zítra zavřeno');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Text zprávy' }), 'Dobrý den');
+    await user.click(within(dialog).getByRole('button', { name: 'Náhled' }));
+    expect(await within(dialog).findByText('Příjemců: 1, bez e-mailu: 0')).toBeInTheDocument();
+    expect(post).toHaveBeenLastCalledWith('/api/email-templates/written/send', {
+      target: { kind: 'patient', id: 'p1' }, subject: 'Zítra zavřeno', text: 'Dobrý den', dryRun: true,
+    });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Odeslat' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Odeslat zprávu?' })).getByRole('button', { name: 'Odeslat' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
+    expect(post).toHaveBeenLastCalledWith('/api/email-templates/written/send', {
+      target: { kind: 'patient', id: 'p1' }, subject: 'Zítra zavřeno', text: 'Dobrý den', dryRun: false,
+    });
+  });
 });
