@@ -48,3 +48,28 @@ export function angleLabelTargets(curves: Record<string, unknown>): { joint: str
   if ('trunk_flexion' in curves) out.push({ joint: 'neck', curve: 'trunk_flexion' });
   return out;
 }
+
+export interface AngleSpecOut { joint: number; prev: number[]; next: number; value: number }
+
+/**
+ * The flexion arcs to draw at a frame: knees (hip - knee - ankle) and hips (shoulder - hip - knee) of the sides the curves have.
+ * Joints a skeleton does not name are left out.
+ */
+export function angleSpecs(names: readonly string[], curves: Record<string, readonly (number | null)[]>, frame: number): AngleSpecOut[] {
+  const idx = (n: string) => names.indexOf(n);
+  const out: AngleSpecOut[] = [];
+  for (const side of ['L', 'R'] as const) {
+    const s = SIDE_NAME[side];
+    for (const [curve, joint, prev, next] of [
+      [`knee_flexion_${side}`, `${s}_knee`, `${s}_hip`, `${s}_ankle`],
+      [`hip_flexion_${side}`, `${s}_hip`, `${s}_shoulder`, `${s}_knee`],
+    ] as const) {
+      const value = curves[curve]?.[frame];
+      const j = idx(joint);
+      const p = idx(prev);
+      const n = idx(next);
+      if (value !== null && value !== undefined && j >= 0 && p >= 0 && n >= 0) out.push({ joint: j, prev: [p], next: n, value });
+    }
+  }
+  return out;
+}

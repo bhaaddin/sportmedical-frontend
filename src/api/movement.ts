@@ -39,7 +39,8 @@ export type Side = z.infer<typeof sideSchema>;
 
 /* ───────────── ClipResult (section 3) ───────────── */
 
-const keypointSchema = z.tuple([z.number(), z.number(), z.number()]);
+/** [x, y, confidence]; x and y are null when the point is unknown. */
+const keypointSchema = z.tuple([z.number().nullable(), z.number().nullable(), z.number()]);
 
 export const clipResultSchema = z.object({
   schemaVersion: z.literal(1),
@@ -55,9 +56,13 @@ export const clipResultSchema = z.object({
     reasons: z.array(z.object({ code: z.string(), messageKey: z.string().optional(), detail: z.string().nullish() })),
   }),
   skeleton: z.object({
+    /** `wholebody133` (body 17, feet 6, face 68, hands 2x21) or `halpe26`. */
     keypointSet: z.string(),
+    analysisKeypointSet: z.string().optional(),
     names: z.array(z.string()),
     edges: z.array(z.tuple([z.number().int(), z.number().int()])),
+    /** Half-open index ranges per region; absent for halpe26. */
+    groups: z.record(z.string(), z.tuple([z.number().int(), z.number().int()])).optional(),
     times: z.array(z.number()),
     frames: z.array(z.array(keypointSchema)),
   }),
@@ -95,7 +100,9 @@ export const clipResultSchema = z.object({
     sentence: z.object({ cs: z.string(), en: z.string() }),
     ruleVersion: z.string(),
   })),
-  score: z.object({ band: z.enum(['green', 'watch', 'red', 'needs_review']), errorCount: z.number().int(), reasonKey: z.string().nullish() }),
+  /** The MyoSim musculoskeletal fit (CONTRACT 3b): when `available`, the API serves anatomy.json and anatomy.bin. */
+  anatomy: z.object({ available: z.boolean(), model: z.string().optional(), bodies: z.number().optional(), muscles: z.number().optional(), reason: z.string().nullish() }).passthrough().nullish(),
+  score: z.object({ band: z.enum(['green', 'watch', 'red', 'needs_review']), errorCount: z.number().int().nullish(), watchCount: z.number().int().nullish(), redCount: z.number().int().nullish(), reasonKey: z.string().nullish() }),
 });
 export type ClipResult = z.infer<typeof clipResultSchema>;
 export type Flag = ClipResult['flags'][number];
@@ -375,6 +382,18 @@ export async function getClipVideo(clipId: string): Promise<Blob | string> {
   if (movementMock()) return (await mock()).videoUrl(clipId);
   const res = await client.get(`${BASE}/clips/${encodeURIComponent(clipId)}/video`, { responseType: 'blob', timeout: 0 });
   return res.data as Blob;
+}
+
+/** The anatomy description of a clip (anatomy.json). */
+export async function getAnatomyJson(clipId: string): Promise<unknown> {
+  return call('get', `/clips/${encodeURIComponent(clipId)}/anatomy`);
+}
+
+/** The anatomy numbers of a clip (anatomy.bin). */
+export async function getAnatomyBin(clipId: string): Promise<ArrayBuffer> {
+  if (movementMock()) return (await mock()).anatomyBin(clipId);
+  const res = await client.get(`${BASE}/clips/${encodeURIComponent(clipId)}/anatomy.bin`, { responseType: 'arraybuffer', timeout: 60_000 });
+  return res.data as ArrayBuffer;
 }
 
 export async function postDecision(clipId: string, input: DecisionInput): Promise<Decision> {

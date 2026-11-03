@@ -115,12 +115,38 @@ describe('review screen with the fixture', () => {
     for (const base of ['knee_flexion', 'hip_flexion', 'trunk_flexion']) expect(screen.getByTestId(`curve-${base}`)).toBeInTheDocument();
   });
 
-  it('the layer toggles are real toggle buttons', async () => {
+  it('the layer toggles are real toggle buttons: Kosti, Svaly, Šlachy, Klouby, Body, Úhly, Stopa', async () => {
     wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
-    const skeleton = screen.getByRole('button', { name: 'Kostra' });
-    expect(skeleton).toHaveAttribute('aria-pressed', 'true');
-    await userEvent.setup().click(skeleton);
-    expect(skeleton).toHaveAttribute('aria-pressed', 'false');
+    const user = userEvent.setup();
+    const on = ['Kosti', 'Svaly', 'Šlachy', 'Klouby', 'Úhly', 'Stopa'];
+    for (const name of on) expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Body' })).toHaveAttribute('aria-pressed', 'false');
+    await user.click(screen.getByRole('button', { name: 'Svaly' }));
+    expect(screen.getByRole('button', { name: 'Svaly' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('the style switch changes between Anatomie and Kostra; the muscle note says it is a visual model', async () => {
+    wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
+    const user = userEvent.setup();
+    expect(screen.getByRole('button', { name: 'Anatomie 2D' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('muscle-note')).toHaveTextContent('vizuální model');
+    expect(screen.getByTestId('muscle-note')).toHaveTextContent('ne naměřené EMG');
+    await user.click(screen.getByRole('button', { name: 'Kostra' }));
+    expect(screen.getByRole('button', { name: 'Kostra' })).toHaveAttribute('aria-pressed', 'true');
+    // the wireframe has no muscles, tendons or joint caps to toggle
+    expect(screen.queryByRole('button', { name: 'Svaly' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Šlachy' })).toBeNull();
+    expect(screen.queryByTestId('muscle-note')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Kosti' })).toBeInTheDocument();
+  });
+
+  it('Detail zooms the stage onto the athlete and back', async () => {
+    wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
+    const toggle = screen.getByTestId('detail-toggle');
+    expect(screen.getByTestId('video-stage')).toHaveAttribute('data-detail', 'off');
+    await userEvent.setup().click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('video-stage')).toHaveAttribute('data-detail', 'on');
   });
 
   it('shows the clinician decision instead of the draft once one exists, and unlocks the report', () => {
@@ -338,5 +364,32 @@ describe('permissions', () => {
     const decisions = [{ id: 'd1', action: 'reject' as const, band: null, faultTags: [], unsure: false, note: '', decidedBy: 'abcd', decidedAt: '2026-11-03T10:00:00Z' }];
     wrap(<ReviewView clip={clipOf({ decisions })} videoSrc={null} />);
     expect(screen.getByTestId('score-label')).toHaveTextContent('Návrh zamítnut klinikem');
+  });
+});
+
+describe('3D anatomy', () => {
+  const withAnatomy = (): ClipDetail => clipOf({ result: { ...buildRunningSideResult(), anatomy: { available: true, model: 'myo_sim/myofullbody', bodies: 88, muscles: 424 } } });
+
+  it('offers 3D anatomie first, then the 2D anatomy and the wireframe, for a clip that has an anatomy', async () => {
+    wrap(<ReviewView clip={withAnatomy()} videoSrc={null} />);
+    expect(screen.getByRole('button', { name: '3D anatomie' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Anatomie 2D' })).toHaveAttribute('aria-pressed', 'false');
+    // the 3D layers: no joint caps, but the bones, muscles, tendons, keypoints, angles, trail, events
+    for (const name of ['Kosti', 'Svaly', 'Šlachy', 'Body', 'Úhly', 'Stopa', 'Události']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Klouby' })).toBeNull();
+    // muscle groups and the honest legend
+    expect(screen.getByTestId('muscle-note')).toHaveTextContent('Aktivita svalů je vizuální odhad z rychlosti zkracování, ne měření EMG.');
+  });
+
+  it('a clip without an anatomy has no 3D style and keeps the procedural 2D one', () => {
+    wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
+    expect(screen.queryByRole('button', { name: '3D anatomie' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Anatomie 2D' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says so and falls back to the 2D anatomy when the 3D one cannot be loaded', async () => {
+    wrap(<ReviewView clip={withAnatomy()} videoSrc={null} />);
+    expect(await screen.findByText(/3D anatomii se nepodařilo načíst/)).toBeInTheDocument();
+    expect(screen.getByTestId('video-stage')).toHaveAttribute('data-style', 'anatomy');
   });
 });

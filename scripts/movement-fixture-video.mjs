@@ -1,35 +1,39 @@
 /*
- * Makes the two small fixture videos of the movement module (src/movement/fixtures/*.webm): a floor, a wall, a 1 m floor
- * marker, (for the drop jump) a 30 cm box, and a frame counter so a reviewer can SEE that the skeleton overlay is in sync.
- * 1280x720, 60 fps, 120 frames, VP9. Needs ffmpeg on PATH:   node scripts/movement-fixture-video.mjs
+ * Makes the two small fixture videos of the movement module (src/movement/fixtures/*.webm) to match the two real pipeline
+ * results next to them (*.result.json): same size (1920x1080), 60 fps and frame count. A dark wall, a floor line where the
+ * athlete's feet land, a 1 m floor marker and a frame counter, so a reviewer can SEE that the overlay is in sync.
+ * Needs ffmpeg on PATH:   node scripts/movement-fixture-video.mjs
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const out = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'movement', 'fixtures');
 const font = process.env.FONT ?? '/Windows/Fonts/arial.ttf';
-const S = 300; // pixels per metre, the same as synth.ts
-const FLOOR = 690;
 
-function make(name, extra) {
+function make(name, resultFile) {
+  const r = JSON.parse(readFileSync(resolve(out, resultFile), 'utf8'));
+  const { width, height, frameCount, fps } = r.video;
+  /* the floor is where the lowest foot point ever gets to */
+  let floor = 0;
+  for (const f of r.skeleton.frames) for (const k of f.slice(15, 23)) if (k[1] !== null && k[1] > floor) floor = k[1];
+  floor = Math.round(floor + 6);
+  const metre = Math.round(1 / r.scale.metersPerPixel);
   const filters = [
-    `drawbox=x=0:y=${FLOOR}:w=1280:h=30:color=0x3a3f45:t=fill`,
-    `drawbox=x=0:y=${FLOOR}:w=1280:h=3:color=0x6b727a:t=fill`,
-    // 1 m marker on the floor, right of the athlete
-    `drawbox=x=900:y=${FLOOR + 8}:w=${S}:h=6:color=0xd0d4d8:t=fill`,
-    ...extra,
-    `drawtext=fontfile='${font}':text='%{n}':x=24:y=20:fontsize=36:fontcolor=0xd0d4d8`,
+    `drawbox=x=0:y=${floor}:w=${width}:h=${height - floor}:color=0x3a3f45:t=fill`,
+    `drawbox=x=0:y=${floor}:w=${width}:h=4:color=0x6b727a:t=fill`,
+    `drawbox=x=${width - metre - 120}:y=${floor + 16}:w=${metre}:h=8:color=0xd0d4d8:t=fill`,
+    `drawtext=fontfile='${font}':text='%{n}':x=32:y=28:fontsize=56:fontcolor=0xd0d4d8`,
   ].join(',');
   const args = [
-    '-y', '-f', 'lavfi', '-i', 'color=c=0x20262c:s=1280x720:r=60:d=2',
-    '-vf', filters, '-c:v', 'libvpx-vp9', '-b:v', '120k', '-crf', '38', '-g', '30', '-pix_fmt', 'yuv420p', '-an',
+    '-y', '-f', 'lavfi', '-i', `color=c=0x20262c:s=${width}x${height}:r=${fps}:d=${frameCount / fps}`,
+    '-vf', filters, '-frames:v', String(frameCount), '-c:v', 'libvpx-vp9', '-b:v', '150k', '-crf', '40', '-g', '30', '-pix_fmt', 'yuv420p', '-an',
     resolve(out, name),
   ];
-  const r = spawnSync('ffmpeg', args, { stdio: 'inherit' });
-  if (r.status !== 0) throw new Error(`ffmpeg failed for ${name}`);
+  const res = spawnSync('ffmpeg', args, { stdio: 'inherit' });
+  if (res.status !== 0) throw new Error(`ffmpeg failed for ${name}`);
 }
 
-make('running-side.webm', []);
-// the box the athlete drops from: 30 cm high, 50 cm wide, 40 cm behind the landing spot
-make('dropjump-front.webm', [`drawbox=x=${640 - Math.round(0.4 * S) - Math.round(0.25 * S)}:y=${FLOOR - Math.round(0.3 * S)}:w=${Math.round(0.5 * S)}:h=${Math.round(0.3 * S)}:color=0x59616a:t=fill`]);
+make('running-side.webm', 'running_side.result.json');
+make('dropjump-front.webm', 'drop_jump_front.result.json');

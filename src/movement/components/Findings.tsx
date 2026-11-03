@@ -52,7 +52,7 @@ export function ScoreBlock({ clip }: { clip: ClipDetail }) {
         </Typography>
       )}
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-        {t('score.errors', { n: result.score.errorCount })} · {t('score.scale', { source: t(`scale.${result.scale.source}`) })}
+        {t('score.errors', { n: result.score.errorCount ?? (result.score.redCount ?? 0) + (result.score.watchCount ?? 0) })} · {t('score.scale', { source: t(`scale.${result.scale.source}`) })}
       </Typography>
       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
         {t('score.versions', { rules: result.versions.rules, model: result.versions.poseModel })}

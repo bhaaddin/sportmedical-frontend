@@ -7,9 +7,27 @@
  * Any patient id gets the same three seeded sessions; what is created lives until reload.
  */
 import type { ClipResult } from '../../api/movement';
-import { buildDropJumpFrontResult, buildQaRejectedResult, buildRunningSideResult } from './synth';
 import runningVideo from './running-side.webm?url';
 import dropJumpVideo from './dropjump-front.webm?url';
+
+/*
+ * The two results are real pipeline output (COCO-WholeBody 133 points, 1920x1080 at 60 fps). They are big, so they are loaded
+ * the first time the mock answers - never with the application's own scripts.
+ */
+let running: ClipResult | null = null;
+let dropJump: ClipResult | null = null;
+async function loadFixtures(): Promise<void> {
+  if (running !== null) return;
+  running = (await import('./running_side.result.json')).default as unknown as ClipResult;
+  dropJump = (await import('./drop_jump_front.result.json')).default as unknown as ClipResult;
+}
+const build = (movement: 'running' | 'drop_jump', clipId: string): ClipResult => ({ ...(movement === 'running' ? running! : dropJump!), clipId });
+
+/** A clip whose quality check failed: the result carries only its qa. */
+const qaRejected = (): ClipResult['qa'] => ({
+  passed: false, usableFrameRatio: 0.42, meanConfidence: 0.38,
+  reasons: [{ code: 'low_fps', messageKey: 'movement.qa.low_fps', detail: '30 fps' }, { code: 'too_dark', messageKey: 'movement.qa.too_dark', detail: '31/255' }],
+});
 
 const delay = (ms = 120) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -47,7 +65,7 @@ const statusOf = (c: StoredClip): string => {
 };
 
 const resultFor = (c: StoredClip): ClipResult => {
-  const base = c.movement === 'running' ? buildRunningSideResult(c.clipId) : buildDropJumpFrontResult(c.clipId);
+  const base = build(c.movement, c.clipId);
   const metrics = c.shift === 0 ? base.metrics : base.metrics.map((m) => ({ ...m, value: Math.round((m.value + c.shift * (m.side === 'L' ? 1 : 0.6)) * 10) / 10 }));
   return { ...base, view: c.view, metrics };
 };
@@ -104,7 +122,7 @@ const consentsOf = (patientId: string): StoredConsent[] =>
 function detail(c: StoredClip) {
   const status = statusOf(c);
   const rejected = status === 'rejected';
-  const qa = rejected ? buildQaRejectedResult(c.clipId).qa : null;
+  const qa = rejected ? qaRejected() : null;
   return {
     clipId: c.clipId, sessionId: c.sessionId, patientId: c.patientId, movement: c.movement, view: c.view, status,
     failureReason: rejected ? 'qa_rejected' : null, attemptCount: 1, hasVideo: true, qaPassed: rejected ? false : status === 'done' ? true : null,
@@ -119,6 +137,7 @@ type Options = { params?: Record<string, string>; body?: unknown };
 
 /** The router: one entry per row of the controller. Async, like the network. */
 export async function handle(verb: string, path: string, options: Options = {}): Promise<unknown> {
+  await loadFixtures();
   await delay(verb === 'get' ? 60 : 120);
   const body = (options.body ?? {}) as Record<string, unknown>;
   let m: RegExpExecArray | null;
@@ -176,6 +195,10 @@ export async function handle(verb: string, path: string, options: Options = {}):
     c.uploaded = true;
     return ok({ clipId: m[1], status: 'queued' });
   }
+  if ((m = /^\/clips\/([^/]+)\/anatomy$/.exec(path)) && verb === 'get') {
+    const c = clipOf(m[1]);
+    return ok(c.movement === 'drop_jump' ? (await import('./drop_jump_front.anatomy.json')).default : (await import('./running_side.anatomy.json')).default);
+  }
   if ((m = /^\/clips\/([^/]+)$/.exec(path)) && verb === 'get') return ok(detail(clipOf(m[1])));
   if ((m = /^\/clips\/([^/]+)\/decision$/.exec(path)) && verb === 'post') {
     const c = clipOf(m[1]);
@@ -213,6 +236,15 @@ export async function uploadClipFile(clipId: string, file: Blob, onProgress: (r:
   }
   const c = clips.get(clipId);
   if (c) c.uploaded = true;
+}
+
+/* The anatomy of the two fixtures (MyoSim fit of the pipeline): json by import, the binary by URL. */
+import runningAnatomyBin from './running_side.anatomy.bin?url';
+import dropJumpAnatomyBin from './drop_jump_front.anatomy.bin?url';
+
+export async function anatomyBin(clipId: string): Promise<ArrayBuffer> {
+  const url = clipOf(clipId).movement === 'drop_jump' ? dropJumpAnatomyBin : runningAnatomyBin;
+  return (await fetch(url)).arrayBuffer();
 }
 
 export async function videoUrl(clipId: string): Promise<string> {

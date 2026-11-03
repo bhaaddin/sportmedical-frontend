@@ -32,7 +32,7 @@ const ONLY = (process.env.PAGES ?? 'review,running,upload,timeline,admin,failed,
 mkdirSync(OUT, { recursive: true });
 
 const pw = await loadPlaywright();
-const browser = await pw.chromium.launch({ executablePath: findChrome(), headless: true });
+const browser = await pw.chromium.launch({ executablePath: findChrome(), headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const failures = [];
 const fail = (where, what) => { failures.push(`${where}: ${what}`); console.log(`  FAIL ${where}: ${what}`); };
 const ok = (where, what) => console.log(`  ok   ${where}: ${what}`);
@@ -68,6 +68,8 @@ for (const [w, h] of VPS) {
         await page.waitForSelector('h1', { timeout: 20000 });
         if (name === 'review' || name === 'running') {
           await page.waitForSelector('[data-testid="overlay-canvas"]', { timeout: 20000 });
+          await page.waitForSelector('[data-testid="anatomy-canvas"]', { timeout: 60000 }).catch(() => fail(where, '3D anatomy did not appear'));
+          await page.waitForTimeout(800);
           await page.waitForFunction(() => { const v = document.querySelector('video'); return v && v.readyState >= 2; }, null, { timeout: 20000 }).catch(() => fail(where, 'video did not load'));
           // jump to the first finding, as a click on it does
           await page.locator('[data-flag]').first().click();
@@ -103,11 +105,27 @@ for (const [w, h] of VPS) {
       if (m.h1 !== 1) fail(where, `${m.h1} h1`);
       if (m.bad.length) fail(where, `targets under 44 px: ${m.bad.slice(0, 6).join('; ')}`);
       if (errors.length) fail(where, `console: ${errors.slice(0, 3).join(' | ')}`);
-      await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}.jpg`), type: 'jpeg', quality: 55 });
+      await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}.jpg`), type: 'jpeg', quality: 60 });
       if ((name === 'review') && !process.env.NO_SCROLL) {
         await page.evaluate(() => { const r = document.getElementById('fit-region'); if (r) r.scrollTop = r.scrollHeight * 0.55; });
         await page.waitForTimeout(300);
         await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}-scrolled.jpg`), type: 'jpeg', quality: 55 });
+      }
+      if ((name === 'review' || name === 'running') && !process.env.NO_SCROLL) {
+        const bench = await page.evaluate(() => { const e = window.__movementEngine; if (!e) return null; const ms = e.bench(60); const c = document.querySelector('[data-testid=overlay-canvas]'); return { ms: Math.round(ms * 10) / 10, fps: Math.round(1000 / ms), draw2d: c ? Number(c.dataset.drawMs).toFixed(1) : null }; });
+        console.log('  perf ' + where + ' ' + JSON.stringify(bench));
+        await page.evaluate(() => { const r = document.getElementById('fit-region'); if (r) r.scrollTop = 0; });
+        await page.locator('[data-testid="orbit-toggle"]').click().catch(() => undefined);
+        await page.waitForTimeout(1200);
+        await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}-orbit.jpg`), type: 'jpeg', quality: 60 });
+        await page.locator('[data-testid="orbit-toggle"]').click().catch(() => undefined);
+        await page.waitForTimeout(300);
+      }
+      if (name === 'review' && !process.env.NO_SCROLL) {
+        await page.evaluate(() => { const r = document.getElementById('fit-region'); if (r) r.scrollTop = 0; });
+        await page.locator('[data-testid="detail-toggle"]').click();
+        await page.waitForTimeout(900);
+        await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}-detail.jpg`), type: 'jpeg', quality: 60 });
       }
       await page.close();
     }
