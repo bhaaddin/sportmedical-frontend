@@ -1,14 +1,16 @@
 /* A patient's movement timeline: score trend per movement, the sessions, before/after, and the consents. */
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { Box, Button, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { StatusChip } from '../../components/ui';
 import { PageFrame, Shelf } from '../../ui/shelf';
-import { useMovementSessions, type Movement } from '../../api/movement';
+import { usePermission } from '../../auth/usePermission';
+import { getClip, movementKeys, useMovementSessions, type Movement } from '../../api/movement';
 import { MOVE_PATHS } from '../flags';
 import { formatDate, useMoveT } from '../i18n';
-import { compareSessions, movementsIn, scoreTrend, type TrendPoint } from '../lib/review';
+import { compareMetrics, doneClipOf, movementsIn, scoreTrend, type TrendPoint } from '../lib/review';
 import { formatValue } from '../lib/asymmetry';
 import { ConsentPanel } from '../components/ConsentPanel';
 import { usePatientLabel } from '../components/PatientPicker';
@@ -18,11 +20,11 @@ function Trend({ points }: { points: TrendPoint[] }) {
   const { t } = useMoveT();
   const W = 300;
   const H = 90;
-  const max = Math.max(4, ...points.map((p) => p.errorCount));
-  const xy = points.map((p, i) => [points.length === 1 ? W / 2 : 12 + (i / (points.length - 1)) * (W - 24), H - 12 - (p.errorCount / max) * (H - 24)] as const);
+  /* the band as a level: green at the bottom, red at the top - lower is better */
+  const xy = points.map((p, i) => [points.length === 1 ? W / 2 : 12 + (i / (points.length - 1)) * (W - 24), H - 12 - ((p.level - 1) / 2) * (H - 24)] as const);
   return (
     <Box sx={{ minWidth: 0 }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${t('timeline.trend.errors')}: ${points.map((p) => p.errorCount).join(', ')}`} style={{ display: 'block', maxHeight: 130 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${t('timeline.trend.title')}: ${points.map((p) => t(`band.${p.band}`)).join(', ')}`} style={{ display: 'block', maxHeight: 130 }}>
         {xy.length > 1 && <Box component="polyline" points={xy.map(([x, y]) => `${x},${y}`).join(' ')} fill="none" strokeWidth={2} sx={(th) => ({ stroke: th.palette.text.secondary })} />}
         {xy.map(([x, y], i) => (
           <Box key={points[i].sessionId} component="circle" cx={x} cy={y} r={6}
@@ -38,6 +40,7 @@ export default function TimelinePage() {
   const { patientId } = useParams<{ patientId: string }>();
   const name = usePatientLabel(patientId);
   const query = useMovementSessions(patientId);
+  const mayCapture = usePermission('movement.capture');
   const sessions = useMemo(() => [...(query.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)), [query.data]);
   const movements = useMemo(() => movementsIn(sessions), [sessions]);
 
@@ -48,19 +51,22 @@ export default function TimelinePage() {
   const [afterId, setAfterId] = useState<string | null>(null);
   const before = eligible.find((s) => s.id === (beforeId ?? eligible[eligible.length - 1]?.id));
   const after = eligible.find((s) => s.id === (afterId ?? eligible[0]?.id));
-  const rows = before && after && before.id !== after.id ? compareSessions(before, after, movement) : [];
+  const different = before !== undefined && after !== undefined && before.id !== after.id;
+  const beforeClip = useQuery({ queryKey: movementKeys.clip(doneClipOf(before, movement) ?? ''), queryFn: () => getClip(doneClipOf(before, movement)!), enabled: different && doneClipOf(before, movement) !== null });
+  const afterClip = useQuery({ queryKey: movementKeys.clip(doneClipOf(after, movement) ?? ''), queryFn: () => getClip(doneClipOf(after, movement)!), enabled: different && doneClipOf(after, movement) !== null });
+  const rows = different ? compareMetrics(beforeClip.data?.result?.metrics, afterClip.data?.result?.metrics) : [];
 
   return (
     <PageFrame
       title={t('title')}
       purpose={name ? `${name} · ${t('timeline.purpose')}` : t('timeline.purpose')}
       entities={patientId && name ? [{ kind: 'patient', id: patientId, label: name }] : undefined}
-      primaryAction={{ label: t('action.upload'), to: MOVE_PATHS.upload(patientId) }}
+      primaryAction={mayCapture ? { label: t('action.upload'), to: MOVE_PATHS.upload(patientId) } : undefined}
     >
       <Stack spacing={{ xs: 3, md: 3.5 }}>
         <Shelf id="trend" title={t('timeline.trend.title')} hint={t('timeline.trend.hint')} layout="board" stagger={false}
           loading={query.isLoading} error={query.isError ? t('timeline.error') : false} onRetry={() => void query.refetch()}
-          empty={movements.length === 0} emptyState={{ text: t('timeline.trend.empty'), action: { label: t('action.upload'), to: MOVE_PATHS.upload(patientId) } }}>
+          empty={movements.length === 0} emptyState={{ text: t('timeline.trend.empty'), ...(mayCapture ? { action: { label: t('action.upload'), to: MOVE_PATHS.upload(patientId) } } : {}) }}>
           <Box sx={{ display: 'grid', gap: 2, p: { xs: 1.5, md: 2 }, gridTemplateColumns: { xs: '1fr', md: `repeat(${Math.max(1, movements.length)}, minmax(0, 1fr))` } }}>
             {movements.map((m) => {
               const points = scoreTrend(sessions, m);
@@ -72,7 +78,7 @@ export default function TimelinePage() {
                     {last && <StatusChip tone={BAND_TONE[last.band]} dot size="sm">{t(`band.${last.band}`)}</StatusChip>}
                   </Stack>
                   <Trend points={points} />
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{t('timeline.trend.errors')}: {points.map((p) => p.errorCount).join(' → ')}</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{points.map((p) => t(`band.${p.band}`)).join(' → ')}</Typography>
                 </Box>
               );
             })}
@@ -80,7 +86,7 @@ export default function TimelinePage() {
         </Shelf>
 
         <Shelf id="sessions" title={t('timeline.sessions.title')} hint={t('timeline.sessions.hint')} count={sessions.length} layout="board" stagger={false}
-          loading={query.isLoading} empty={sessions.length === 0} emptyState={{ text: t('timeline.sessions.empty'), action: { label: t('action.upload'), to: MOVE_PATHS.upload(patientId) } }}>
+          loading={query.isLoading} empty={sessions.length === 0} emptyState={{ text: t('timeline.sessions.empty'), ...(mayCapture ? { action: { label: t('action.upload'), to: MOVE_PATHS.upload(patientId) } } : {}) }}>
           <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: { xs: 1, md: 1.5 }, gap: 1.5 }}>
             {sessions.map((s) => (
               <Box component="li" key={s.id} data-testid="session-row" sx={(th) => ({ p: 1.25, borderRadius: 2, border: `1px solid ${th.palette.divider}` })}>
@@ -89,7 +95,7 @@ export default function TimelinePage() {
                   {s.clips.map((c) => (
                     <Button key={c.clipId} component={RouterLink} to={MOVE_PATHS.clip(c.clipId)} variant="outlined" sx={{ minHeight: 44, textTransform: 'none', gap: 1, borderRadius: 999 }}>
                       {t(`movement.${c.movement}`)} · {t(`view.${c.view}`)}
-                      {c.status === 'done' && (c.decisionBand ?? c.score?.band) ? <StatusChip tone={BAND_TONE[(c.decisionBand ?? c.score!.band)]} size="sm" dot>{t(`band.${c.decisionBand ?? c.score!.band}`)}</StatusChip>
+                      {c.status === 'done' && c.band ? <><StatusChip tone={BAND_TONE[c.band]} size="sm" dot>{t(`band.${c.band}`)}</StatusChip>{c.hasDecision && <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>{t('timeline.clip.decided')}</Typography>}</>
                         : <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>{c.status === 'failed' ? t('timeline.clip.failed') : t('timeline.clip.processing')}</Typography>}
                     </Button>
                   ))}

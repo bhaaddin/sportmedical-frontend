@@ -1,156 +1,228 @@
 /*
  * The in-memory stand-in for /api/movement (dev flag only, see ../flags.ts). Loaded lazily by src/api/movement.ts.
- * Any patient id gets the same three seeded sessions; new sessions, clips, decisions and consents live until reload.
+ *
+ * It answers like MovementController: every staff route returns the ApiResult envelope `{success, data, message}`, and a
+ * refusal throws an axios-shaped error whose body carries the stable `code` (`movement.care_consent_missing`, ...). The
+ * api module reads these payloads through the same zod schemas as the real ones.
+ * Any patient id gets the same three seeded sessions; what is created lives until reload.
  */
-import type {
-  AdminStats, ClipDetail, ClipResult, ClipSummary, ConsentType, Decision, DecisionInput, Movement, MovementConsent, MovementSession, NewClip, View,
-} from '../../api/movement';
+import type { ClipResult } from '../../api/movement';
 import { buildDropJumpFrontResult, buildQaRejectedResult, buildRunningSideResult } from './synth';
 import runningVideo from './running-side.webm?url';
 import dropJumpVideo from './dropjump-front.webm?url';
 
 const delay = (ms = 120) => new Promise<void>((r) => setTimeout(r, ms));
 
+type Movement = 'running' | 'drop_jump';
+type View = 'side' | 'front' | 'back';
+
+interface StoredDecision { id: string; action: string; band: string | null; faultTags: string[]; unsure: boolean; note: string | null; clinicianStaffId: string; decidedAt: string }
 interface StoredClip {
-  clipId: string;
-  sessionId: string;
-  patientId: string;
-  movement: Movement;
-  view: View;
-  startedAt: number | null;
-  failed: boolean;
-  decisions: Decision[];
-  markerPx?: number;
+  clipId: string; sessionId: string; patientId: string; movement: Movement; view: View;
+  startedAt: number | null; uploaded: boolean; shift: number; markerPx: number | null; decisions: StoredDecision[]; createdAt: string;
 }
+interface StoredSession { sessionId: string; patientId: string; appointmentId: string | null; date: string; serviceItemId: string | null; clipIds: string[] }
+interface StoredConsent { kind: 'care' | 'ml'; version: string; grantedAt: string; withdrawnAt: string | null; active: boolean }
 
 const clips = new Map<string, StoredClip>();
-const sessions = new Map<string, MovementSession[]>();
-const consents = new Map<string, MovementConsent[]>();
+const sessions = new Map<string, StoredSession[]>();
+const consents = new Map<string, StoredConsent[]>();
 let counter = 0;
 const id = (p: string) => `${p}-${++counter}-${Math.random().toString(36).slice(2, 7)}`;
+const STAFF = '0190a000-0000-7000-8000-00000000a1b2';
 
-const resultFor = (clip: StoredClip): ClipResult => {
-  if (clip.clipId === 'fx-qa-rejected') return buildQaRejectedResult(clip.clipId);
-  const base = clip.movement === 'running' ? buildRunningSideResult(clip.clipId) : buildDropJumpFrontResult(clip.clipId);
-  return { ...base, view: clip.view };
+const ok = <T,>(data: T) => ({ success: true, message: '', data });
+
+/** An axios-shaped refusal: `error.response.data.code` is what the screens read. */
+function refuse(status: number, code: string, message: string): never {
+  throw Object.assign(new Error(message), { isAxiosError: true, response: { status, data: { success: false, code, message } } });
+}
+
+const statusOf = (c: StoredClip): string => {
+  if (c.clipId === 'fx-qa-rejected') return 'rejected';
+  if (!c.uploaded) return 'uploading';
+  if (c.startedAt === null) return 'uploaded';
+  const age = Date.now() - c.startedAt;
+  return age < 1500 ? 'queued' : age < 4000 ? 'processing' : 'done';
 };
 
-function seed(patientId: string): MovementSession[] {
-  const day = (offset: number) => new Date(Date.now() - offset * 86_400_000).toISOString().slice(0, 10);
-  const mk = (sid: string, movement: Movement, view: View, shift: number, decided: boolean): [ClipSummary, StoredClip] => {
-    const clipId = `${sid}-${movement}`;
-    const full = movement === 'running' ? buildRunningSideResult(clipId) : buildDropJumpFrontResult(clipId);
-    const key = full.metrics.filter((m) => m.side !== null).slice(0, 6).map((m) => ({ id: m.id, side: m.side, value: Math.round((m.value + shift * (m.side === 'L' ? 1 : 0.6)) * 10) / 10, unit: m.unit }));
-    const errorCount = Math.max(0, full.score.errorCount + (shift > 0 ? 1 : shift < 0 ? -1 : 0));
-    const stored: StoredClip = { clipId, sessionId: sid, patientId, movement, view, startedAt: 0, failed: false, decisions: [] };
-    if (decided) stored.decisions.push({ id: id('d'), action: 'accept', band: errorCount > 2 ? 'red' : 'watch', faultTags: [], unsure: false, note: '', decidedBy: 'MUDr. Zkušební', decidedAt: new Date(Date.now() - 86_400_000).toISOString() });
-    return [{ clipId, movement, view, status: 'done', score: { band: full.score.band, errorCount }, decisionBand: decided ? stored.decisions[0].band : null, keyMetrics: key }, stored];
+const resultFor = (c: StoredClip): ClipResult => {
+  const base = c.movement === 'running' ? buildRunningSideResult(c.clipId) : buildDropJumpFrontResult(c.clipId);
+  const metrics = c.shift === 0 ? base.metrics : base.metrics.map((m) => ({ ...m, value: Math.round((m.value + c.shift * (m.side === 'L' ? 1 : 0.6)) * 10) / 10 }));
+  return { ...base, view: c.view, metrics };
+};
+
+const bandOf = (c: StoredClip): string | null => (statusOf(c) === 'done' ? resultFor(c).score.band : null);
+
+const summary = (c: StoredClip) => {
+  const status = statusOf(c);
+  return {
+    clipId: c.clipId, movement: c.movement, view: c.view, status, band: bandOf(c), hasDecision: c.decisions.length > 0,
+    failureReason: status === 'rejected' ? 'qa_rejected' : null, createdAt: c.createdAt,
   };
-  const out: MovementSession[] = [];
+};
+
+function seed(patientId: string): StoredSession[] {
+  const day = (offset: number) => new Date(Date.now() - offset * 86_400_000).toISOString().slice(0, 10);
+  const out: StoredSession[] = [];
   for (const [i, spec] of ([[60, 4, true], [30, 2, true], [0, 0, false]] as const).entries()) {
-    const sid = `${patientId}-s${i + 1}`;
-    const a = mk(sid, 'drop_jump', 'front', spec[1] * 1.5, spec[2]);
-    const b = mk(sid, 'running', 'side', spec[1], spec[2]);
-    clips.set(a[1].clipId, a[1]);
-    clips.set(b[1].clipId, b[1]);
-    out.push({ id: sid, patientId, date: day(spec[0]), clips: [a[0], b[0]] });
+    const sessionId = `${patientId}-s${i + 1}`;
+    const clipIds: string[] = [];
+    for (const [movement, view, k] of [['drop_jump', 'front', 1.5], ['running', 'side', 1]] as const) {
+      const clipId = `${sessionId}-${movement}`;
+      clips.set(clipId, {
+        clipId, sessionId, patientId, movement, view, startedAt: 0, uploaded: true, shift: spec[1] * k, markerPx: null, createdAt: new Date(Date.now() - spec[0] * 86_400_000).toISOString(),
+        decisions: spec[2] ? [{ id: id('d'), action: 'accept', band: spec[1] > 2 ? 'red' : 'watch', faultTags: [], unsure: false, note: null, clinicianStaffId: STAFF, decidedAt: new Date(Date.now() - 86_400_000).toISOString() }] : [],
+      });
+      clipIds.push(clipId);
+    }
+    out.push({ sessionId, patientId, appointmentId: null, date: day(spec[0]), serviceItemId: null, clipIds });
   }
   return out.reverse();
 }
 
-const sessionsOf = (patientId: string): MovementSession[] => {
+const sessionsOf = (patientId: string): StoredSession[] => {
   if (!sessions.has(patientId)) sessions.set(patientId, seed(patientId));
   return sessions.get(patientId)!;
 };
 
 /** Fixed demo clips every screen can open by address: /pohyb/klip/fx-running-side etc. */
-function demoClip(clipId: string): StoredClip | undefined {
-  if (clipId === 'fx-running-side') return clips.get(clipId) ?? (clips.set(clipId, { clipId, sessionId: 'fx', patientId: 'demo', movement: 'running', view: 'side', startedAt: 0, failed: false, decisions: [] }), clips.get(clipId));
-  if (clipId === 'fx-dropjump-front') return clips.get(clipId) ?? (clips.set(clipId, { clipId, sessionId: 'fx', patientId: 'demo', movement: 'drop_jump', view: 'front', startedAt: 0, failed: false, decisions: [] }), clips.get(clipId));
-  if (clipId === 'fx-qa-rejected') return clips.get(clipId) ?? (clips.set(clipId, { clipId, sessionId: 'fx', patientId: 'demo', movement: 'running', view: 'side', startedAt: 0, failed: true, decisions: [] }), clips.get(clipId));
-  return clips.get(clipId);
+function clipOf(clipId: string): StoredClip {
+  const demo: Record<string, Movement> = { 'fx-running-side': 'running', 'fx-dropjump-front': 'drop_jump', 'fx-qa-rejected': 'running' };
+  if (!clips.has(clipId) && demo[clipId]) {
+    clips.set(clipId, {
+      clipId, sessionId: 'fx', patientId: 'ZZ-test', movement: demo[clipId], view: clipId === 'fx-dropjump-front' ? 'front' : 'side',
+      startedAt: 0, uploaded: true, shift: 0, markerPx: null, decisions: [], createdAt: new Date().toISOString(),
+    });
+  }
+  return clips.get(clipId) ?? refuse(404, 'movement.not_found', 'The clip was not found.');
 }
 
-export async function createSession(input: { patientId: string; appointmentId?: string; date: string }): Promise<MovementSession> {
-  await delay();
-  const s: MovementSession = { id: id('s'), patientId: input.patientId, date: input.date, appointmentId: input.appointmentId ?? null, clips: [] };
-  sessions.set(input.patientId, [s, ...sessionsOf(input.patientId)]);
-  return s;
+const consentsOf = (patientId: string): StoredConsent[] =>
+  consents.get(patientId) ?? [{ kind: 'care', version: '1', grantedAt: new Date(Date.now() - 20 * 86_400_000).toISOString(), withdrawnAt: null, active: true }];
+
+function detail(c: StoredClip) {
+  const status = statusOf(c);
+  const rejected = status === 'rejected';
+  const qa = rejected ? buildQaRejectedResult(c.clipId).qa : null;
+  return {
+    clipId: c.clipId, sessionId: c.sessionId, patientId: c.patientId, movement: c.movement, view: c.view, status,
+    failureReason: rejected ? 'qa_rejected' : null, attemptCount: 1, hasVideo: true, qaPassed: rejected ? false : status === 'done' ? true : null,
+    qa, markerPx: c.markerPx, pipelineVersion: '0.1.0', rulesVersion: c.movement === 'running' ? 'running.v1' : 'landing.v1', poseModelVersion: 'rtmpose-halpe26',
+    /* a rejected clip carries a result with only its qa filled, like the callback */
+    result: status === 'done' ? resultFor(c) : rejected ? { schemaVersion: 1, clipId: c.clipId, qa } : null,
+    decisions: c.decisions, createdAt: c.createdAt, updatedAt: c.createdAt,
+  };
 }
 
-export async function listSessions(patientId: string): Promise<MovementSession[]> {
-  await delay();
-  return sessionsOf(patientId).map((s) => ({
-    ...s,
-    clips: s.clips.map((c) => {
-      const st = clips.get(c.clipId);
-      return st && c.status !== 'done' ? { ...c, status: statusOf(st) } : c;
-    }),
-  }));
+type Options = { params?: Record<string, string>; body?: unknown };
+
+/** The router: one entry per row of the controller. Async, like the network. */
+export async function handle(verb: string, path: string, options: Options = {}): Promise<unknown> {
+  await delay(verb === 'get' ? 60 : 120);
+  const body = (options.body ?? {}) as Record<string, unknown>;
+  let m: RegExpExecArray | null;
+
+  if ((m = /^\/patients\/([^/]+)\/consents$/.exec(path)) && verb === 'get') {
+    const rows = consentsOf(m[1]);
+    return ok({ consents: rows, careActive: rows.some((r) => r.kind === 'care' && r.active), mlTrainingActive: rows.some((r) => r.kind === 'ml' && r.active) });
+  }
+  if ((m = /^\/patients\/([^/]+)\/consents\/(care|ml)$/.exec(path))) {
+    const [, patientId, kind] = m;
+    const rows = consentsOf(patientId);
+    if (verb === 'post') {
+      if (!rows.some((r) => r.kind === kind && r.active)) rows.push({ kind: kind as 'care' | 'ml', version: String(body.version ?? '1'), grantedAt: new Date().toISOString(), withdrawnAt: null, active: true });
+    } else {
+      const active = rows.find((r) => r.kind === kind && r.active);
+      if (!active) refuse(409, 'movement.consent_not_active', 'The consent is not active.');
+      active.active = false;
+      active.withdrawnAt = new Date().toISOString();
+    }
+    consents.set(patientId, rows);
+    return ok(rows.filter((r) => r.kind === kind).at(-1));
+  }
+  if (path === '/sessions' && verb === 'post') {
+    const patientId = String(body.patientId);
+    if (!consentsOf(patientId).some((r) => r.kind === 'care' && r.active)) refuse(409, 'movement.care_consent_missing', 'Care consent is missing.');
+    const s: StoredSession = { sessionId: id('s'), patientId, appointmentId: (body.appointmentId as string) ?? null, date: String(body.date), serviceItemId: null, clipIds: [] };
+    sessions.set(patientId, [s, ...sessionsOf(patientId)]);
+    return ok({ sessionId: s.sessionId, patientId, appointmentId: s.appointmentId, date: s.date, serviceItemId: null, clips: [] });
+  }
+  if (path === '/sessions' && verb === 'get') {
+    const patientId = options.params?.patientId ?? '';
+    return ok(sessionsOf(patientId).map((s) => ({ ...s, clipIds: undefined, clips: s.clipIds.map((cid) => summary(clips.get(cid)!)) })));
+  }
+  if ((m = /^\/sessions\/([^/]+)\/clips$/.exec(path)) && verb === 'post') {
+    const owner = [...sessions.entries()].find(([, list]) => list.some((s) => s.sessionId === m![1]));
+    if (!owner) refuse(404, 'movement.not_found', 'The session was not found.');
+    if (!consentsOf(owner[0]).some((r) => r.kind === 'care' && r.active)) refuse(409, 'movement.care_consent_missing', 'Care consent is missing.');
+    const clipId = id('clip');
+    clips.set(clipId, {
+      clipId, sessionId: m[1], patientId: owner[0], movement: body.movement as Movement, view: body.view as View, startedAt: null, uploaded: false, shift: 0,
+      markerPx: (body.markerPx as number) ?? null, decisions: [], createdAt: new Date().toISOString(),
+    });
+    owner[1].find((s) => s.sessionId === m![1])!.clipIds.push(clipId);
+    return ok({ clipId, uploadUrl: `/api/movement/clips/${clipId}/upload` });
+  }
+  if ((m = /^\/clips\/([^/]+)\/marker$/.exec(path)) && verb === 'put') {
+    const c = clipOf(m[1]);
+    c.markerPx = (body.markerPx as number | null) ?? null;
+    return ok({ clipId: c.clipId, markerPx: c.markerPx });
+  }
+  if ((m = /^\/clips\/([^/]+)\/(process|retry)$/.exec(path)) && verb === 'post') {
+    const c = clipOf(m[1]);
+    if (m[2] === 'process' && !c.uploaded) refuse(409, 'movement.no_upload', 'No video was uploaded.');
+    c.startedAt = Date.now();
+    c.uploaded = true;
+    return ok({ clipId: m[1], status: 'queued' });
+  }
+  if ((m = /^\/clips\/([^/]+)$/.exec(path)) && verb === 'get') return ok(detail(clipOf(m[1])));
+  if ((m = /^\/clips\/([^/]+)\/decision$/.exec(path)) && verb === 'post') {
+    const c = clipOf(m[1]);
+    if (statusOf(c) !== 'done') refuse(409, 'movement.clip_state_invalid', 'Only a finished analysis can be decided on.');
+    if (body.action !== 'reject' && !body.band) refuse(400, 'movement.band_required', 'Accept and edit need a band.');
+    const d: StoredDecision = {
+      id: id('d'), action: String(body.action), band: (body.band as string) ?? null, faultTags: (body.faultTags as string[]) ?? [], unsure: body.unsure === true,
+      note: (body.note as string) || null, clinicianStaffId: STAFF, decidedAt: new Date().toISOString(),
+    };
+    c.decisions = [...c.decisions, d];
+    return ok(d);
+  }
+  if (path === '/admin/stats' && verb === 'get') {
+    return ok({
+      clipsByStatus: { Done: 109, Rejected: 14, Failed: 5, Queued: 2 },
+      qaOutcomes: { passed: 109, failed: 19 },
+      failureReasons: { low_fps: 8, too_dark: 5, low_confidence: 4, truncated_body: 2, callback_timeout: 1 },
+      resultBands: { green: 41, watch: 48, red: 20 },
+      decisionsByAction: { Accept: 61, Edit: 15, Reject: 8 },
+      modelVersions: { '0.1.0 / landing.v1 / rtmpose-halpe26': 62, '0.1.0 / running.v1 / rtmpose-halpe26': 47 },
+      consents: { care_active: 41, care_withdrawn: 1, ml_active: 27, ml_withdrawn: 3 },
+      exports: { Record_Sent: 61, Record_Failed: 2, Delete_Sent: 3 },
+    });
+  }
+  if (path === '/admin/exports/retry-failed' && verb === 'post') return ok({ requeued: 2 });
+  return refuse(404, 'movement.not_found', `No mock for ${verb} ${path}`);
 }
 
-export async function createClip(sessionId: string, input: { movement: Movement; view: View; markerPx?: number }): Promise<NewClip> {
-  await delay();
-  const owner = [...sessions.entries()].find(([, list]) => list.some((s) => s.id === sessionId));
-  const patientId = owner?.[0] ?? 'demo';
-  const clipId = id('clip');
-  clips.set(clipId, { clipId, sessionId, patientId, movement: input.movement, view: input.view, startedAt: null, failed: false, decisions: [], markerPx: input.markerPx });
-  const list = sessionsOf(patientId);
-  const s = list.find((x) => x.id === sessionId);
-  if (s) s.clips = [...s.clips, { clipId, movement: input.movement, view: input.view, status: 'uploading', score: null, decisionBand: null, keyMetrics: [] }];
-  return { clipId, uploadUrl: `/api/movement/clips/${clipId}/upload` };
-}
-
-export async function uploadClipFile(_clipId: string, file: Blob, onProgress: (r: number) => void, signal?: AbortSignal): Promise<void> {
+export async function uploadClipFile(clipId: string, file: Blob, onProgress: (r: number) => void, signal?: AbortSignal): Promise<void> {
   void file;
   for (let i = 1; i <= 10; i++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     await delay(60);
     onProgress(i / 10);
   }
-}
-
-export async function processClip(clipId: string): Promise<void> {
-  await delay();
-  const c = demoClip(clipId);
-  if (c) { c.startedAt = Date.now(); c.failed = false; }
-}
-
-/** queued for 1.5 s, processing for 2.5 s, then done. */
-function statusOf(c: StoredClip): ClipDetail['status'] {
-  if (c.failed) return 'failed';
-  if (c.startedAt === null) return 'uploading';
-  const age = Date.now() - c.startedAt;
-  return age < 1500 ? 'queued' : age < 4000 ? 'processing' : 'done';
-}
-
-export async function getClip(clipId: string): Promise<ClipDetail> {
-  await delay(60);
-  const c = demoClip(clipId);
-  if (!c) throw Object.assign(new Error('not found'), { response: { status: 404 } });
-  const status = statusOf(c);
-  const base = { clipId, sessionId: c.sessionId, patientId: c.patientId, movement: c.movement, view: c.view, status, decisions: c.decisions };
-  if (status === 'done') return { ...base, error: null, result: resultFor(c) };
-  if (status === 'failed') return { ...base, error: { code: 'qa_rejected', message: 'QA rejected' }, result: resultFor(c) };
-  return { ...base, error: null, result: null };
+  const c = clips.get(clipId);
+  if (c) c.uploaded = true;
 }
 
 export async function videoUrl(clipId: string): Promise<string> {
-  const c = demoClip(clipId);
-  return c?.movement === 'drop_jump' ? dropJumpVideo : runningVideo;
-}
-
-export async function postDecision(clipId: string, input: DecisionInput): Promise<Decision> {
-  await delay();
-  const c = demoClip(clipId);
-  if (!c) throw new Error('not found');
-  const d: Decision = { ...input, id: id('d'), decidedBy: 'Vy (zkušební režim)', decidedAt: new Date().toISOString() };
-  c.decisions = [...c.decisions, d];
-  return d;
+  return clipOf(clipId).movement === 'drop_jump' ? dropJumpVideo : runningVideo;
 }
 
 /** A tiny but valid one-page PDF. */
 export async function reportBlob(clipId: string): Promise<Blob> {
+  const c = clipOf(clipId);
+  if (c.decisions.length === 0) refuse(409, 'movement.no_decision', 'There is no decision yet.');
   const text = `BT /F1 18 Tf 60 760 Td (Pohybova analyza - zkusebni zprava ${clipId.slice(0, 12)}) Tj ET`;
   const objs = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -166,30 +238,4 @@ export async function reportBlob(clipId: string): Promise<Blob> {
   pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
   pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return new Blob([pdf], { type: 'application/pdf' });
-}
-
-export async function adminStats(): Promise<AdminStats> {
-  await delay();
-  return {
-    qa: { total: 128, passed: 109, rejected: 19, reasons: [{ code: 'low_fps', count: 8 }, { code: 'too_dark', count: 5 }, { code: 'low_confidence', count: 4 }, { code: 'truncated_body', count: 2 }] },
-    consents: { care: { given: 41, withdrawn: 1 }, ml: { given: 27, withdrawn: 3 } },
-    dataset: { clips: 109, athletes: 27, labelled: 84, exported: 61 },
-    versions: { pipeline: ['0.1.0'], rules: ['landing.v1', 'running.v1'], model: ['rtmpose-halpe26'] },
-  };
-}
-
-export async function getConsents(patientId: string): Promise<MovementConsent[]> {
-  await delay(60);
-  return consents.get(patientId) ?? [
-    { type: 'care', version: '1', given: true, at: new Date(Date.now() - 20 * 86_400_000).toISOString() },
-    { type: 'ml', version: '1', given: false, at: null },
-  ];
-}
-
-export async function setConsent(patientId: string, body: { type: ConsentType; version: string; given: boolean }): Promise<MovementConsent[]> {
-  await delay();
-  const now = await getConsents(patientId);
-  const next = now.map((c) => (c.type === body.type ? { ...c, given: body.given, version: body.version, at: new Date().toISOString() } : c));
-  consents.set(patientId, next);
-  return next;
 }

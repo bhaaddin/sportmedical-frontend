@@ -10,8 +10,9 @@ import { alpha } from '@mui/material/styles';
 import { CheckCircle, ErrorOutlined, Straighten, Tune, VideoCameraBack, Videocam, WbSunny, Checkroom, Style } from '@mui/icons-material';
 import { PageFrame, Shelf } from '../../ui/shelf';
 import { useDevice } from '../../layout/useDevice';
+import { usePermission } from '../../auth/usePermission';
 import {
-  createClip, createSession, movementKeys, processClip, uploadClipFile, useMovementConsents, useMovementSessions,
+  createClip, createSession, movementErrorCode, movementKeys, processClip, setClipMarker, uploadClipFile, useMovementConsents, useMovementSessions,
   MOVEMENTS, VIEWS, type Movement, type View,
 } from '../../api/movement';
 import { MOVE_PATHS } from '../flags';
@@ -43,6 +44,7 @@ export default function UploadPage() {
   const [params, setParams] = useSearchParams();
   const patientId = params.get('patientId') ?? undefined;
   const name = usePatientLabel(patientId);
+  const mayCapture = usePermission('movement.capture');
   const consents = useMovementConsents(patientId);
   const sessions = useMovementSessions(patientId);
   const careMissing = consents.data !== undefined && consents.data.find((c) => c.type === 'care')?.given !== true;
@@ -62,7 +64,7 @@ export default function UploadPage() {
   const picker = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
   /* Kept between attempts, so a failed PUT is retried on the SAME clip and no duplicate is created. */
-  const created = useRef<{ sessionId: string; clipId: string; uploadUrl: string } | null>(null);
+  const created = useRef<{ sessionId: string; clipId: string; uploadUrl: string; markerPx: number | undefined } | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const todays = useMemo(() => (sessions.data ?? []).filter((s) => s.date === today), [sessions.data, today]);
@@ -111,14 +113,17 @@ export default function UploadPage() {
           try {
             sessionId = (await createSession({ patientId, date: today })).id;
           } catch (e) {
-            const status = (e as { response?: { status?: number } }).response?.status;
-            setError(status === 403 || status === 409 || status === 412 || status === 422 ? t('upload.consent_refused') : t('upload.session_failed'));
+            setError(movementErrorCode(e) === 'movement.care_consent_missing' ? t('upload.consent_refused') : t('upload.session_failed'));
             setPhase('checked');
             return;
           }
         }
         const clip = await createClip(sessionId, { movement, view, ...(markerPx !== undefined ? { markerPx } : {}) });
-        created.current = { sessionId, ...clip };
+        created.current = { sessionId, ...clip, markerPx };
+      } else if (created.current.markerPx !== markerPx) {
+        /* The marker was marked (or cleared) after the clip was created: the API has its own route for it. */
+        await setClipMarker(created.current.clipId, markerPx ?? null);
+        created.current.markerPx = markerPx;
       }
       await uploadClipFile(created.current.clipId, created.current.uploadUrl, file, setProgress, abort.current.signal);
       setPhase('processing');
@@ -134,7 +139,7 @@ export default function UploadPage() {
 
   const onMarker = useCallback((px: number | undefined) => setMarkerPx(px), []);
   const busy = phase === 'uploading' || phase === 'processing';
-  const canStart = patientId !== undefined && file !== null && phase === 'checked' && verdict?.ok === true && !careMissing;
+  const canStart = mayCapture && patientId !== undefined && file !== null && phase === 'checked' && verdict?.ok === true && !careMissing;
   const phone = device === 'phone';
 
   const facts = probe
@@ -157,6 +162,7 @@ export default function UploadPage() {
             </Stack>
           )}
         </Box>
+        {!mayCapture && <Alert severity="info">{t('upload.no_right')}</Alert>}
         {careMissing && patientId !== undefined && (
           <Alert severity="warning" role="alert" action={<Button component={RouterLink} to={`/patients/${patientId}`} color="inherit" sx={{ minHeight: 44 }}>{t('upload.consent.open')}</Button>}>
             {t('upload.consent.missing')}

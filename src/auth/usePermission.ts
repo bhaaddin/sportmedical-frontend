@@ -50,7 +50,11 @@ export type Permission =
   | 'documents.manage'
   | 'communication.manage'
   | 'patients.export'
-  | 'exports.download';
+  | 'exports.download'
+  | 'movement.view'
+  | 'movement.capture'
+  | 'movement.review'
+  | 'movement.admin';
 
 /**
  * Whether the server has told this browser anything at all.

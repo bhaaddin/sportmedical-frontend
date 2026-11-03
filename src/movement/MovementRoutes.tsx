@@ -14,10 +14,10 @@ const TimelinePage = lazy(() => import('./pages/TimelinePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 function Admin() {
-  return usePermission('settings.clinic.manage') ? <AdminPage /> : <NotFound />;
+  return usePermission('movement.admin') ? <AdminPage /> : <NotFound />;
 }
 function Staff({ children }: { children: React.ReactNode }) {
-  return usePermission('patients.view') ? <>{children}</> : <NotFound />;
+  return usePermission('movement.view') ? <>{children}</> : <NotFound />;
 }
 
 export default function MovementRoutes() {

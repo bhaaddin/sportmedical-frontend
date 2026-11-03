@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
-import { clipResultSchema, decisionInputSchema, FAULT_TAGS, getClip, type ClipDetail } from '../api/movement';
+import { clipDetailSchema, clipResultSchema, consentsOf, decisionInputSchema, FAULT_TAGS, getClip, movementErrorCode, sessionSchema, type ClipDetail } from '../api/movement';
 import { MOVEMENT_FLAG_KEY, MOVEMENT_MOCK_KEY, movementEnabled, movementMock } from './flags';
 import { cs, en, moveT } from './i18n';
 import { buildDropJumpFrontResult, buildQaRejectedResult, buildRunningSideResult } from './fixtures/synth';
@@ -27,12 +27,12 @@ const wrap = (ui: React.ReactElement, path = '/') => {
 
 const clipOf = (over: Partial<ClipDetail> = {}): ClipDetail => ({
   clipId: 'fx-running-side', sessionId: 's', patientId: 'p1', movement: 'running', view: 'side', status: 'done',
-  error: null, result: buildRunningSideResult(), decisions: [], ...over,
+  error: null, qaReasons: [], markerPx: null, result: buildRunningSideResult(), decisions: [], ...over,
 });
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit']));
+  localStorage.setItem('permissions', JSON.stringify(['movement.view', 'movement.capture', 'movement.review', 'movement.admin', 'exports.download']));
   setViewport(VIEWPORTS.desktop);
 });
 
@@ -62,9 +62,9 @@ describe('feature flag', () => {
     expect(movementMock()).toBe(true);
   });
   it('the palette offers the page only with the flag on', () => {
-    expect(staticCommands(['patients.view']).some((c) => c.id === 'page-movement')).toBe(false);
+    expect(staticCommands(['movement.view']).some((c) => c.id === 'page-movement')).toBe(false);
     localStorage.setItem(MOVEMENT_FLAG_KEY, '1');
-    expect(staticCommands(['patients.view']).some((c) => c.id === 'page-movement')).toBe(true);
+    expect(staticCommands(['movement.view']).some((c) => c.id === 'page-movement')).toBe(true);
     expect(staticCommands([]).some((c) => c.id === 'page-movement')).toBe(false);
   });
 });
@@ -124,12 +124,12 @@ describe('review screen with the fixture', () => {
   });
 
   it('shows the clinician decision instead of the draft once one exists, and unlocks the report', () => {
-    const decisions = [{ id: 'd1', action: 'accept' as const, band: 'green' as const, faultTags: ['knee_valgus' as const], unsure: false, note: 'ok', decidedBy: 'MUDr. Test', decidedAt: '2026-11-03T10:00:00Z' }];
+    const decisions = [{ id: 'd1', action: 'accept' as const, band: 'green' as const, faultTags: ['knee_valgus' as const], unsure: false, note: 'ok', decidedBy: '0190a000-0000-7000-8000-00000000a1b2', decidedAt: '2026-11-03T10:00:00Z' }];
     wrap(<ReviewView clip={clipOf({ decisions })} videoSrc={null} />);
     expect(screen.getByTestId('score-label')).toHaveTextContent('Rozhodnutí klinika: Zelená');
     expect(screen.getByRole('button', { name: /Otevřít zprávu/ })).toBeEnabled();
     const history = screen.getByTestId('decision-history');
-    expect(within(history).getByText(/MUDr\. Test/)).toBeInTheDocument();
+    expect(within(history).getByText(/Klinik a1b2/)).toBeInTheDocument();
     expect(within(history).getByText('Koleno dovnitř')).toBeInTheDocument();
   });
 
@@ -175,10 +175,10 @@ describe('decision form', () => {
     await waitFor(() => expect(screen.queryByText('Vyberte hodnocení.')).toBeNull());
   });
 
-  it('is read-only without the permission to edit patients', () => {
-    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+  it('is read-only without movement.review', () => {
+    localStorage.setItem('permissions', JSON.stringify(['movement.view']));
     wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
-    expect(screen.getByText('K rozhodnutí chybí oprávnění upravovat pacienty.')).toBeInTheDocument();
+    expect(screen.getByText('K rozhodnutí chybí oprávnění posuzovat analýzu pohybu.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Potvrdit' })).toBeDisabled();
   });
 });
@@ -195,7 +195,7 @@ describe('status screen', () => {
     expect(screen.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('nepodařilo najít postavu');
     unmount();
-    wrap(<StatusView clip={clipOf({ status: 'failed', result: buildQaRejectedResult('x'), error: { code: 'qa_rejected', message: 'x' } })} />);
+    wrap(<StatusView clip={clipOf({ status: 'failed', result: null, qaReasons: buildQaRejectedResult('x').qa.reasons, error: { code: 'qa_rejected', message: 'x' } })} />);
     expect(screen.queryByRole('button', { name: 'Zkusit znovu' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Natočit znovu' })).toHaveAttribute('href', '/pohyb/nahrat?patientId=p1');
     expect(screen.getByText(/Málo snímků za sekundu/)).toBeInTheDocument();
@@ -224,18 +224,119 @@ describe('marker picker', () => {
   });
 });
 
-describe('mock api', () => {
-  it('walks a clip through queued, processing and done', async () => {
+describe('the real API shapes (MovementController)', () => {
+  const wrapped = (data: unknown) => ({ success: true, message: '', data });
+
+  it('reads a wrapped or an already unwrapped consent list into one line per kind', () => {
+    const status = { consents: [
+      { kind: 'care', version: '1', grantedAt: '2026-10-01T08:00:00Z', withdrawnAt: null, active: true },
+      { kind: 'ml', version: '1', grantedAt: '2026-09-01T08:00:00Z', withdrawnAt: '2026-10-02T08:00:00Z', active: false },
+    ], careActive: true, mlTrainingActive: false };
+    for (const payload of [wrapped(status), status]) {
+      const rows = consentsOf(payload);
+      expect(rows.find((r) => r.type === 'care')).toMatchObject({ given: true, version: '1' });
+      expect(rows.find((r) => r.type === 'ml')).toMatchObject({ given: false });
+    }
+  });
+
+  it('reads a clip: rejected becomes a failure with the qa_rejected code, a partial result is tolerated', () => {
+    const detail = clipDetailSchema.parse({
+      clipId: 'c', sessionId: 's', patientId: 'p', movement: 'running', view: 'side', status: 'rejected', failureReason: null,
+      qa: buildQaRejectedResult('c').qa, result: { schemaVersion: 1, clipId: 'c', qa: buildQaRejectedResult('c').qa }, decisions: [],
+    });
+    expect(detail.status).toBe('failed');
+    expect(detail.error?.code).toBe('qa_rejected');
+    expect(detail.result).toBeNull();
+    expect(detail.qaReasons.map((r) => r.code)).toEqual(['low_fps', 'too_dark']);
+  });
+
+  it('reads a finished clip with its decisions (author is a staff id, a rejection has no band)', () => {
+    const detail = clipDetailSchema.parse({
+      clipId: 'c', sessionId: 's', patientId: 'p', movement: 'running', view: 'side', status: 'done', result: buildRunningSideResult('c'),
+      decisions: [{ id: 'd', action: 'reject', band: null, faultTags: [], unsure: true, note: null, clinicianStaffId: 'abcd', decidedAt: '2026-11-03T10:00:00Z' }],
+    });
+    expect(detail.result?.skeleton.frames).toHaveLength(120);
+    expect(detail.decisions[0]).toMatchObject({ band: null, note: '', decidedBy: 'abcd' });
+  });
+
+  it('a done clip with a broken result is refused loudly', () => {
+    expect(() => clipDetailSchema.parse({ clipId: 'c', movement: 'running', view: 'side', status: 'done', result: { schemaVersion: 9 } })).toThrow();
+  });
+
+  it('reads the session list rows (sessionId, clip summaries with band and hasDecision)', () => {
+    const s = sessionSchema.parse({
+      sessionId: 's1', patientId: 'p', appointmentId: null, date: '2026-11-03', serviceItemId: null,
+      clips: [{ clipId: 'c', movement: 'drop_jump', view: 'front', status: 'rejected', band: null, hasDecision: false, failureReason: 'qa_rejected', createdAt: '2026-11-03T08:00:00Z' }],
+    });
+    expect(s.id).toBe('s1');
+    expect(s.clips[0]).toMatchObject({ status: 'failed', band: null });
+  });
+
+  it('a decision needs a band unless it rejects, and a rejection sends none', () => {
+    expect(() => decisionInputSchema.parse({ action: 'edit', faultTags: [], unsure: false, note: '' })).toThrow();
+    expect(decisionInputSchema.parse({ action: 'reject', band: null, faultTags: [], unsure: false, note: '' }).band).toBeNull();
+  });
+
+  it('reads the refusal code of a failed call', () => {
+    expect(movementErrorCode({ response: { data: { success: false, code: 'movement.care_consent_missing' } } })).toBe('movement.care_consent_missing');
+    expect(movementErrorCode(new Error('x'))).toBeNull();
+  });
+});
+
+describe('mock api answers like the controller', () => {
+  it('walks a clip through uploading, uploaded, queued and refuses a session without care consent', async () => {
     localStorage.setItem(MOVEMENT_FLAG_KEY, '1');
     localStorage.setItem(MOVEMENT_MOCK_KEY, '1');
     const first = await getClip('fx-dropjump-front');
     expect(first.status).toBe('done');
     expect(first.result?.movement).toBe('drop_jump');
-    const { createSession, createClip, processClip } = await import('../api/movement');
-    const s = await createSession({ patientId: 'ZZ-test', date: '2026-11-03' });
-    const c = await createClip(s.id, { movement: 'running', view: 'side', markerPx: 412 });
+    const api = await import('../api/movement');
+    const s = await api.createSession({ patientId: 'ZZ-test', date: '2026-11-03' });
+    const c = await api.createClip(s.id, { movement: 'running', view: 'side', markerPx: 412 });
     expect((await getClip(c.clipId)).status).toBe('uploading');
-    await processClip(c.clipId);
+    expect((await getClip(c.clipId)).markerPx).toBe(412);
+    await api.setClipMarker(c.clipId, null);
+    expect((await getClip(c.clipId)).markerPx).toBeNull();
+    await api.uploadClipFile(c.clipId, c.uploadUrl, new Blob(['x'], { type: 'video/mp4' }), () => undefined);
+    expect((await getClip(c.clipId)).status).toBe('uploaded');
+    await api.processClip(c.clipId);
     expect((await getClip(c.clipId)).status).toBe('queued');
+    await api.setConsent('ZZ-nocare', 'care', false);
+    await expect(api.createSession({ patientId: 'ZZ-nocare', date: '2026-11-03' })).rejects.toSatisfy((e) => movementErrorCode(e) === 'movement.care_consent_missing');
+  });
+
+  it('decides, rejects without a band and lists the admin counts', async () => {
+    localStorage.setItem(MOVEMENT_FLAG_KEY, '1');
+    localStorage.setItem(MOVEMENT_MOCK_KEY, '1');
+    const api = await import('../api/movement');
+    await api.postDecision('fx-running-side', { action: 'reject', faultTags: [], unsure: false, note: '' });
+    const clip = await getClip('fx-running-side');
+    expect(clip.decisions.at(-1)).toMatchObject({ action: 'reject', band: null });
+    await expect(api.postDecision('fx-running-side', { action: 'accept', faultTags: [], unsure: false, note: '' })).rejects.toThrow();
+    const stats = await api.getAdminStats();
+    expect(stats.qaOutcomes.passed).toBeGreaterThan(0);
+    expect(await api.retryFailedExports()).toBe(2);
+  });
+});
+
+describe('permissions', () => {
+  it('without exports.download the report stays locked even after a decision', () => {
+    localStorage.setItem('permissions', JSON.stringify(['movement.view']));
+    const decisions = [{ id: 'd1', action: 'accept' as const, band: 'green' as const, faultTags: [], unsure: false, note: '', decidedBy: 'abcd', decidedAt: '2026-11-03T10:00:00Z' }];
+    wrap(<ReviewView clip={clipOf({ decisions })} videoSrc={null} />);
+    expect(screen.getByRole('button', { name: /Otevřít zprávu/ })).toBeDisabled();
+    expect(screen.getByText(/právo stahovat soubory/)).toBeInTheDocument();
+  });
+
+  it('a failed clip offers retry only with movement.capture', () => {
+    localStorage.setItem('permissions', JSON.stringify(['movement.view']));
+    wrap(<StatusView clip={clipOf({ status: 'failed', result: null, error: { code: 'pose_failed', message: 'x' } })} />);
+    expect(screen.queryByRole('button', { name: 'Zkusit znovu' })).toBeNull();
+  });
+
+  it('a rejection shows no band chip, only the verdict', () => {
+    const decisions = [{ id: 'd1', action: 'reject' as const, band: null, faultTags: [], unsure: false, note: '', decidedBy: 'abcd', decidedAt: '2026-11-03T10:00:00Z' }];
+    wrap(<ReviewView clip={clipOf({ decisions })} videoSrc={null} />);
+    expect(screen.getByTestId('score-label')).toHaveTextContent('Návrh zamítnut klinikem');
   });
 });

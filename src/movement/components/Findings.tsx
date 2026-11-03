@@ -6,6 +6,7 @@ import type { ClipDetail, Flag, Metric } from '../../api/movement';
 import { asymmetryLevel, formatAsymmetry, formatValue, metricRows, outsideNorm } from '../lib/asymmetry';
 import { groupFlags, latestDecision, scoreView } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
+import { staffLabel } from '../lib/review';
 
 export const BAND_TONE: Record<string, ChipTone> = { green: 'green', watch: 'beige', red: 'red', needs_review: 'blue' };
 const SEVERITY_TONE: Record<Flag['severity'], ChipTone> = { red: 'red', watch: 'beige', info: 'grey' };
@@ -28,8 +29,10 @@ export function ScoreBlock({ clip }: { clip: ClipDetail }) {
         {view.kind === 'needs_review' && <BandChip band="needs_review" />}
         {view.kind === 'draft' && <BandChip band={view.band} />}
         {view.kind === 'decided' && <BandChip band={view.band} />}
+        {view.kind === 'rejected' && <StatusChip tone="grey" dot>{t('band.rejected')}</StatusChip>}
         <Typography data-testid="score-label" sx={{ fontWeight: 700, fontSize: 15 }}>
           {view.kind === 'decided' ? t('score.decided', { band: t(`band.${view.band}`) })
+            : view.kind === 'rejected' ? t('score.rejected')
             : view.kind === 'needs_review' ? t('score.needs_review') : t('score.draft')}
         </Typography>
       </Stack>
@@ -43,9 +46,9 @@ export function ScoreBlock({ clip }: { clip: ClipDetail }) {
           ))}
         </Box>
       )}
-      {view.kind === 'decided' && decision && (
+      {(view.kind === 'decided' || view.kind === 'rejected') && decision && (
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          {t('decision.history.by', { who: decision.decidedBy, when: formatDateTime(decision.decidedAt) })}
+          {t('decision.history.by', { who: staffLabel(decision.decidedBy), when: formatDateTime(decision.decidedAt) })}
         </Typography>
       )}
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>

@@ -3,6 +3,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { CheckCircle, ErrorOutlined, HourglassTop } from '@mui/icons-material';
+import { usePermission } from '../../auth/usePermission';
 import { useRetryProcess, type ClipDetail } from '../../api/movement';
 import { MOVE_PATHS } from '../flags';
 import { useMoveT, type MoveKey } from '../i18n';
@@ -12,12 +13,14 @@ const STEPS = ['uploading', 'queued', 'processing', 'done'] as const;
 
 export function StatusView({ clip }: { clip: ClipDetail }) {
   const { t, maybe } = useMoveT();
-  const retry = useRetryProcess(clip.clipId);
+  const mayCapture = usePermission('movement.capture');
+  const retry = useRetryProcess(clip.clipId, clip.status === 'uploaded' ? 'process' : 'retry');
   const failed = clip.status === 'failed';
-  const current = STEPS.indexOf(clip.status === 'failed' ? 'processing' : (clip.status as (typeof STEPS)[number]));
+  const current = STEPS.indexOf(clip.status === 'failed' ? 'processing' : clip.status === 'uploaded' ? 'uploading' : (clip.status as (typeof STEPS)[number]));
+  const waitingToStart = clip.status === 'uploaded';
   const code = clip.error?.code ?? 'internal';
   const errorKey = `status.error.${code}` as MoveKey;
-  const reasons = clip.result?.qa.reasons ?? [];
+  const reasons = clip.qaReasons;
   const again = clip.patientId ? MOVE_PATHS.upload(clip.patientId) : MOVE_PATHS.upload();
 
   return (
@@ -45,7 +48,14 @@ export function StatusView({ clip }: { clip: ClipDetail }) {
         })}
       </Stack>
 
-      {!failed && (
+      {waitingToStart && (
+        <Stack spacing={1} sx={{ mt: 2 }}>
+          <Typography role="status">{t('status.uploaded.text')}</Typography>
+          {mayCapture && <Box><Button variant="contained" onClick={() => retry.mutate()} disabled={retry.isPending} sx={{ minHeight: 44 }}>{t('action.start_processing')}</Button></Box>}
+        </Stack>
+      )}
+
+      {!failed && !waitingToStart && (
         <Typography role="status" sx={{ mt: 2 }}>
           {clip.status === 'processing' ? t('status.processing.text') : t('status.queued.text')} <Box component="span" sx={{ color: 'text.secondary' }}>{t('status.waiting')}</Box>
         </Typography>
@@ -63,10 +73,10 @@ export function StatusView({ clip }: { clip: ClipDetail }) {
             </Box>
           )}
           <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
-            {code !== 'qa_rejected' && (
+            {mayCapture && code !== 'qa_rejected' && (
               <Button variant="contained" onClick={() => retry.mutate()} disabled={retry.isPending} sx={{ minHeight: 44 }}>{t('action.retry')}</Button>
             )}
-            <Button component={RouterLink} to={again} variant={code === 'qa_rejected' ? 'contained' : 'outlined'} sx={{ minHeight: 44 }}>{t('action.record_again')}</Button>
+            {mayCapture && <Button component={RouterLink} to={again} variant={code === 'qa_rejected' ? 'contained' : 'outlined'} sx={{ minHeight: 44 }}>{t('action.record_again')}</Button>}
             {clip.patientId && (
               <Button component={RouterLink} to={MOVE_PATHS.patient(clip.patientId)} sx={{ minHeight: 44 }}>{t('action.back_timeline')}</Button>
             )}

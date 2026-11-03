@@ -1,12 +1,12 @@
 /* ══════════════════════════════════════════════════════════════
    Pohybová analýza - the client of /api/movement (contract: sportmedical-movement/docs/CONTRACT.md, sections 3, 4, 6).
 
-   Every answer is read through a zod schema, so a backend that drifts fails here with a clear message and not three
-   components later. Parts the contract does not spell out (the shape of GET /clips/{id}, the session list, the consents,
-   the admin stats) are the ASSUMPTIONS marked below - this file is the one place to adjust them.
+   The real shapes are those of MovementController.cs (sportmedical-api, docs/engineering/movement-analysis.md), which is
+   authoritative. Staff routes answer in the ApiResult envelope ({success, data, code}); every answer is read through a zod
+   schema, so a backend that drifts fails here with a clear message and not three components later.
 
-   While `movementMock()` is on, the fixtures of src/movement/fixtures answer instead of the network (never in production
-   unless somebody sets the dev flag).
+   While `movementMock()` is on, src/movement/fixtures/mockApi.ts answers with the same wrapped payloads instead of the
+   network (never in production unless somebody sets the dev flag).
    ══════════════════════════════════════════════════════════════ */
 import axios from 'axios';
 import { z } from 'zod';
@@ -103,66 +103,140 @@ export type Metric = ClipResult['metrics'][number];
 export type MoveEvent = ClipResult['events'][number];
 export type ScoreBand = ClipResult['score']['band'];
 
-/* ───────────── decision (section 4) ───────────── */
+/* ───────────── decision (section 4, MovementController.Decide) ───────────── */
 
-export const decisionInputSchema = z.object({
-  action: z.enum(['accept', 'edit', 'reject']),
-  band: bandSchema,
-  faultTags: z.array(faultTagSchema),
-  unsure: z.boolean(),
-  note: z.string().max(4000),
-});
+/**
+ * What is sent. A band is required for accept and edit (`movement.band_required`); a rejection may carry none, and then
+ * sends none - the reject is the clinician saying "the machine's draft is wrong", not a rating.
+ */
+export const decisionInputSchema = z
+  .object({
+    action: z.enum(['accept', 'edit', 'reject']),
+    band: bandSchema.nullish(),
+    faultTags: z.array(faultTagSchema),
+    unsure: z.boolean(),
+    note: z.string().max(4000),
+  })
+  .refine((d) => d.action === 'reject' || (d.band !== null && d.band !== undefined), { path: ['band'], message: 'band required' });
 export type DecisionInput = z.infer<typeof decisionInputSchema>;
 
-/** ASSUMPTION: a stored decision adds who and when (the API appends, never edits). */
-export const decisionSchema = decisionInputSchema.extend({
-  id: z.string(),
-  decidedBy: z.string(),
-  decidedAt: z.string(),
-});
-export type Decision = z.infer<typeof decisionSchema>;
+/** A stored decision as the API sends it; the author is a staff id (there is no name in the answer). */
+export const decisionSchema = z
+  .object({
+    id: z.string(),
+    action: z.enum(['accept', 'edit', 'reject']),
+    band: bandSchema.nullish(),
+    faultTags: z.array(z.string()).default([]),
+    unsure: z.boolean().default(false),
+    note: z.string().nullish(),
+    clinicianStaffId: z.string(),
+    decidedAt: z.string(),
+  })
+  .transform((d) => ({
+    id: d.id,
+    action: d.action,
+    band: d.band ?? null,
+    faultTags: d.faultTags as FaultTag[],
+    unsure: d.unsure,
+    note: d.note ?? '',
+    decidedBy: d.clinicianStaffId,
+    decidedAt: d.decidedAt,
+  }));
+export type Decision = z.output<typeof decisionSchema>;
 
-/* ───────────── GET /clips/{id}: status + ClipResult + decisions ───────────── */
+/* ───────────── GET /clips/{id} ───────────── */
 
-export const CLIP_STATUSES = ['uploading', 'queued', 'processing', 'done', 'failed'] as const;
-export const clipStatusSchema = z.enum(CLIP_STATUSES);
-export type ClipStatus = z.infer<typeof clipStatusSchema>;
+/** `rejected` is a clip the quality check refused; the screens treat it as a failure with the code `qa_rejected`. */
+export const WIRE_STATUSES = ['uploading', 'uploaded', 'queued', 'processing', 'done', 'failed', 'rejected'] as const;
+export const CLIP_STATUSES = ['uploading', 'uploaded', 'queued', 'processing', 'done', 'failed'] as const;
+export type ClipStatus = (typeof CLIP_STATUSES)[number];
+const wireStatusSchema = z.enum(WIRE_STATUSES);
+const toStatus = (s: z.infer<typeof wireStatusSchema>): ClipStatus => (s === 'rejected' ? 'failed' : s);
 
-export const clipDetailSchema = z.object({
-  clipId: z.string(),
-  sessionId: z.string().nullish(),
-  patientId: z.string().nullish(),
-  movement: movementSchema,
-  view: viewSchema,
-  status: clipStatusSchema,
-  error: z.object({ code: z.string(), message: z.string() }).nullish(),
-  result: clipResultSchema.nullish(),
-  decisions: z.array(decisionSchema).default([]),
-});
-export type ClipDetail = z.infer<typeof clipDetailSchema>;
+const qaSummarySchema = z
+  .object({ reasons: z.array(z.object({ code: z.string(), messageKey: z.string().optional(), detail: z.string().nullish() })).default([]) })
+  .passthrough();
+
+export type QaReason = { code: string; messageKey?: string; detail?: string | null };
+
+export const clipDetailSchema = z
+  .object({
+    clipId: z.string(),
+    sessionId: z.string().nullish(),
+    patientId: z.string().nullish(),
+    movement: movementSchema,
+    view: viewSchema,
+    status: wireStatusSchema,
+    failureReason: z.string().nullish(),
+    attemptCount: z.number().int().optional(),
+    hasVideo: z.boolean().optional(),
+    qaPassed: z.boolean().nullish(),
+    qa: z.unknown().optional(),
+    markerPx: z.number().nullish(),
+    pipelineVersion: z.string().nullish(),
+    rulesVersion: z.string().nullish(),
+    poseModelVersion: z.string().nullish(),
+    /** The ClipResult once the clip is done; for a rejected clip only its `qa` part, so it is read strictly only when done. */
+    result: z.unknown().optional(),
+    decisions: z.array(decisionSchema).default([]),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+  })
+  .transform((c, ctx) => {
+    const wireRejected = c.status === 'rejected';
+    const qa = qaSummarySchema.safeParse(c.qa ?? (c.result as { qa?: unknown } | null | undefined)?.qa);
+    const reasons: QaReason[] = qa.success ? qa.data.reasons : [];
+    let result: ClipResult | null = null;
+    if (c.status === 'done' && c.result !== null && c.result !== undefined) {
+      const parsed = clipResultSchema.safeParse(c.result);
+      if (parsed.success) result = parsed.data;
+      else ctx.addIssue({ code: 'custom', message: `ClipResult: ${parsed.error.issues[0]?.message ?? 'invalid'}` });
+    }
+    const code = c.failureReason ?? (wireRejected ? 'qa_rejected' : null);
+    return {
+      clipId: c.clipId,
+      sessionId: c.sessionId ?? null,
+      patientId: c.patientId ?? null,
+      movement: c.movement,
+      view: c.view,
+      status: toStatus(c.status),
+      error: code === null ? null : { code, message: code },
+      qaReasons: reasons,
+      markerPx: c.markerPx ?? null,
+      result,
+      decisions: c.decisions,
+    };
+  });
+export type ClipDetail = z.output<typeof clipDetailSchema>;
 
 /* ───────────── sessions ───────────── */
 
-/** ASSUMPTION: the timeline row of a clip carries the draft score, the last decision's band and the headline metrics. */
-export const clipSummarySchema = z.object({
-  clipId: z.string(),
-  movement: movementSchema,
-  view: viewSchema,
-  status: clipStatusSchema,
-  score: z.object({ band: z.enum(['green', 'watch', 'red', 'needs_review']), errorCount: z.number().int() }).nullish(),
-  decisionBand: bandSchema.nullish(),
-  keyMetrics: z.array(z.object({ id: z.string(), side: sideSchema.nullable(), value: z.number(), unit: z.string() })).default([]),
-});
-export type ClipSummary = z.infer<typeof clipSummarySchema>;
+/** One clip on the timeline: the machine's band (a draft) and whether a clinician has decided. */
+export const clipSummarySchema = z
+  .object({
+    clipId: z.string(),
+    movement: movementSchema,
+    view: viewSchema,
+    status: wireStatusSchema,
+    band: z.enum(['green', 'watch', 'red', 'needs_review']).nullish(),
+    hasDecision: z.boolean().default(false),
+    failureReason: z.string().nullish(),
+    createdAt: z.string().optional(),
+  })
+  .transform((c) => ({ ...c, status: toStatus(c.status), band: c.band ?? null }));
+export type ClipSummary = z.output<typeof clipSummarySchema>;
 
-export const sessionSchema = z.object({
-  id: z.string(),
-  patientId: z.string(),
-  date: z.string(),
-  appointmentId: z.string().nullish(),
-  clips: z.array(clipSummarySchema).default([]),
-});
-export type MovementSession = z.infer<typeof sessionSchema>;
+export const sessionSchema = z
+  .object({
+    sessionId: z.string(),
+    patientId: z.string(),
+    appointmentId: z.string().nullish(),
+    date: z.string(),
+    serviceItemId: z.string().nullish(),
+    clips: z.array(clipSummarySchema).default([]),
+  })
+  .transform((s) => ({ id: s.sessionId, patientId: s.patientId, appointmentId: s.appointmentId ?? null, date: s.date, clips: s.clips }));
+export type MovementSession = z.output<typeof sessionSchema>;
 
 export const newClipSchema = z.object({ clipId: z.string(), uploadUrl: z.string() });
 export type NewClip = z.infer<typeof newClipSchema>;
@@ -171,33 +245,43 @@ export type NewClip = z.infer<typeof newClipSchema>;
 
 export const CONSENT_TYPES = ['care', 'ml'] as const;
 export type ConsentType = (typeof CONSENT_TYPES)[number];
-export const CONSENT_VERSION = '1';
 
-/** ASSUMPTION: GET /patients/{id}/consents -> the latest state of each type; POST {type, version, given}. */
-export const consentSchema = z.object({
-  type: z.enum(CONSENT_TYPES),
+/** The row of one consent as the API sends it. */
+const consentRowSchema = z.object({
+  kind: z.enum(CONSENT_TYPES),
   version: z.string(),
-  given: z.boolean(),
-  at: z.string().nullish(),
+  grantedAt: z.string(),
+  withdrawnAt: z.string().nullish(),
+  active: z.boolean(),
 });
-export type MovementConsent = z.infer<typeof consentSchema>;
+const consentStatusSchema = z.object({ consents: z.array(consentRowSchema).default([]), careActive: z.boolean(), mlTrainingActive: z.boolean() });
 
-/* ───────────── admin stats (no names) ───────────── */
+/** What the screens read: one line per kind - the active grant, else nothing. */
+export interface MovementConsent { type: ConsentType; version: string; given: boolean; at: string | null }
 
-/** ASSUMPTION: aggregate numbers only. */
+export function consentsOf(payload: unknown): MovementConsent[] {
+  const status = consentStatusSchema.parse(unwrap(payload));
+  return CONSENT_TYPES.map((type) => {
+    const active = status.consents.find((c) => c.kind === type && c.active);
+    const last = [...status.consents].filter((c) => c.kind === type).sort((a, b) => b.grantedAt.localeCompare(a.grantedAt))[0];
+    return active
+      ? { type, version: active.version, given: true, at: active.grantedAt }
+      : { type, version: last?.version ?? '', given: false, at: last?.withdrawnAt ?? null };
+  });
+}
+
+/* ───────────── admin stats: counts only ───────────── */
+
+const counts = z.record(z.string(), z.number().int()).default({});
 export const adminStatsSchema = z.object({
-  qa: z.object({
-    total: z.number().int(),
-    passed: z.number().int(),
-    rejected: z.number().int(),
-    reasons: z.array(z.object({ code: z.string(), count: z.number().int() })),
-  }),
-  consents: z.object({
-    care: z.object({ given: z.number().int(), withdrawn: z.number().int() }),
-    ml: z.object({ given: z.number().int(), withdrawn: z.number().int() }),
-  }),
-  dataset: z.object({ clips: z.number().int(), athletes: z.number().int(), labelled: z.number().int(), exported: z.number().int().optional() }),
-  versions: z.object({ pipeline: z.array(z.string()), rules: z.array(z.string()), model: z.array(z.string()) }),
+  clipsByStatus: counts,
+  qaOutcomes: counts,
+  failureReasons: counts,
+  resultBands: counts,
+  decisionsByAction: counts,
+  modelVersions: counts,
+  consents: counts,
+  exports: counts,
 });
 export type AdminStats = z.infer<typeof adminStatsSchema>;
 
@@ -205,32 +289,46 @@ export type AdminStats = z.infer<typeof adminStatsSchema>;
 
 const BASE = '/api/movement';
 
-/** The API may wrap an answer as {success, data}; the contract shows it bare. Both are read. */
+/**
+ * Staff routes answer in the usual ApiResult envelope. `client.ts` already unwraps `{success, data}`; this reads a payload
+ * that may or may not have been unwrapped yet (the same rule as `unwrapApiResult` in bookingContracts).
+ */
 function unwrap(body: unknown): unknown {
-  if (body !== null && typeof body === 'object' && 'success' in body && 'data' in body) return (body as { data: unknown }).data;
+  if (body !== null && typeof body === 'object' && !Array.isArray(body) && 'success' in body && 'data' in body) return (body as { data: unknown }).data;
   return body;
+}
+
+/** The stable `code` of a refusal (`movement.care_consent_missing`, ...), or null. */
+export function movementErrorCode(error: unknown): string | null {
+  const code = (error as { response?: { data?: { code?: unknown } } } | null)?.response?.data?.code;
+  return typeof code === 'string' ? code : null;
 }
 
 async function mock() {
   return import('../movement/fixtures/mockApi');
 }
 
+type Verb = 'get' | 'post' | 'put' | 'delete';
+
+/** One call: the network, or (dev flag) the fixtures answering with the same wrapped payloads. Returns the unwrapped data. */
+async function call(verb: Verb, path: string, options: { params?: Record<string, string>; body?: unknown } = {}): Promise<unknown> {
+  if (movementMock()) return unwrap(await (await mock()).handle(verb, path, options));
+  const res = await client.request({ method: verb, url: `${BASE}${path}`, params: options.params, data: options.body });
+  return unwrap(res.data);
+}
+
 export async function createSession(input: { patientId: string; appointmentId?: string; date: string }): Promise<MovementSession> {
-  if (movementMock()) return (await mock()).createSession(input);
-  const res = await client.post(`${BASE}/sessions`, input);
-  return sessionSchema.parse(unwrap(res.data));
+  const data = (await call('post', '/sessions', { body: input })) as { sessionId?: string; id?: string; clips?: unknown } & Record<string, unknown>;
+  /* The creation answer is the session; it may carry no clips yet. */
+  return sessionSchema.parse({ clips: [], ...data, sessionId: data.sessionId ?? data.id });
 }
 
 export async function listSessions(patientId: string): Promise<MovementSession[]> {
-  if (movementMock()) return (await mock()).listSessions(patientId);
-  const res = await client.get(`${BASE}/sessions`, { params: { patientId } });
-  return z.array(sessionSchema).parse(unwrap(res.data));
+  return z.array(sessionSchema).parse(await call('get', '/sessions', { params: { patientId } }));
 }
 
 export async function createClip(sessionId: string, input: { movement: Movement; view: View; markerPx?: number }): Promise<NewClip> {
-  if (movementMock()) return (await mock()).createClip(sessionId, input);
-  const res = await client.post(`${BASE}/sessions/${encodeURIComponent(sessionId)}/clips`, input);
-  return newClipSchema.parse(unwrap(res.data));
+  return newClipSchema.parse(await call('post', `/sessions/${encodeURIComponent(sessionId)}/clips`, { body: input }));
 }
 
 /** True for an address on this API (relative, or the configured API origin): only those may receive our bearer token. */
@@ -240,11 +338,11 @@ export function isOwnApiUrl(url: string): boolean {
   return base !== '' && url.startsWith(base);
 }
 
-/** PUT the file to the upload target, reporting 0..1. A signed storage link gets no Authorization header. */
+/** PUT the raw file (Content-Type video/*) to the upload target, reporting 0..1. A foreign signed link gets no Authorization header. */
 export async function uploadClipFile(clipId: string, uploadUrl: string, file: Blob, onProgress: (ratio: number) => void, signal?: AbortSignal): Promise<void> {
   if (movementMock()) return (await mock()).uploadClipFile(clipId, file, onProgress, signal);
   const options = {
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    headers: { 'Content-Type': file.type.startsWith('video/') ? file.type : 'video/mp4' },
     timeout: 0,
     signal,
     onUploadProgress: (e: { loaded: number; total?: number }) => onProgress(e.total ? Math.min(1, e.loaded / e.total) : 0),
@@ -254,15 +352,22 @@ export async function uploadClipFile(clipId: string, uploadUrl: string, file: Bl
   onProgress(1);
 }
 
+/** The staff-entered length of the 1 m marker in native pixels; null clears it. */
+export async function setClipMarker(clipId: string, markerPx: number | null): Promise<void> {
+  await call('put', `/clips/${encodeURIComponent(clipId)}/marker`, { body: { markerPx } });
+}
+
 export async function processClip(clipId: string): Promise<void> {
-  if (movementMock()) return (await mock()).processClip(clipId);
-  await client.post(`${BASE}/clips/${encodeURIComponent(clipId)}/process`);
+  await call('post', `/clips/${encodeURIComponent(clipId)}/process`);
+}
+
+/** Starts a failed or rejected clip over. */
+export async function retryClip(clipId: string): Promise<void> {
+  await call('post', `/clips/${encodeURIComponent(clipId)}/retry`);
 }
 
 export async function getClip(clipId: string): Promise<ClipDetail> {
-  if (movementMock()) return (await mock()).getClip(clipId);
-  const res = await client.get(`${BASE}/clips/${encodeURIComponent(clipId)}`);
-  return clipDetailSchema.parse(unwrap(res.data));
+  return clipDetailSchema.parse(await call('get', `/clips/${encodeURIComponent(clipId)}`));
 }
 
 /** The video needs the bearer token, which a <video src> cannot send: fetch it as a blob and play an object URL. */
@@ -273,12 +378,12 @@ export async function getClipVideo(clipId: string): Promise<Blob | string> {
 }
 
 export async function postDecision(clipId: string, input: DecisionInput): Promise<Decision> {
-  const body = decisionInputSchema.parse(input);
-  if (movementMock()) return (await mock()).postDecision(clipId, body);
-  const res = await client.post(`${BASE}/clips/${encodeURIComponent(clipId)}/decision`, body);
-  return decisionSchema.parse(unwrap(res.data));
+  const parsed = decisionInputSchema.parse(input);
+  const body = { ...parsed, band: parsed.band ?? undefined };
+  return decisionSchema.parse(await call('post', `/clips/${encodeURIComponent(clipId)}/decision`, { body }));
 }
 
+/** The athlete PDF (needs `movement.view` and `exports.download`; the server audits the download). */
 export async function getReportBlob(clipId: string): Promise<Blob> {
   if (movementMock()) return (await mock()).reportBlob(clipId);
   const res = await client.get(`${BASE}/clips/${encodeURIComponent(clipId)}/report`, { responseType: 'blob', timeout: 60_000 });
@@ -286,23 +391,29 @@ export async function getReportBlob(clipId: string): Promise<Blob> {
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
-  if (movementMock()) return (await mock()).adminStats();
-  const res = await client.get(`${BASE}/admin/stats`);
-  return adminStatsSchema.parse(unwrap(res.data));
+  return adminStatsSchema.parse(await call('get', '/admin/stats'));
+}
+
+/** Puts failed ML-store exports back on the queue; answers how many. */
+export async function retryFailedExports(): Promise<number> {
+  const data = z.object({ requeued: z.number().int() }).parse(await call('post', '/admin/exports/retry-failed'));
+  return data.requeued;
 }
 
 export async function getConsents(patientId: string): Promise<MovementConsent[]> {
-  if (movementMock()) return (await mock()).getConsents(patientId);
-  const res = await client.get(`${BASE}/patients/${encodeURIComponent(patientId)}/consents`);
-  return z.array(consentSchema).parse(unwrap(res.data));
+  return consentsOf(await call('get', `/patients/${encodeURIComponent(patientId)}/consents`));
 }
 
+/** Grant (POST, with the version) or withdraw (DELETE) one consent, then read them all again. */
 export async function setConsent(patientId: string, type: ConsentType, given: boolean): Promise<MovementConsent[]> {
-  const body = { type, version: CONSENT_VERSION, given };
-  if (movementMock()) return (await mock()).setConsent(patientId, body);
-  await client.post(`${BASE}/patients/${encodeURIComponent(patientId)}/consents`, body);
+  const path = `/patients/${encodeURIComponent(patientId)}/consents/${type}`;
+  if (given) await call('post', path, { body: { version: CONSENT_VERSION } });
+  else await call('delete', path);
   return getConsents(patientId);
 }
+
+/** The consent text version the screens grant; the server defaults to its own when none is sent. */
+export const CONSENT_VERSION = '1';
 
 /* ───────────── react-query ───────────── */
 
@@ -324,7 +435,7 @@ export function useClip(clipId: string | undefined) {
     enabled: clipId !== undefined && clipId !== '',
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'queued' || status === 'processing' || status === 'uploading' ? CLIP_POLL_MS : false;
+      return status === 'queued' || status === 'processing' || status === 'uploading' || status === 'uploaded' ? CLIP_POLL_MS : false;
     },
   });
 }
@@ -353,10 +464,11 @@ export function useSetConsent(patientId: string) {
   });
 }
 
-export function useRetryProcess(clipId: string) {
+/** Retry a failed clip, or start an uploaded one that was never queued. */
+export function useRetryProcess(clipId: string, kind: 'retry' | 'process' = 'retry') {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => processClip(clipId),
+    mutationFn: () => (kind === 'retry' ? retryClip(clipId) : processClip(clipId)),
     onSuccess: () => qc.invalidateQueries({ queryKey: movementKeys.clip(clipId) }),
   });
 }
@@ -371,4 +483,9 @@ export function useDecision(clipId: string) {
 
 export function useAdminStats(enabled = true) {
   return useQuery({ queryKey: movementKeys.admin, queryFn: getAdminStats, enabled });
+}
+
+export function useRetryFailedExports() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: retryFailedExports, onSuccess: () => qc.invalidateQueries({ queryKey: movementKeys.admin }) });
 }

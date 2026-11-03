@@ -38,7 +38,7 @@ const fail = (where, what) => { failures.push(`${where}: ${what}`); console.log(
 const ok = (where, what) => console.log(`  ok   ${where}: ${what}`);
 
 const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-const PERMS = ['patients.view', 'patients.edit', 'patients.register', 'settings.clinic.manage', 'billing.manage'];
+const PERMS = ['patients.view', 'patients.edit', 'movement.view', 'movement.capture', 'movement.review', 'movement.admin', 'exports.download'];
 
 for (const [w, h] of VPS) {
   for (const theme of THEMES) {

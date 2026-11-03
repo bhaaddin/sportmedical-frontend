@@ -1,5 +1,5 @@
 /* Small pure rules of the review screen: flag grouping, score presentation, fault-tag relevance, session compare. */
-import type { ClipDetail, ClipSummary, Decision, FaultTag, Flag, Movement, MovementSession } from '../../api/movement';
+import type { ClipDetail, Decision, FaultTag, Flag, Metric, Movement, MovementSession } from '../../api/movement';
 import { FAULT_TAGS } from '../../api/movement';
 
 export const SEVERITY_ORDER = ['red', 'watch', 'info'] as const;
@@ -24,12 +24,13 @@ export function decisionsNewestFirst(decisions: readonly Decision[]): Decision[]
 export type ScoreView =
   | { kind: 'draft'; band: 'green' | 'watch' | 'red' }
   | { kind: 'needs_review' }
-  | { kind: 'decided'; band: 'green' | 'watch' | 'red' };
+  | { kind: 'decided'; band: 'green' | 'watch' | 'red' }
+  | { kind: 'rejected' };
 
 /** What the chip says: a draft until a decision exists, then the clinician's band. */
 export function scoreView(clip: Pick<ClipDetail, 'result' | 'decisions'>): ScoreView | null {
   const decision = latestDecision(clip.decisions);
-  if (decision !== null) return { kind: 'decided', band: decision.band };
+  if (decision !== null) return decision.band === null ? { kind: 'rejected' } : { kind: 'decided', band: decision.band };
   const band = clip.result?.score.band;
   if (band === undefined) return null;
   return band === 'needs_review' ? { kind: 'needs_review' } : { kind: 'draft', band };
@@ -50,30 +51,44 @@ export function decisionReady(action: 'accept' | 'edit' | 'reject' | null, band:
   return action === 'reject' || band !== null;
 }
 
+/** The API names the author by staff id only: show "Klinik" with the last four characters, never the whole id. */
+export function staffLabel(staffId: string): string {
+  return `Klinik ${staffId.replace(/[^0-9a-z]/gi, '').slice(-4)}`;
+}
+
 /* ───────── timeline ───────── */
 
-export interface TrendPoint { sessionId: string; date: string; errorCount: number; band: 'green' | 'watch' | 'red' | 'needs_review' }
+/** The three bands as a level, lower is better; `needs_review` has none. */
+export const BAND_LEVEL = { green: 1, watch: 2, red: 3 } as const;
 
-/** Score trend of one movement: oldest first, one point per session (the first finished clip of that movement). */
+export interface TrendPoint { sessionId: string; date: string; level: 1 | 2 | 3; band: 'green' | 'watch' | 'red' }
+
+/** Band trend of one movement: oldest first, one point per session (its first finished clip of that movement with a band). */
 export function scoreTrend(sessions: readonly MovementSession[], movement: Movement): TrendPoint[] {
   const points: TrendPoint[] = [];
   for (const s of sessions) {
-    const clip = s.clips.find((c) => c.movement === movement && c.status === 'done' && c.score);
-    if (clip?.score) points.push({ sessionId: s.id, date: s.date, errorCount: clip.score.errorCount, band: clip.decisionBand ?? clip.score.band });
+    const clip = s.clips.find((c) => c.movement === movement && c.status === 'done' && c.band !== null && c.band !== 'needs_review');
+    if (clip && clip.band !== null && clip.band !== 'needs_review') points.push({ sessionId: s.id, date: s.date, level: BAND_LEVEL[clip.band], band: clip.band });
   }
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface CompareRow { key: string; id: string; side: 'L' | 'R' | null; unit: string; before: number | null; after: number | null; delta: number | null }
 
-function clipOf(session: MovementSession | undefined, movement: Movement): ClipSummary | undefined {
-  return session?.clips.find((c) => c.movement === movement && c.status === 'done');
+/** The finished clip of a movement in a session (the one the comparison reads). */
+export function doneClipOf(session: MovementSession | undefined, movement: Movement): string | null {
+  return session?.clips.find((c) => c.movement === movement && c.status === 'done')?.clipId ?? null;
 }
 
-/** Key metrics of the same movement in two sessions, side by side, with the change. */
-export function compareSessions(before: MovementSession | undefined, after: MovementSession | undefined, movement: Movement): CompareRow[] {
-  const a = clipOf(before, movement)?.keyMetrics ?? [];
-  const b = clipOf(after, movement)?.keyMetrics ?? [];
+/** Headline metrics of a result: the left-right ones first, at most six. */
+export function keyMetrics(metrics: readonly Metric[] | undefined): Metric[] {
+  return [...(metrics ?? [])].sort((a, b) => Number(b.side !== null) - Number(a.side !== null)).slice(0, 6);
+}
+
+/** Key metrics of the same movement in two results, side by side, with the change. */
+export function compareMetrics(before: readonly Metric[] | undefined, after: readonly Metric[] | undefined): CompareRow[] {
+  const a = keyMetrics(before);
+  const b = keyMetrics(after);
   const keyOf = (m: { id: string; side: 'L' | 'R' | null }) => `${m.id}:${m.side ?? '-'}`;
   const keys = new Map<string, { id: string; side: 'L' | 'R' | null; unit: string }>();
   for (const m of [...a, ...b]) if (!keys.has(keyOf(m))) keys.set(keyOf(m), { id: m.id, side: m.side, unit: m.unit });

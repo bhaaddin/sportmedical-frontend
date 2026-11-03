@@ -273,7 +273,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       .map((entry) => {
         const children = entry.children?.filter(allowed);
         /* Pohybová analýza: only while its feature flag is on. */
-        if (entry.path === '/patients' && movementEnabled()) {
+        if (entry.path === '/patients' && movementEnabled() && held.has('movement.view')) {
           return { ...entry, children: [...(children ?? []), { text: 'Pohybová analýza', icon: <DirectionsRun />, path: '/pohyb' } as MenuEntry] };
         }
         return { ...entry, children };
@@ -528,7 +528,7 @@ export default function StaffApp() {
           <Route path="/nastaveni/zabezpeceni-a-zalohy" element={<RequirePermission of="settings.clinic.manage"><SecurityCenterPage /></RequirePermission>} />
           <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
           <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
-          {movementEnabled() ? <Route path="/pohyb/*" element={<RequirePermission of="patients.view"><MovementRoutes /></RequirePermission>} /> : null}
+          {movementEnabled() ? <Route path="/pohyb/*" element={<RequirePermission of="movement.view"><MovementRoutes /></RequirePermission>} /> : null}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:group" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />

@@ -8,7 +8,7 @@ import { checkClip } from './uploadCheck';
 import { asymmetryLevel, computeAsymmetry, formatAsymmetry, formatValue, metricRows } from './asymmetry';
 import { curvePath, extentOf, groupCurves } from './curves';
 import { clickToVideoPx, markerPixelLength, markerPlausible } from './marker';
-import { compareSessions, decisionReady, groupFlags, scoreTrend, scoreView, tagsForMovement } from './review';
+import { compareMetrics, decisionReady, doneClipOf, groupFlags, scoreTrend, scoreView, staffLabel, tagsForMovement } from './review';
 import { buildDropJumpFrontResult, buildRunningSideResult, HALPE26_NAMES } from '../fixtures/synth';
 import type { ClipDetail, Decision, Flag, MovementSession } from '../../api/movement';
 
@@ -268,6 +268,7 @@ describe('review rules', () => {
     expect(scoreView(base)).toEqual({ kind: 'draft', band: 'watch' });
     const d: Decision = { id: '1', action: 'accept', band: 'green', faultTags: [], unsure: false, note: '', decidedBy: 'x', decidedAt: '2026-11-03T10:00:00Z' };
     expect(scoreView({ result, decisions: [d] })).toEqual({ kind: 'decided', band: 'green' });
+    expect(scoreView({ result, decisions: [{ ...d, action: 'reject', band: null }] })).toEqual({ kind: 'rejected' });
     expect(scoreView({ result: { ...result, score: { ...result.score, band: 'needs_review' } }, decisions: [] })).toEqual({ kind: 'needs_review' });
     expect(scoreView({ result: null, decisions: [] } as unknown as Pick<ClipDetail, 'result' | 'decisions'>)).toBeNull();
   });
@@ -284,16 +285,23 @@ describe('review rules', () => {
     expect(new Set([...run.main, ...run.other]).size).toBe(12);
     expect(tagsForMovement('drop_jump').main).toContain('knee_valgus');
   });
-  it('builds the trend and the before/after comparison', () => {
-    const mk = (id: string, date: string, errors: number, value: number): MovementSession => ({
-      id, patientId: 'p', date,
-      clips: [{ clipId: `${id}-c`, movement: 'running', view: 'side', status: 'done', score: { band: 'watch', errorCount: errors }, decisionBand: null, keyMetrics: [{ id: 'knee_flexion_ic', side: 'L', value, unit: 'deg' }] }],
+  it('builds the band trend and the before/after comparison from the clips', () => {
+    const mk = (id: string, date: string, band: 'green' | 'watch' | 'red'): MovementSession => ({
+      id, patientId: 'p', appointmentId: null, date,
+      clips: [{ clipId: `${id}-c`, movement: 'running', view: 'side', status: 'done', band, hasDecision: false }],
     });
-    const s = [mk('b', '2026-10-02', 2, 20), mk('a', '2026-09-01', 4, 12)];
-    expect(scoreTrend(s, 'running').map((p) => p.errorCount)).toEqual([4, 2]);
-    const rows = compareSessions(s[1], s[0], 'running');
+    const s = [mk('b', '2026-10-02', 'green'), mk('a', '2026-09-01', 'red')];
+    expect(scoreTrend(s, 'running').map((p) => p.level)).toEqual([3, 1]);
+    expect(scoreTrend(s, 'drop_jump')).toEqual([]);
+    expect(doneClipOf(s[0], 'running')).toBe('b-c');
+    const metric = (value: number) => ({ id: 'knee_flexion_ic', side: 'L' as const, value, unit: 'deg' });
+    const rows = compareMetrics([metric(12)], [metric(20)]);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ before: 12, after: 20, delta: 8 });
+    expect(compareMetrics(undefined, [metric(5)])[0]).toMatchObject({ before: null, delta: null });
+  });
+  it('names a decision author only by the tail of the staff id', () => {
+    expect(staffLabel('0190a000-0000-7000-8000-00000000a1b2')).toBe('Klinik a1b2');
   });
 });
 

@@ -6,7 +6,7 @@ import { PictureAsPdf } from '@mui/icons-material';
 import { StatusChip } from '../../components/ui';
 import { usePermission } from '../../auth/usePermission';
 import { BANDS, getReportBlob, useDecision, type Band, type ClipDetail, type DecisionInput, type FaultTag } from '../../api/movement';
-import { decisionReady, decisionsNewestFirst, latestDecision, tagsForMovement } from '../lib/review';
+import { decisionReady, decisionsNewestFirst, latestDecision, staffLabel, tagsForMovement } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
 import { BAND_TONE } from './Findings';
 
@@ -14,7 +14,7 @@ type Action = DecisionInput['action'];
 
 export function DecisionPanel({ clip }: { clip: ClipDetail }) {
   const { t } = useMoveT();
-  const mayDecide = usePermission('patients.edit');
+  const mayDecide = usePermission('movement.review');
   const mutation = useDecision(clip.clipId);
   const draftBand = clip.result?.score.band;
   const last = latestDecision(clip.decisions);
@@ -39,8 +39,8 @@ export function DecisionPanel({ clip }: { clip: ClipDetail }) {
 
   const submit = () => {
     if (action === null) return;
-    /* A rejection still carries a band (the contract requires one): the draft's, or "sledovat" when it had none. */
-    const sent: Band = action === 'reject' ? (band ?? (draftBand && draftBand !== 'needs_review' ? draftBand : 'watch')) : band!;
+    /* A rejection carries no band (the API does not ask for one); accept and edit do. */
+    const sent: Band | null = action === 'reject' ? null : band;
     mutation.mutate(
       { action, band: sent, faultTags: tags, unsure, note: note.trim() },
       { onSuccess: () => { setSaved(true); setAction(null); setBand(null); setTags([]); setUnsure(false); setNote(''); } },
@@ -132,6 +132,8 @@ export function DecisionPanel({ clip }: { clip: ClipDetail }) {
 
 export function ReportButton({ clipId, enabled }: { clipId: string; enabled: boolean }) {
   const { t } = useMoveT();
+  /* The PDF leaves the system: it needs the download right as well as the right to open movement analysis. */
+  const mayDownload = usePermission('exports.download');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const open = async () => {
@@ -150,11 +152,11 @@ export function ReportButton({ clipId, enabled }: { clipId: string; enabled: boo
   };
   return (
     <Box data-testid="report-block">
-      <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => void open()} disabled={!enabled || busy} sx={{ minHeight: 44 }}>
+      <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => void open()} disabled={!enabled || !mayDownload || busy} sx={{ minHeight: 44 }}>
         {t('action.report')}
       </Button>
       <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-        {enabled ? t('report.hint') : t('report.locked')}
+        {!mayDownload ? t('report.no_download') : enabled ? t('report.hint') : t('report.locked')}
       </Typography>
       {failed && <Alert severity="error" sx={{ mt: 1 }}>{t('report.failed')}</Alert>}
     </Box>
@@ -178,15 +180,15 @@ export function DecisionHistory({ decisions }: { decisions: ClipDetail['decision
               sx={(theme) => ({ p: 1.25, borderRadius: 1.5, border: `1px solid ${theme.palette.divider}`, bgcolor: alpha(theme.palette.text.primary, 0.03) })}
             >
               <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <StatusChip tone={BAND_TONE[d.band]} size="sm" dot>{t(`band.${d.band}`)}</StatusChip>
+                {d.band !== null && <StatusChip tone={BAND_TONE[d.band]} size="sm" dot>{t(`band.${d.band}`)}</StatusChip>}
                 <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{t(`decision.${d.action}`)}</Typography>
                 {d.unsure && <StatusChip tone="beige" size="sm">{t('decision.unsure.tag')}</StatusChip>}
               </Stack>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {t('decision.history.by', { who: d.decidedBy, when: formatDateTime(d.decidedAt) })}
+                {t('decision.history.by', { who: staffLabel(d.decidedBy), when: formatDateTime(d.decidedAt) })}
               </Typography>
               {d.faultTags.length > 0 && (
-                <Typography variant="body2">{d.faultTags.map((tag) => t(`tag.${tag}`)).join(', ')}</Typography>
+                <Typography variant="body2">{d.faultTags.map((tag) => t(`tag.${tag as FaultTag}`)).join(', ')}</Typography>
               )}
               {d.note !== '' && <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{d.note}</Typography>}
             </Box>

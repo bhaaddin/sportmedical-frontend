@@ -7,7 +7,7 @@ import { formatDate, useMoveT } from '../i18n';
 
 export function ConsentPanel({ patientId }: { patientId: string }) {
   const { t } = useMoveT();
-  const may = usePermission('patients.edit');
+  const may = usePermission('movement.capture');
   const query = useMovementConsents(patientId);
   const set = useSetConsent(patientId);
   const [confirm, setConfirm] = useState<ConsentType | null>(null);

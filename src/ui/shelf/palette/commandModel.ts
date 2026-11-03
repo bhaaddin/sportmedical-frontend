@@ -156,7 +156,7 @@ const PAGES: readonly Command[] = [
   { id: 'page-patients', group: 'page', label: 'Pacienti', hint: 'Kartotéka kliniky', to: '/patients', requires: 'patients.view', keywords: ['kartotéka', 'registr'] },
   { id: 'page-clubs', group: 'page', label: 'Kluby a týmy', hint: 'Hromadné objednávky a odkazy pro sportovce', to: '/clubs' },
   { id: 'page-billing', group: 'page', label: 'Fakturace', hint: 'Doklady a platby', to: '/billing', requires: 'billing.manage', keywords: ['faktury', 'platby'] },
-  { id: 'page-movement', group: 'page', label: 'Pohybová analýza', hint: 'Videozáznam pohybu a návrh hodnocení', to: '/pohyb', requires: 'patients.view', flag: 'movement', keywords: ['běh', 'doskok', 'kostra', 'video', 'pohyb'] },
+  { id: 'page-movement', group: 'page', label: 'Pohybová analýza', hint: 'Videozáznam pohybu a návrh hodnocení', to: '/pohyb', requires: 'movement.view', flag: 'movement', keywords: ['běh', 'doskok', 'kostra', 'video', 'pohyb'] },
   { id: 'page-settings', group: 'page', label: 'Nastavení', hint: 'Konfigurace kliniky', to: '/settings', keywords: ['konfigurace'] },
   ...(Object.entries(SECTION_CHILDREN) as [string, (typeof SECTION_CHILDREN)['/billing']][]).flatMap(([parent, children]) =>
     children

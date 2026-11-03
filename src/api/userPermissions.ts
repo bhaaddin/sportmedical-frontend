@@ -98,6 +98,22 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Stahovat soubory ze systému',
     detail: 'Exporty, CSV, PDF faktury a zprávy, dokumenty pacienta, seznamy hráčů. Bez tohoto práva tlačítka stažení nejdou použít; každé stažení se zapíše do auditu.',
   },
+  'movement.view': {
+    label: 'Otevírat analýzu pohybu',
+    detail: 'Relace, záznamy, kostra, úhly a zpráva z pohybové analýzy.',
+  },
+  'movement.capture': {
+    label: 'Natáčet a nahrávat analýzu pohybu',
+    detail: 'Zakládat relace, nahrávat záznamy, spouštět zpracování a zapisovat souhlasy s analýzou pohybu.',
+  },
+  'movement.review': {
+    label: 'Posuzovat analýzu pohybu',
+    detail: 'Potvrdit, upravit nebo zamítnout návrh hodnocení (rozhodnutí klinika).',
+  },
+  'movement.admin': {
+    label: 'Statistiky analýzy pohybu',
+    detail: 'Souhrn kvality záznamů, souhlasů a verzí a opakování neúspěšných exportů.',
+  },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',
     detail: 'Číst odpovědi pacientů a nastavovat dotazníky.',
