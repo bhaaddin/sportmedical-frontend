@@ -26,6 +26,8 @@ import {
   openPortal, portalDocumentUrl, rememberPortalToken, setPortalPassword, signOutEverywhere,
 } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard, PortalInvoice } from '../../api/patientPortal';
+import { AddToCalendar } from '../../components/calendar/AddToCalendar';
+import type { CalendarEvent } from '../../components/calendar/calendarLinks';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import { useDevice } from '../../layout/useDevice';
@@ -67,45 +69,15 @@ const STATUS_LABELS: Record<string, string> = {
 /* The server (hardening B8) refuses a portal password shorter than 12; say so before it does. */
 const MIN_PASSWORD = 12;
 
-/** UTC instant as an iCalendar stamp: 20260929T083000Z. */
-function icsStamp(iso: string): string {
-  return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-}
-
-/**
- * Builds a one-event .ics from the appointment and hands it to the browser to
- * download — the patient adds it to Google or Apple Calendar. Client-side, so it
- * needs nothing from the server.
- */
-function addToCalendar(appointment: PortalAppointment): void {
-  const summary = `SportMedical — ${appointment.activityName || 'Termín'}`;
-  const ics = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//SportMedical//Portal//CS',
-    'BEGIN:VEVENT',
-    `UID:${icsStamp(appointment.startUtc)}-sportmedical@portal`,
-    `DTSTAMP:${icsStamp(new Date().toISOString())}`,
-    `DTSTART:${icsStamp(appointment.startUtc)}`,
-    `DTEND:${icsStamp(appointment.endUtc)}`,
-    `SUMMARY:${summary}`,
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].join('\r\n');
-
-  try {
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'termin.ics';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch {
-    /* download blocked — nothing to do; the time is on screen. */
-  }
+/** The appointment as a calendar event (one builder for every page: components/calendar). */
+function portalEvent(appointment: PortalAppointment, address = ''): CalendarEvent {
+  return {
+    startUtc: appointment.startUtc,
+    endUtc: appointment.endUtc,
+    title: `SportMedical — ${appointment.activityName || 'Termín'}`,
+    location: address.trim() === '' ? null : address.trim(),
+    uid: `${appointment.id}@sportmedical-portal`,
+  };
 }
 
 const canStillCancel = (appointment: PortalAppointment): boolean =>
@@ -168,9 +140,7 @@ function NextAppointmentCard({
       <Typography data-testid="price-line" sx={{ fontSize: 15, fontWeight: 700 }}>{patientPriceLine(appointment)}</Typography>
 
       <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap', mt: 1 }}>
-        <Button variant="contained" startIcon={<CalendarMonthOutlined />} onClick={() => addToCalendar(appointment)} sx={ctaSx(46)}>
-          Do kalendáře
-        </Button>
+        <AddToCalendar event={portalEvent(appointment, address)} variant="contained" buttonSx={ctaSx(46)} />
         {canStillCancel(appointment) && (
           <Button variant="outlined" onClick={() => onCancel(appointment)} sx={ghostSx(46)}>
             Zrušit termín
@@ -205,14 +175,7 @@ function AppointmentRow({
         <Typography data-testid="price-line" sx={{ fontSize: 14, fontWeight: 600 }}>{patientPriceLine(appointment)}</Typography>
         {!past && (
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
-            <Button
-              size="small"
-              startIcon={<CalendarMonthOutlined sx={{ fontSize: 16 }} />}
-              onClick={() => addToCalendar(appointment)}
-              sx={{ color: '#A8560D', minHeight: 44, px: 1, fontSize: 13 }}
-            >
-              Do kalendáře
-            </Button>
+            <AddToCalendar event={portalEvent(appointment)} variant="text" size="small" compact buttonSx={{ color: '#A8560D', minHeight: 44, px: 1, fontSize: 13 }} />
             {canCancel && (
               <Button size="small" onClick={() => onCancel?.(appointment)} sx={{ color: LABEL_COLOR, minHeight: 44, px: 1, fontSize: 13 }}>
                 Zrušit termín

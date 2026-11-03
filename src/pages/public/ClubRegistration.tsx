@@ -38,7 +38,8 @@ import { allowsActivity } from '../../components/clubs/order/routing';
 import { SLOT_PICKER_KEYS } from './club/SlotPicker';
 import { TermCalendar } from './club/TermCalendar';
 import { CAL_KEYS, priceLabel, withCalDefaults } from './club/texts';
-import { downloadIcs } from './club/ics';
+import { AddToCalendar } from '../../components/calendar/AddToCalendar';
+import type { CalendarEvent } from '../../components/calendar/calendarLinks';
 import type { SlotsStatus } from './club/SlotPicker';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
 import {
@@ -347,18 +348,18 @@ export default function ClubRegistration() {
 
   const phoneOfClinic = clinic?.phone.trim() ?? '';
 
-  /** The booking as an .ics download, built here from date, time, činnost and place. */
-  const saveToCalendar = (b: BookedInfo) => {
+  /** The booking as a calendar event, built here from date, time, činnost and place. */
+  const calendarEvent = (b: BookedInfo): CalendarEvent => {
     const minutes = offer?.activities.find((x) => x.activityId === activityId)?.durationMinutes ?? 0;
     const endUtc = b.endUtc ?? new Date(new Date(b.startUtc).getTime() + Math.max(minutes, 15) * 60_000).toISOString();
     const place = [b.calendarName, clinic?.address].map((x) => (x ?? '').trim()).filter((x) => x !== '').join(', ');
-    downloadIcs({
+    return {
       startUtc: b.startUtc,
       endUtc,
       title: [b.activityName ?? 'Prohlídka', clinic?.name].map((x) => (x ?? '').trim()).filter((x) => x !== '').join(' · '),
       location: place === '' ? null : place,
       description: b.bring,
-    }, 'termin-prohlidky.ics');
+    };
   };
 
   /* A notice (dead link, loading, confirmed, full): the hero when there is one, then one pane that fills the region. */
@@ -421,8 +422,7 @@ export default function ClubRegistration() {
         onAdd={infoMode ? addAnother : null}
         calendarLine={cal['formulare.club-reg.done.calendar']}
         priceLabel={cal['formulare.club-reg.price.label']}
-        icsLabel={cal['formulare.club-reg.done.ics']}
-        onIcs={() => saveToCalendar(booked)}
+        calendar={<AddToCalendar heading={cal['formulare.club-reg.done.ics']} event={calendarEvent(booked)} fileName="termin-prohlidky.ics" centered buttonSx={ghostSx(50)} />}
       />,
     );
   }

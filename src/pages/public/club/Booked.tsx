@@ -1,8 +1,9 @@
 /* The success screen: when, which činnost, where, what to bring - and one click for the next player. */
+import type { ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { CheckCircleOutlined, EventOutlined } from '@mui/icons-material';
+import { CheckCircleOutlined } from '@mui/icons-material';
 import { ARCHIVO, BRAND, clinicDate } from '../../../components/public/brand';
-import { LABEL_COLOR, Panel, SOFT_TEXT, ctaSx, ghostSx, longWhen } from '../../../components/public/kit';
+import { LABEL_COLOR, Panel, SOFT_TEXT, ctaSx, longWhen } from '../../../components/public/kit';
 
 export interface BookedInfo {
   startUtc: string;
@@ -22,10 +23,12 @@ const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text
 const hhmm = (time: string): string => time.slice(0, 5);
 
 export function Booked({
-  booked, title, next, bringTitle, addLabel, onAdd, calendarLine, icsLabel, onIcs, priceLabel = 'Cena',
+  booked, title, next, bringTitle, addLabel, onAdd, calendarLine, calendar, priceLabel = 'Cena',
 }: {
   booked: BookedInfo; title: string; next: string; bringTitle: string; addLabel: string; onAdd: (() => void) | null;
-  calendarLine: string; icsLabel: string; onIcs: () => void;
+  calendarLine: string;
+  /** The "add to calendar" buttons (components/calendar/AddToCalendar). */
+  calendar: ReactNode;
   /** The word before the price line ("Cena"); an editable slot. */
   priceLabel?: string;
 }) {
@@ -53,7 +56,7 @@ export function Booked({
       )}
       <Typography sx={{ color: LABEL_COLOR }}>{next}</Typography>
       <Typography data-testid="booked-calendar-line" sx={{ color: SOFT_TEXT, fontSize: 15 }}>{calendarLine}</Typography>
-      <Button variant="outlined" startIcon={<EventOutlined />} onClick={onIcs} sx={ghostSx(50)}>{icsLabel}</Button>
+      {calendar}
       {onAdd !== null && (
         <Button variant="contained" onClick={onAdd} sx={ctaSx(50)}>{addLabel}</Button>
       )}

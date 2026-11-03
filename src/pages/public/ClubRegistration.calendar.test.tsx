@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { ClubFreeSlot, ClubOffer } from '../../api/publicClub';
 import { VIEWPORTS, setViewport } from '../../test/viewport';
-import { buildIcs } from './club/ics';
+import { buildIcs } from '../../components/calendar/calendarLinks';
 import { monthCells } from './club/TermCalendar';
 
 const getClubOffer = vi.fn();
@@ -222,7 +222,7 @@ describe('success screen', () => {
 
     expect(await screen.findByTestId('booked-when')).toHaveTextContent(/26\. října v 09:00–09:15/);
     expect(screen.getByTestId('booked-calendar-line')).toHaveTextContent('Váš termín uvidí i ordinace v kalendáři');
-    await userEvent.click(screen.getByRole('button', { name: 'Přidat do kalendáře' }));
+    await userEvent.click(screen.getByRole('button', { name: /Apple Kalendář/ }));
     expect(create).toHaveBeenCalledTimes(1);
     const blob = create.mock.calls[0][0] as Blob;
     expect(blob.type).toContain('text/calendar');

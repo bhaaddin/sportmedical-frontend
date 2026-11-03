@@ -81,7 +81,7 @@ describe('/rezervace/:token', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Vaše rezervace' })).toBeInTheDocument();
     expect(await screen.findByText(/Základní sportovní prohlídka/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Přidat do kalendáře/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Apple Kalendář/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zrušit termín' })).toBeInTheDocument();
     // The old hard-coded document reminder is gone: documents are the činnost's setting now.
     expect(screen.queryByText(/výpis ze zdravotní dokumentace/i)).not.toBeInTheDocument();

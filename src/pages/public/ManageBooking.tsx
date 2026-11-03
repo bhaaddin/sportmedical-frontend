@@ -41,7 +41,6 @@ import {
 import {
   EventAvailableOutlined,
   EventBusyOutlined,
-  DownloadOutlined,
 } from '@mui/icons-material';
 import {
   ManageError,
@@ -54,6 +53,7 @@ import type { ManagedBooking } from '../../api/publicManage';
 import { bookableOffer, freeDays, freeSlots } from '../../api/publicBooking';
 import type { BookableSlot } from '../../api/publicBooking';
 import { shownPrice } from '../../components/booking/grid/appointmentPrice';
+import { AddToCalendar } from '../../components/calendar/AddToCalendar';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
@@ -330,24 +330,27 @@ export default function ManageBooking() {
               )}
 
               {/*
-                A plain link, not a fetch. The browser downloads the file and
-                hands it to whatever the patient keeps their calendar in,
-                which is the whole point of offering it.
+                A real https link to the server's .ics (inline, text/calendar): Safari on iPhone
+                and Mac offers "Add to calendar" for it, Android and desktop hand it to the
+                calendar app. Google gets its own link.
               */}
-              <Button
-                fullWidth
-                variant="contained"
-                disableElevation
-                href={calendarFileUrl(token)}
-                startIcon={<DownloadOutlined />}
-                sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
-              >
-                Přidat do kalendáře
-              </Button>
-
-              <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1, mb: 2.5 }}>
-                Stáhne soubor, který si otevřete v Google, Apple i jinde.
-              </Typography>
+              <Box sx={{ mb: 2.5 }}>
+                <AddToCalendar
+                  fullWidth
+                  icsContained
+                  heading="Přidat do kalendáře"
+                  variant="outlined"
+                  icsUrl={calendarFileUrl(token)}
+                  event={{
+                    startUtc: booking.startUtc,
+                    endUtc: booking.endUtc,
+                    title: [booking.activityName, clinic?.name].map((x) => (x ?? '').trim()).filter((x) => x !== '').join(' — '),
+                    location: clinic?.address?.trim() || null,
+                    uid: `${booking.appointmentId}@sportmedical`,
+                  }}
+                  buttonSx={{ borderRadius: 999, py: 1.25, minHeight: 48, color: BRAND.ink, borderColor: BRAND.line, boxShadow: 'none' }}
+                />
+              </Box>
 
               {canReschedule && (
                 <Button
