@@ -75,6 +75,8 @@ export function childrenFor(pathname: string): { parent: ContextualParent; items
       (parent === '/planovani' && pathname.startsWith('/kalendar/')) ||
       /* The doctor's diagnostic form is opened from the patient's card. */
       (parent === '/patients' && pathname === '/diagnostics/new') ||
+      /* Pohybová analýza (feature flag) hangs under Pacienti. */
+      (parent === '/patients' && isActivePath(pathname, '/pohyb')) ||
       items.some((c) => !c.shortcut && isActivePath(pathname, c.path));
     if (own) return { parent, items };
   }

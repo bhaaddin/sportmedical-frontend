@@ -10,7 +10,7 @@
  */
 import { Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Box, Button } from '@mui/material';
-import { Dashboard, People, Settings, CalendarMonth, Receipt, ReceiptLong, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, PersonAdd, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
+import { DirectionsRun, Dashboard, People, Settings, CalendarMonth, Receipt, ReceiptLong, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, PersonAdd, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
 import { patientInPath } from './pages/patients/sections';
@@ -26,6 +26,7 @@ import { PageLoader } from './components/shell/PageLoader';
 import { RAIL_WIDTH, SIDEBAR_WIDTH } from './components/shell/shellStyles';
 import { isPlannerRoute } from './components/shell/plannerRoutes';
 import type { MenuEntry, ShellNav } from './components/shell/shellTypes';
+import { movementEnabled } from './movement/flags';
 import { SECTION_CHILDREN, type ContextualParent } from './components/shell/shellModel';
 import { useDevice } from './layout/useDevice';
 import { afterFirstPaint } from './utils/afterFirstPaint';
@@ -37,6 +38,7 @@ import { usePageArrival } from './motion/PageTransition';
 const NotFound = lazy(() => import('./pages/NotFound'));
 /* DEV only: the pop-out gallery the contrast audit reads (scripts/stage3b); the condition is a build-time constant, so a production bundle has neither the route nor the module. */
 const PopoutGallery = import.meta.env.DEV ? lazy(() => import('./dev/PopoutGallery')) : null;
+const MovementRoutes = lazy(() => import('./movement/MovementRoutes'));
 const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const PlannerPage = lazy(() => import('./planner/PlannerPage'));
 const ClubPlannerPage = lazy(() => import('./planner/ClubPlannerPage'));
@@ -268,7 +270,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const allowed = (entry: MenuEntry) => entry.requires === undefined || held.has(entry.requires);
     return menuItems
       .filter(allowed)
-      .map((entry) => ({ ...entry, children: entry.children?.filter(allowed) }));
+      .map((entry) => {
+        const children = entry.children?.filter(allowed);
+        /* Pohybová analýza: only while its feature flag is on. */
+        if (entry.path === '/patients' && movementEnabled()) {
+          return { ...entry, children: [...(children ?? []), { text: 'Pohybová analýza', icon: <DirectionsRun />, path: '/pohyb' } as MenuEntry] };
+        }
+        return { ...entry, children };
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [[...held].sort().join(' ')]);
 
@@ -519,6 +528,7 @@ export default function StaffApp() {
           <Route path="/nastaveni/zabezpeceni-a-zalohy" element={<RequirePermission of="settings.clinic.manage"><SecurityCenterPage /></RequirePermission>} />
           <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
           <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
+          {movementEnabled() ? <Route path="/pohyb/*" element={<RequirePermission of="patients.view"><MovementRoutes /></RequirePermission>} /> : null}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:group" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />

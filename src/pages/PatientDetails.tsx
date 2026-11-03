@@ -11,7 +11,7 @@
  * is open; what the layout loaded comes in through the outlet context rather
  * than being fetched a second time here.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useIsPhone } from '../layout/useDevice';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,8 @@ import { billingApi } from '../api/billing';
 import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
 import { usePermission } from '../auth/usePermission';
 import { SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { movementEnabled } from '../movement/flags';
+const PatientMovementCard = lazy(() => import('../movement/pages/PatientMovementCard'));
 import ConsentLine from '../components/patients/ConsentLine';
 import { LabelValue } from '../components/patients/LabelValue';
 import { NextAppointmentCard, nextInWindow } from '../components/patients/NextAppointmentCard';
@@ -185,6 +187,9 @@ export default function PatientDetails() {
           <Typography component="h3" sx={{ fontSize: 14, fontWeight: 700 }}>Souhlasy</Typography>
           <ConsentLine patientId={patient.id} />
         </Box>
+        {movementEnabled() && (
+          <Suspense fallback={null}><PatientMovementCard patientId={patient.id} /></Suspense>
+        )}
       </PatientRelatedShelf>
 
       <Box

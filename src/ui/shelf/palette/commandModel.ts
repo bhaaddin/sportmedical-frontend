@@ -13,6 +13,7 @@
  * (`serverSearchAllowed`) - those would travel in a URL - and no row ever shows an identifier.
  */
 import { SECTION_CHILDREN } from '../../../components/shell/shellModel';
+import { movementEnabled } from '../../../movement/flags';
 import type { Permission } from '../../../auth/usePermission';
 import { ENTITY_PLURAL, entityTarget, looksLikeIdentifier, mayOpen, refKey, type EntityKind, type EntityRef } from '../entities';
 import type { RecentEntry, PinnedEntry } from '../memory';
@@ -40,6 +41,8 @@ export interface Command {
   /** Extra words that find it ("rezervace" finds "Nová objednávka"). */
   keywords?: readonly string[];
   requires?: Permission;
+  /** Hidden unless this feature flag is on. */
+  flag?: 'movement';
   entity?: EntityRef;
   /** Added to the score (an action the desk uses all day sits above a page of the same name). */
   boost?: number;
@@ -153,6 +156,7 @@ const PAGES: readonly Command[] = [
   { id: 'page-patients', group: 'page', label: 'Pacienti', hint: 'Kartotéka kliniky', to: '/patients', requires: 'patients.view', keywords: ['kartotéka', 'registr'] },
   { id: 'page-clubs', group: 'page', label: 'Kluby a týmy', hint: 'Hromadné objednávky a odkazy pro sportovce', to: '/clubs' },
   { id: 'page-billing', group: 'page', label: 'Fakturace', hint: 'Doklady a platby', to: '/billing', requires: 'billing.manage', keywords: ['faktury', 'platby'] },
+  { id: 'page-movement', group: 'page', label: 'Pohybová analýza', hint: 'Videozáznam pohybu a návrh hodnocení', to: '/pohyb', requires: 'patients.view', flag: 'movement', keywords: ['běh', 'doskok', 'kostra', 'video', 'pohyb'] },
   { id: 'page-settings', group: 'page', label: 'Nastavení', hint: 'Konfigurace kliniky', to: '/settings', keywords: ['konfigurace'] },
   ...(Object.entries(SECTION_CHILDREN) as [string, (typeof SECTION_CHILDREN)['/billing']][]).flatMap(([parent, children]) =>
     children
@@ -172,7 +176,7 @@ const PAGES: readonly Command[] = [
 
 /** Actions and pages the person may open (one row per address; the first label wins a duplicate). */
 export function staticCommands(held: readonly string[]): Command[] {
-  const allowed = (c: Command) => c.requires === undefined || held.includes(c.requires);
+  const allowed = (c: Command) => (c.requires === undefined || held.includes(c.requires)) && (c.flag !== 'movement' || movementEnabled());
   const seen = new Set<string>();
   const out: Command[] = [];
   for (const c of [...ACTIONS, ...PAGES]) {
