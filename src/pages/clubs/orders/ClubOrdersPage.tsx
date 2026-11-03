@@ -26,6 +26,8 @@ import { clubsApi } from '../../../api/clubs';
 import { Add, History } from '@mui/icons-material';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
+import { getOneOrderSettings } from '../../../api/clubOneOrder';
+import { collapseToRoots } from '../../../components/clubs/orders/oneOrderModel';
 import { useDevice } from '../../../layout/useDevice';
 import { clubCalendarPath, clubOrdersHistoryPath } from '../../../components/shell/plannerRoutes';
 import { formatPricedSeats, orderTotalCzk, priceText } from '../../../components/clubs/orders/orderMoney';
@@ -101,7 +103,10 @@ export default function ClubOrdersPage() {
   });
 
   const everything = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
-  const all = useMemo(() => withoutCancelled(everything), [everything]);
+  /* One order per club: a club in the mode shows ONE row per order (its root), not one per added day. A server without the setting (404) changes nothing. */
+  const oneOrder = useQuery({ queryKey: ['club-one-order-settings'], queryFn: getOneOrderSettings, retry: false, staleTime: 60_000 });
+  const oneOrderClubs = oneOrder.data?.clubIds;
+  const all = useMemo(() => collapseToRoots(withoutCancelled(everything), oneOrderClubs ?? []), [everything, oneOrderClubs]);
   const cancelledCount = useMemo(() => onlyCancelled(everything).length, [everything]);
   const counts = useMemo(() => statusCounts(all), [all]);
   const visible = useMemo(() => filterOrders(all, status, from, to), [all, status, from, to]);

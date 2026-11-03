@@ -111,6 +111,8 @@ export interface ClubOrderView {
   groupTotals: OrderGroupTotals;
   /** The invoice that billed THIS order (every billed order of a group carries its own); null until invoiced. */
   invoiceId: string | null;
+  /** One order per club: set on the staff-create answer when the new order was added to the club's open order (the root's id). */
+  joinedOrderId?: string | null;
 }
 
 export interface OrderAddendumSummary {
@@ -398,6 +400,7 @@ export function toOrder(raw: unknown): ClubOrderView {
       totalCzk: num(totals.totalCzk, quote === null ? 0 : num(quote.totalCzk)),
     },
     invoiceId: typeof o.invoiceId === 'string' && o.invoiceId !== '' ? o.invoiceId : null,
+    joinedOrderId: typeof o.joinedOrderId === 'string' && o.joinedOrderId !== '' ? o.joinedOrderId : null,
   };
 }
 
@@ -458,6 +461,22 @@ export function toRelease(data: unknown): ReleaseUnfilledResult {
 }
 
 const BASE = '/api/v1/club-orders';
+
+/** One order per club: bill only some days of the order (`orderIds`) and/or one month (`month`, yyyy-MM). Absent = everything left. */
+export interface InvoiceSubset {
+  orderIds?: string[];
+  month?: string;
+}
+
+/** `?orderIds=a&orderIds=b&month=2026-11` (repeated parameter, as the contract says); empty when there is no subset. */
+export function subsetQuery(subset?: InvoiceSubset): string {
+  if (subset === undefined) return '';
+  const q = new URLSearchParams();
+  for (const id of subset.orderIds ?? []) q.append('orderIds', id);
+  if (subset.month !== undefined && subset.month !== '') q.append('month', subset.month);
+  const text = q.toString();
+  return text === '' ? '' : `?${text}`;
+}
 
 export const clubOrdersApi = {
   /** Creates an order in status Invited and returns it with its form link (nothing is e-mailed). */
@@ -529,13 +548,14 @@ export const clubOrdersApi = {
     call(async () => toOrder(unwrap((await client.post(`${BASE}/${rootId}/merge`, { orderIds })).data))),
 
   /** What the group's one invoice would hold (a read; works for PerPerson too, the invoice itself is refused). */
-  invoiceDraft: (id: string): Promise<InvoiceDraft> =>
-    call(async () => toInvoiceDraft((await client.get(`${BASE}/${id}/invoice-draft`)).data)),
+  invoiceDraft: (id: string, subset?: InvoiceSubset): Promise<InvoiceDraft> =>
+    call(async () => toInvoiceDraft((await client.get(`${BASE}/${id}/invoice-draft${subsetQuery(subset)}`)).data)),
 
   /** Creates the group's one invoice (201) or returns the existing one (200, `created: false`). */
-  createInvoice: (id: string): Promise<CreatedInvoice> =>
+  createInvoice: (id: string, subset?: InvoiceSubset): Promise<CreatedInvoice> =>
     call(async () => {
-      const response = await client.post(`${BASE}/${id}/invoice`, null);
+      const body = subset !== undefined && (subset.orderIds !== undefined || subset.month !== undefined) ? subset : null;
+      const response = await client.post(`${BASE}/${id}/invoice`, body);
       return toCreatedInvoice(response.data, response.status);
     }),
 

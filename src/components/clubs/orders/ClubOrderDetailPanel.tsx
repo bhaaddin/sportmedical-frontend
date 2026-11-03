@@ -42,6 +42,9 @@ import { ClubLinksBlock } from './ClubLinksBlock';
 import { WriteToClubDialog } from './WriteToClubDialog';
 import { OfferedDaysBlock } from './OfferedDaysBlock';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
+import { getOneOrderSettings } from '../../../api/clubOneOrder';
+import { isOneOrder, ONE_ORDER_SETTINGS_KEY, OneOrderBlock, useCombinedOrder } from './OneOrderBlock';
+import { OneOrderInvoiceDialog } from './OneOrderInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
 import { orderCode } from '../order/orderFormat';
 import { nextStepOf, rangeText, registeredLine, seatPercent, STATUS_TONE } from './orderLogic';
@@ -82,6 +85,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   /* Etapa 5: a row of the group opens that order in the same drawer. */
   const [orderId, setOrderId] = useState(initialId);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [oneInvoiceOpen, setOneInvoiceOpen] = useState(false);
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
 
   const query = useQuery({
@@ -107,8 +111,14 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   });
   const invoiceDraft = invoiceDraftQuery.data;
 
+  /* One order per club: the combined view, only when the server has the settings route (404 = the feature is hidden). */
+  const oneSettings = useQuery({ queryKey: ONE_ORDER_SETTINGS_KEY, queryFn: getOneOrderSettings, retry: false, staleTime: 60_000 });
+  const combinedQuery = useCombinedOrder(orderId, oneSettings.data != null && order !== undefined && order.status !== 'Invited');
+  const combined = isOneOrder(combinedQuery.data) ? combinedQuery.data : null;
+
   const refresh = () => {
     void invalidateClubWorld(queryClient);
+    void queryClient.invalidateQueries({ queryKey: ['club-order-combined'] });
     onChanged?.();
   };
 
@@ -148,7 +158,19 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         {nextStep !== null ? (
           <Alert severity="info" icon={false} data-testid="order-next-step" sx={{ fontWeight: 600 }}>{`Co dál: ${nextStep}`}</Alert>
         ) : null}
-        <Block title="Souhrn">
+        {combined !== null ? (
+          <OneOrderBlock
+            combined={combined}
+            currentId={order.id}
+            mayBill={mayBill}
+            perPerson={order.paymentMethod === 'PerPerson'}
+            onOpen={setOrderId}
+            onAddDay={() => navigate(clubCalendarPath(order.clubId), { state: { pickOrder: { clubId: order.clubId } } })}
+            onInvoice={() => setOneInvoiceOpen(true)}
+            onChanged={refresh}
+          />
+        ) : null}
+        <Block title={combined !== null ? 'Tento den' : 'Souhrn'}>
           <Stack direction="row" sx={{ gap: 3, flexWrap: 'wrap', mb: 1.5 }}>
             <Box><Typography sx={{ fontSize: 22, fontWeight: 700 }}>{order.totalSeats}</Typography><Typography variant="caption" color="text.secondary">míst</Typography></Box>
             <Box><Typography sx={{ fontSize: 22, fontWeight: 700 }}>{order.registered}</Typography><Typography variant="caption" color="text.secondary">zapsáno</Typography></Box>
@@ -179,7 +201,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           {related.map((g) => <RelatedCard key={g.id} group={g} />)}
         </Shelf>
 
-        {hasGroup(order) ? (
+        {hasGroup(order) && combined === null ? (
           <OrderGroupBlock order={order} root={rootQuery.data} onOpen={setOrderId} />
         ) : null}
 
@@ -340,7 +362,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     const addendumButton = takesAddendum ? (
       <Button key="addendum" variant="contained" onClick={() => addAddendum(order)} data-testid="add-addendum" {...btn}>Přidat další službu / další hráče</Button>
     ) : null;
-    const invoiceButton = takesAddendum ? (
+    const invoiceButton = takesAddendum && combined === null ? (
       <Box key="invoice" sx={{ display: 'contents' }}>
         <Button
           variant="outlined"
@@ -412,7 +434,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, px: 2.5, py: 1.75, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
       {order?.clubColorHex ? <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: order.clubColorHex }} /> : null}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }} noWrap>{order?.clubName ?? 'Objednávka klubu'}</Typography>
+        <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {combined !== null ? `${combined.clubName || order?.clubName || 'Klub'} – objednávka ${combined.reference}` : (order?.clubName ?? 'Objednávka klubu')}
+        </Typography>
         {order !== undefined ? <StatusChip tone={STATUS_TONE[order.status]} size="sm">{ORDER_STATUS_LABEL[order.status]}</StatusChip> : null}
       </Box>
       {order !== undefined ? (
@@ -485,6 +509,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         <RemoveWindowDialog order={order} block={removing} onClose={() => setRemoving(null)} onRemoved={() => { setRemoving(null); refresh(); }} />
       ) : null}
 
+      {oneInvoiceOpen && combined !== null ? <OneOrderInvoiceDialog combined={combined} onClose={() => setOneInvoiceOpen(false)} onChanged={refresh} /> : null}
       {invoiceOpen ? <ClubInvoiceDialog orderId={orderId} onClose={() => setInvoiceOpen(false)} onChanged={onChanged} /> : null}
 
       {order !== undefined ? (

@@ -19,6 +19,7 @@
  */
 import { planGuard } from './planGuard';
 import { orderCode } from '../../components/clubs/order/orderFormat';
+import { oneOrderClubIds } from '../../api/clubOneOrder';
 import type { PickSession } from '../../components/clubs/order/pickSession';
 import { editBlockRefs } from '../../components/clubs/order/editSession';
 import type { CoverageActivity } from '../../components/clubs/order/coverage';
@@ -941,7 +942,8 @@ export class ApiDataSource implements PlannerDataSource {
     await this.adopt(view);
     await this.deps.invalidate();
     this.emit();
-    return { ready, orderId: view.id, orderCode: orderCode(view.id), windows: ranges.length };
+    const joined = view.joinedOrderId ?? null;
+    return { ready, orderId: view.id, orderCode: orderCode(view.id), windows: ranges.length, ...(joined !== null ? { joinedOrderCode: orderCode(joined) } : {}) };
   }
 
   /** After a successful save the saved order is the one being edited. */
@@ -973,6 +975,8 @@ export class ApiDataSource implements PlannerDataSource {
     } catch {
       return; /* unreadable list: same as the calendar - nothing to ask */
     }
+    /* One order per club: the server adds the new days to the club's open order, so there is nothing to ask about. */
+    if ((await oneOrderClubIds()).includes(session.clubId)) return;
     const live = orders.filter((o) => o.status === 'Requested' || o.status === 'Confirmed');
     if (live.length === 0) return;
     const rows = live.map((o) => ({

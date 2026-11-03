@@ -5,7 +5,7 @@ import { ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrder
 import { clubRegistrationLink } from '../../../api/publicClub';
 import { SoftCard } from '../../ui';
 import { LinkCopyRow } from '../orders/LinkCopyRow';
-import { formatCzk, rangeLine } from './orderFormat';
+import { formatCzk, orderCode, rangeLine } from './orderFormat';
 import { orderRanges } from './orderLogic';
 import { routedActivities, type RoutedOrder } from '../orders/orderWindows';
 import { allowedNames } from './routing';
@@ -25,7 +25,9 @@ export function OrderSuccess({ order }: { order: ClubOrderView }) {
     <Stack spacing={2.5} data-testid="order-success">
       <Box>
         <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
-          {order.status === 'Confirmed' ? 'Rezervace je v kalendáři' : 'Objednávka je uložena'}
+          {(order.joinedOrderId ?? null) !== null
+            ? `Přidáno do objednávky ${orderCode(order.joinedOrderId as string)}`
+            : order.status === 'Confirmed' ? 'Rezervace je v kalendáři' : 'Objednávka je uložena'}
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>{ORDER_STATUS_LABEL[order.status]}</Typography>
       </Box>

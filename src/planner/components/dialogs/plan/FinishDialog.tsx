@@ -80,7 +80,9 @@ function useFinish() {
       act.closeDialog();
       const code = result.orderCode ?? order?.code ?? null;
       act.toast(
-        result.ready
+        result.joinedOrderCode
+          ? `Přidáno do objednávky ${result.joinedOrderCode}.`
+          : result.ready
           ? `Plán byl uložen a označen jako připravený.${code ? ` Objednávka ${code}.` : ''}`
           : `Plán byl uložen, objednávka zatím není kompletní.${code ? ` ${code}.` : ''}`,
         { durationMs: 6000 },

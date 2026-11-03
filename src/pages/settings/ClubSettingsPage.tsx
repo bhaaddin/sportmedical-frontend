@@ -33,6 +33,7 @@ import type { ClubSettings } from '../../api/clubs';
 import { useIsPhone } from '../../layout/useDevice';
 import { SettingsBoard } from './SettingsBoard';
 import { SettingsScreen } from './SettingsFrame';
+import { OneOrderSettingsBoard } from './OneOrderSettingsBoard';
 import { MAX_PAYER_TEXT, MAX_REGISTRATION_LINK_DAYS } from '../../api/fieldLimits';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
@@ -282,6 +283,8 @@ export default function ClubSettingsPage() {
               </Box>
             </Stack>
           </SettingsBoard>
+
+          <OneOrderSettingsBoard />
 
           <SettingsBoard id="club-4" title="Kdo hradí vyšetření — věty pro rodiče">
             <Stack spacing={2}>

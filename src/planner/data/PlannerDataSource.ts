@@ -205,6 +205,8 @@ export interface FinishPlanResult {
   orderId?: string;
   /** Real sources: the code the desk reads out ("KO-1A2B3C4D"). */
   orderCode?: string;
+  /** One order per club: the code of the club's open order this write was added to ("Přidáno do objednávky KO-…"). */
+  joinedOrderCode?: string;
   /** Real sources: how many windows (ranges) the order holds now. */
   windows?: number;
 }
