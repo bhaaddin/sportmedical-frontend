@@ -57,8 +57,8 @@ export class AnatomyEngine {
 
   /** Loads three.js and the bone meshes, and builds the scene. Heavy: call it lazily, once per clip. */
   static async create(anatomy: Anatomy, glb: ArrayBuffer): Promise<AnatomyEngine> {
-    const THREE: any = await import('../../vendor/three/three.min.js');
-    const { GLTFLoader }: any = await import('../../vendor/three/GLTFLoader.js');
+    const THREE: any = await import('three');
+    const { GLTFLoader }: any = await import('three/examples/jsm/loaders/GLTFLoader.js');
     const gltf: any = await new GLTFLoader().parseAsync(glb, '');
     const engine = new AnatomyEngine(THREE, anatomy);
     engine.buildLights();
@@ -449,7 +449,7 @@ export class AnatomyView {
 
   async attachControls(): Promise<void> {
     if (this.mode !== 'orbit' || this.controls) return;
-    const { OrbitControls }: any = await import('../../vendor/three/OrbitControls.js');
+    const { OrbitControls }: any = await import('three/examples/jsm/controls/OrbitControls.js');
     const c = new OrbitControls(this.camera, this.canvas);
     c.enableDamping = false;
     c.enablePan = true;

@@ -83,6 +83,8 @@ export const clipResultSchema = z.object({
     frame: z.number().int().nullish(),
     normBand: z.tuple([z.number(), z.number()]).nullish(),
     asymmetryPct: z.number().nullish(),
+    /** The pipeline's own name of the metric, in both languages. */
+    label: z.object({ cs: z.string(), en: z.string() }).nullish(),
   })),
   flags: z.array(z.object({
     id: z.string(),
@@ -384,12 +386,12 @@ export async function getClipVideo(clipId: string): Promise<Blob | string> {
   return res.data as Blob;
 }
 
-/** The anatomy description of a clip (anatomy.json). */
+/** The anatomy description of a clip (anatomy.json): the API serves the stored file as it is, NOT in the ApiResult envelope. */
 export async function getAnatomyJson(clipId: string): Promise<unknown> {
   return call('get', `/clips/${encodeURIComponent(clipId)}/anatomy`);
 }
 
-/** The anatomy numbers of a clip (anatomy.bin). */
+/** The anatomy numbers of a clip (anatomy.bin, application/octet-stream), fetched with the bearer token. */
 export async function getAnatomyBin(clipId: string): Promise<ArrayBuffer> {
   if (movementMock()) return (await mock()).anatomyBin(clipId);
   const res = await client.get(`${BASE}/clips/${encodeURIComponent(clipId)}/anatomy.bin`, { responseType: 'arraybuffer', timeout: 60_000 });

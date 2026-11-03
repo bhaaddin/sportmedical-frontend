@@ -73,7 +73,7 @@ export function scoreTrend(sessions: readonly MovementSession[], movement: Movem
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export interface CompareRow { key: string; id: string; side: 'L' | 'R' | null; unit: string; before: number | null; after: number | null; delta: number | null }
+export interface CompareRow { key: string; id: string; label: { cs: string; en: string } | null; side: 'L' | 'R' | null; unit: string; before: number | null; after: number | null; delta: number | null }
 
 /** The finished clip of a movement in a session (the one the comparison reads). */
 export function doneClipOf(session: MovementSession | undefined, movement: Movement): string | null {
@@ -90,8 +90,8 @@ export function compareMetrics(before: readonly Metric[] | undefined, after: rea
   const a = keyMetrics(before);
   const b = keyMetrics(after);
   const keyOf = (m: { id: string; side: 'L' | 'R' | null }) => `${m.id}:${m.side ?? '-'}`;
-  const keys = new Map<string, { id: string; side: 'L' | 'R' | null; unit: string }>();
-  for (const m of [...a, ...b]) if (!keys.has(keyOf(m))) keys.set(keyOf(m), { id: m.id, side: m.side, unit: m.unit });
+  const keys = new Map<string, { id: string; label: { cs: string; en: string } | null; side: 'L' | 'R' | null; unit: string }>();
+  for (const m of [...a, ...b]) if (!keys.has(keyOf(m))) keys.set(keyOf(m), { id: m.id, label: m.label ?? null, side: m.side, unit: m.unit });
   return [...keys.entries()].map(([key, meta]) => {
     const x = a.find((m) => keyOf(m) === key)?.value ?? null;
     const y = b.find((m) => keyOf(m) === key)?.value ?? null;
@@ -104,4 +104,17 @@ export function movementsIn(sessions: readonly MovementSession[]): Movement[] {
   const out = new Set<Movement>();
   for (const s of sessions) for (const c of s.clips) if (c.status === 'done') out.add(c.movement);
   return [...out];
+}
+
+/**
+ * The name of a metric to show: the pipeline's own label in the language of the screen, else our wording for its id, else a
+ * readable form of the id - never the raw code.
+ */
+export function metricName(label: { cs: string; en: string } | null | undefined, id: string, lang: 'cs' | 'en', maybe: (key: string, fallback: string) => string): string {
+  const fromPipeline = label?.[lang];
+  if (fromPipeline !== undefined && fromPipeline !== '') return fromPipeline;
+  const ours = maybe(`metric.${id}`, '');
+  if (ours !== '') return ours;
+  const words = id.replace(/[._]+/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

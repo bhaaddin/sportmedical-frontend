@@ -10,19 +10,22 @@ export interface MetricRow {
   asymmetryPct: number | null;
   /** Metrics without a side (a single value). */
   single: Metric | null;
+  /** The pipeline's name of the metric (cs / en), when it sent one. */
+  label: { cs: string; en: string } | null;
 }
 
 /** Group by metric id, in first-seen order. */
 export function metricRows(metrics: readonly Metric[]): MetricRow[] {
   const rows = new Map<string, MetricRow>();
   for (const m of metrics) {
-    const row = rows.get(m.id) ?? { id: m.id, unit: m.unit, left: null, right: null, asymmetryPct: null, single: null };
+    const row = rows.get(m.id) ?? { id: m.id, unit: m.unit, left: null, right: null, asymmetryPct: null, single: null, label: null };
+    row.label = row.label ?? m.label ?? null;
     if (m.side === 'L') row.left = m; else if (m.side === 'R') row.right = m; else row.single = m;
     rows.set(m.id, row);
   }
   for (const row of rows.values()) {
-    const reported = row.left?.asymmetryPct ?? row.right?.asymmetryPct ?? null;
-    row.asymmetryPct = reported ?? computeAsymmetry(row.left?.value ?? null, row.right?.value ?? null);
+    /* only what the pipeline reported: it leaves the asymmetry empty when both sides are near zero, so no "200 %" is invented here */
+    row.asymmetryPct = row.left?.asymmetryPct ?? row.right?.asymmetryPct ?? null;
   }
   return [...rows.values()];
 }

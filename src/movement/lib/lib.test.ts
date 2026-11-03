@@ -9,7 +9,7 @@ import { checkClip } from './uploadCheck';
 import { asymmetryLevel, computeAsymmetry, formatAsymmetry, formatValue, metricRows } from './asymmetry';
 import { curvePath, extentOf, groupCurves } from './curves';
 import { clickToVideoPx, markerPixelLength, markerPlausible } from './marker';
-import { compareMetrics, decisionReady, doneClipOf, groupFlags, scoreTrend, scoreView, staffLabel, tagsForMovement } from './review';
+import { metricName, compareMetrics, decisionReady, doneClipOf, groupFlags, scoreTrend, scoreView, staffLabel, tagsForMovement } from './review';
 import { buildDropJumpFrontResult, buildRunningSideResult, HALPE26_NAMES } from '../fixtures/synth';
 import { clipResultSchema, type ClipDetail, type ClipResult, type Decision, type Flag, type MovementSession } from '../../api/movement';
 import wholeRunning from '../fixtures/running_side.result.json';
@@ -382,6 +382,25 @@ describe('asymmetry', () => {
     expect(knee.right?.side).toBe('R');
     expect(knee.asymmetryPct).not.toBeNull();
     expect(rows.find((r) => r.id === 'cadence')!.single).not.toBeNull();
+  });
+});
+
+describe('metric names and asymmetry from the pipeline', () => {
+  const maybe = (key: string, fallback: string) => (key === 'metric.cadence' ? 'Kadence (naše)' : fallback);
+  it('shows the pipeline label in the language of the screen, then our wording, then a readable id - never the raw code', () => {
+    expect(metricName({ cs: 'Doba kontaktu', en: 'Contact time' }, 'contact_time', 'cs', maybe)).toBe('Doba kontaktu');
+    expect(metricName({ cs: 'Doba kontaktu', en: 'Contact time' }, 'contact_time', 'en', maybe)).toBe('Contact time');
+    expect(metricName(null, 'cadence', 'cs', maybe)).toBe('Kadence (naše)');
+    expect(metricName(undefined, 'knee_valgus_ic', 'cs', maybe)).toBe('Knee valgus ic');
+    expect(metricName({ cs: '', en: '' }, 'landing.asynchrony', 'cs', maybe)).toBe('Landing asynchrony');
+  });
+  it('keeps the label with the row and does not invent an asymmetry the pipeline left empty', () => {
+    const m = (side: 'L' | 'R', value: number, asym: number | null) => ({ id: 'knee_valgus_peak', side, value, unit: 'deg', normBand: null, asymmetryPct: asym, label: { cs: 'Zapadnutí kolene', en: 'Knee valgus' } });
+    const rows = metricRows([m('L', 0.4, null), m('R', 0, null)]);
+    expect(rows[0].label?.cs).toBe('Zapadnutí kolene');
+    expect(rows[0].asymmetryPct).toBeNull();
+    expect(formatAsymmetry(rows[0].asymmetryPct)).toBe('–');
+    expect(metricRows([m('L', 12, 20), m('R', 10, 20)])[0].asymmetryPct).toBe(20);
   });
 });
 

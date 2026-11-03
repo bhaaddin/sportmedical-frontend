@@ -6,7 +6,7 @@ import type { ClipDetail, Flag, Metric } from '../../api/movement';
 import { asymmetryLevel, formatAsymmetry, formatValue, metricRows, outsideNorm } from '../lib/asymmetry';
 import { groupFlags, latestDecision, scoreView } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
-import { staffLabel } from '../lib/review';
+import { metricName, staffLabel } from '../lib/review';
 
 export const BAND_TONE: Record<string, ChipTone> = { green: 'green', watch: 'beige', red: 'red', needs_review: 'blue' };
 const SEVERITY_TONE: Record<Flag['severity'], ChipTone> = { red: 'red', watch: 'beige', info: 'grey' };
@@ -114,7 +114,7 @@ export function FlagList({ flags, selectedId, lang, onSelect }: {
 }
 
 export function MetricsTable({ metrics, onSeek }: { metrics: readonly Metric[]; onSeek: (frame: number) => void }) {
-  const { t, maybe } = useMoveT();
+  const { t, maybe, lang } = useMoveT();
   const rows = metricRows(metrics);
   const cell = (m: (typeof rows)[number]['left']) => {
     if (m === null) return <Box component="span" sx={{ color: 'text.secondary' }}>–</Box>;
@@ -147,7 +147,7 @@ export function MetricsTable({ metrics, onSeek }: { metrics: readonly Metric[]; 
             return (
               <Box component="tr" key={r.id} data-metric={r.id} sx={(theme) => ({ borderTop: `1px solid ${theme.palette.divider}` })}>
                 <Box component="th" scope="row" sx={{ p: 1, fontWeight: 600, textAlign: 'left' }}>
-                  {maybe(`metric.${r.id}`, r.id)}
+                  {metricName(r.label, r.id, lang, maybe)}
                   {norm && (
                     <Typography component="span" variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 400 }}>
                       {t('review.metrics.norm', { from: String(norm[0]).replace('.', ','), to: String(norm[1]).replace('.', ',') })}

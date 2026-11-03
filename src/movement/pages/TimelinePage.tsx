@@ -10,6 +10,7 @@ import { usePermission } from '../../auth/usePermission';
 import { getClip, movementKeys, useMovementSessions, type Movement } from '../../api/movement';
 import { MOVE_PATHS } from '../flags';
 import { formatDate, useMoveT } from '../i18n';
+import { metricName } from '../lib/review';
 import { compareMetrics, doneClipOf, movementsIn, scoreTrend, type TrendPoint } from '../lib/review';
 import { formatValue } from '../lib/asymmetry';
 import { ConsentPanel } from '../components/ConsentPanel';
@@ -36,7 +37,7 @@ function Trend({ points }: { points: TrendPoint[] }) {
 }
 
 export default function TimelinePage() {
-  const { t, maybe } = useMoveT();
+  const { t, maybe, lang } = useMoveT();
   const { patientId } = useParams<{ patientId: string }>();
   const name = usePatientLabel(patientId);
   const query = useMovementSessions(patientId);
@@ -133,7 +134,7 @@ export default function TimelinePage() {
                 <tbody>
                   {rows.map((r) => (
                     <Box component="tr" key={r.key} sx={(th) => ({ borderTop: `1px solid ${th.palette.divider}`, '& td, & th': { p: 1, textAlign: 'left' } })}>
-                      <th scope="row">{maybe(`metric.${r.id}`, r.id)}{r.side ? ` ${t(`side.short.${r.side}`)}` : ''}</th>
+                      <th scope="row">{metricName(r.label, r.id, lang, maybe)}{r.side ? ` ${t(`side.short.${r.side}`)}` : ''}</th>
                       <td>{r.before === null ? '–' : formatValue(r.before, r.unit)}</td>
                       <td>{r.after === null ? '–' : formatValue(r.after, r.unit)}</td>
                       <Box component="td" sx={(th) => ({ fontWeight: 700, color: r.delta === null || r.delta === 0 ? 'text.secondary' : th.palette.text.primary, bgcolor: r.delta ? alpha(th.palette.primary.main, 0.06) : undefined })}>
