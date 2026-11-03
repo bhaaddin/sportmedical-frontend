@@ -11,6 +11,7 @@ Rules: `.specify/memory/constitution.md` (read it first; it outranks everything 
 ## Commands
 - `npm run typecheck` (the only real check; `tsc -p tsconfig.json` checks nothing).
 - `NODE_OPTIONS=--max-old-space-size=4096 npx vitest run <paths> --maxWorkers=3` (a full run needs more than ten minutes; run it in the background).
+- `npm run knip` (unused files/exports/deps; report only, not a gate) and `npm run a11y` (axe WCAG 2.1 AA on public routes; `BASE=`, `ROUTES=`, own headless Chromium) against a running dev server or `vite preview`.
 - `npm run dev` serves :3000. Staff screens are behind `/login`; the public site is served at the root.
 
 ## Planner (the calendar at `/planovani`)
