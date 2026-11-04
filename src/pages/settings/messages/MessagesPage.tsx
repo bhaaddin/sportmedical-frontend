@@ -22,6 +22,7 @@ import { LayoutEditor } from './LayoutEditor';
 import { AutoRows, CustomRows, GroupLabel, TEMPLATES_KEY } from './MessageRows';
 import { NOT_DEPLOYED_TEXT, customOnly, groupBuiltIn, isNotDeployed } from './messagesModel';
 import { SelfServiceSwitch } from './SelfServiceSwitch';
+import { PauseSwitch } from './PauseSwitch';
 import { SendingStatus } from './SendingStatus';
 import { TemplateEditor } from './TemplateEditor';
 
@@ -50,12 +51,13 @@ export default function MessagesPage() {
       aside={false}
     >
       <Stack spacing={3}>
+      {mayMessages ? <PauseSwitch onToast={setToast} /> : null}
       {notDeployed ? <Alert severity="info">{NOT_DEPLOYED_TEXT}</Alert> : null}
 
       {notDeployed || !mayMessages ? null : (
       <SettingsBoard
         id="auto-messages"
-        title="Automatické zprávy"
+        title="Které e-maily posílat automaticky"
         hint="Odesílají se samy při rezervaci, přesunu nebo zrušení"
         padding={0}
         count={ready ? patients.length + clubs.length : undefined}

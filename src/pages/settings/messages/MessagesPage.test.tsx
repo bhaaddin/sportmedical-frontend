@@ -75,6 +75,63 @@ describe('Změna termínu pacientem', () => {
   });
 });
 
+describe('Odesílat e-maily', () => {
+  const serveSending = (paused: boolean | 'missing') => {
+    serve(LIST);
+    const base = get.getMockImplementation()!;
+    get.mockImplementation((url: string) => (url === '/api/email-templates/sending'
+      ? (paused === 'missing' ? Promise.reject(notFound()) : Promise.resolve({ data: { success: true, data: { paused } } }))
+      : base(url)));
+    put.mockImplementation((_url: string, body: unknown) => Promise.resolve({ data: { success: true, data: body } }));
+  };
+
+  it('shows sending on, and pauses only after the confirmation', async () => {
+    serveSending(false);
+    renderPage();
+    const toggle = await screen.findByRole('switch', { name: 'Odesílat e-maily' });
+    await waitFor(() => expect(toggle).toBeChecked());
+    fireEvent.click(toggle);
+    expect(put).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Pozastavit odesílání' }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith('/api/email-templates/sending', { paused: true }));
+    expect(await screen.findByText(/Odesílání e-mailů je pozastavené/)).toBeInTheDocument();
+  });
+
+  it('shows the warning when paused and resumes with one click', async () => {
+    serveSending(true);
+    renderPage();
+    expect(await screen.findByText(/Odesílání e-mailů je pozastavené. Pacienti ani kluby/)).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'Odesílat e-maily' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(put).toHaveBeenCalledWith('/api/email-templates/sending', { paused: false }));
+    await waitFor(() => expect(screen.queryByText(/Pacienti ani kluby teď nedostanou/)).toBeNull());
+  });
+
+  it('hides the switch on a server without the endpoint', async () => {
+    serveSending('missing');
+    renderPage();
+    await screen.findByRole('list', { name: 'Automatické zprávy' });
+    expect(screen.queryByRole('switch', { name: 'Odesílat e-maily' })).toBeNull();
+    expect(screen.queryByText(/Odesílání e-mailů je pozastavené/)).toBeNull();
+  });
+});
+
+describe('Které e-maily posílat automaticky', () => {
+  it('sits right under the pause switch, one switch per e-mail, and works when /sending is missing', async () => {
+    serve(LIST);
+    put.mockImplementation((_url: string, body: unknown) => Promise.resolve({ data: { success: true, data: body } }));
+    renderPage();
+    expect(await screen.findByText('Které e-maily posílat automaticky')).toBeInTheDocument();
+    const switches = await screen.findAllByRole('switch', { name: /Posílat automaticky:/ });
+    expect(switches.length).toBeGreaterThan(0);
+    const first = switches[0];
+    const wasOn = (first as HTMLInputElement).checked;
+    fireEvent.click(first);
+    await waitFor(() => expect(put).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/email-templates\/.+\/auto-send$/), { enabled: !wasOn }));
+  });
+});
+
 describe('Zprávy', () => {
   it('groups the built-in messages and lists the custom ones apart', async () => {
     serve(LIST);

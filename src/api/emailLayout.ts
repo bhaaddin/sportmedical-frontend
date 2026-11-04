@@ -23,6 +23,9 @@ const renderedSchema = z.object({ subject: z.string(), bodyHtml: z.string() });
 /* Whether every e-mail about a termín carries the patient's own "Změnit nebo zrušit termín" button. */
 const selfServiceSchema = z.object({ enabled: z.boolean().default(true) });
 
+/* The clinic-wide pause: while paused nothing is sent, and the skipped e-mails are not sent later either. */
+const sendingSchema = z.object({ paused: z.boolean().default(false) });
+
 export type EmailLayout = z.infer<typeof layoutSchema>;
 export type RenderedLayout = z.infer<typeof renderedSchema>;
 
@@ -46,6 +49,12 @@ export const emailLayoutApi = {
 
   saveSelfService: (enabled: boolean): Promise<boolean> =>
     request(async () => parseResponse(selfServiceSchema, (await client.put('/api/email-templates/self-service', { enabled })).data).enabled),
+
+  sending: (): Promise<boolean> =>
+    request(async () => parseResponse(sendingSchema, (await client.get('/api/email-templates/sending')).data).paused),
+
+  saveSending: (paused: boolean): Promise<boolean> =>
+    request(async () => parseResponse(sendingSchema, (await client.put('/api/email-templates/sending', { paused })).data).paused),
 
   /** A sample e-mail in the given header and footer, before they are saved. */
   preview: (layout: EmailLayout): Promise<RenderedLayout> =>
