@@ -1,16 +1,20 @@
-/* The free-rotating 3D view of the anatomy, beside or under the video: orbit with the mouse or a finger, presets, synced to the frame. */
-import { useEffect, useRef } from 'react';
+/* The free-rotating 3D view of the anatomy, beside or under the video: orbit with the mouse or a finger, a cinematic camera (eased presets,
+   auto-orbit, follow the pelvis, double-click a bone to fly to it), synced to the frame. */
+import { useEffect, useRef, useState } from 'react';
 import { Box, Button, Stack } from '@mui/material';
 import { useMoveT, type MoveKey } from '../i18n';
-import type { AnatomyEngine, AnatomyView } from './engine';
+import { motionFull, type AnatomyEngine, type AnatomyView } from './engine';
 
-const PRESETS = ['video', 'opposite', 'left', 'right'] as const;
+const PRESETS = ['video', 'front', 'side', 'back', 'top'] as const;
 
 export function Anatomy3DPanel({ engine }: { engine: AnatomyEngine }) {
   const { t } = useMoveT();
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef<AnatomyView | null>(null);
+  const [auto, setAuto] = useState(false);
+  const [follow, setFollow] = useState(true);
+  const canMove = motionFull();
 
   useEffect(() => {
     if (canvas.current === null || wrap.current === null) return undefined;
@@ -42,6 +46,26 @@ export function Anatomy3DPanel({ engine }: { engine: AnatomyEngine }) {
             {t(`review.preset.${p}` as MoveKey)}
           </Button>
         ))}
+        <Button
+          size="small"
+          aria-pressed={auto}
+          disabled={!canMove}
+          title={canMove ? undefined : t('review.reduced_motion')}
+          variant={auto ? 'contained' : 'outlined'}
+          onClick={() => { const next = !auto; setAuto(next); view.current?.setAutoOrbit(next); }}
+          sx={{ minHeight: 44, minWidth: 44, flexShrink: 0, textTransform: 'none', borderRadius: 999 }}
+        >
+          {t('review.auto_orbit')}
+        </Button>
+        <Button
+          size="small"
+          aria-pressed={follow}
+          variant={follow ? 'contained' : 'outlined'}
+          onClick={() => { const next = !follow; setFollow(next); view.current?.setFollow(next); }}
+          sx={{ minHeight: 44, minWidth: 44, flexShrink: 0, textTransform: 'none', borderRadius: 999 }}
+        >
+          {t('review.follow')}
+        </Button>
       </Stack>
     </Stack>
   );

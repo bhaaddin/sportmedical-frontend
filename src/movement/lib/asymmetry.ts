@@ -12,13 +12,28 @@ export interface MetricRow {
   single: Metric | null;
   /** The pipeline's name of the metric (cs / en), when it sent one. */
   label: { cs: string; en: string } | null;
+  /** The same metric read from the 3D model (the `<id>_3d` twin), per side. */
+  twin: { left: Metric | null; right: Metric | null; single: Metric | null } | null;
 }
+
+/** A metric read from the fitted 3D model: its source says so, or its id ends in `_3d`. */
+export const is3dTwin = (m: Pick<Metric, 'id' | 'source'>): boolean => m.source === '3d' || /_3d$/.test(m.id);
 
 /** Group by metric id, in first-seen order. */
 export function metricRows(metrics: readonly Metric[]): MetricRow[] {
   const rows = new Map<string, MetricRow>();
+  /* a 3D twin is shown beside its 2D metric, never as a row of its own (when the 2D one exists) */
+  const base = new Set(metrics.filter((m) => !is3dTwin(m)).map((m) => m.id));
   for (const m of metrics) {
-    const row = rows.get(m.id) ?? { id: m.id, unit: m.unit, left: null, right: null, asymmetryPct: null, single: null, label: null };
+    if (is3dTwin(m) && base.has(m.id.replace(/_3d$/, ''))) {
+      const row = rows.get(m.id.replace(/_3d$/, '')) ?? { id: m.id.replace(/_3d$/, ''), unit: m.unit, left: null, right: null, asymmetryPct: null, single: null, label: null, twin: null };
+      const twin = row.twin ?? { left: null, right: null, single: null };
+      if (m.side === 'L') twin.left = m; else if (m.side === 'R') twin.right = m; else twin.single = m;
+      row.twin = twin;
+      rows.set(row.id, row);
+      continue;
+    }
+    const row = rows.get(m.id) ?? { id: m.id, unit: m.unit, left: null, right: null, asymmetryPct: null, single: null, label: null, twin: null };
     row.label = row.label ?? m.label ?? null;
     if (m.side === 'L') row.left = m; else if (m.side === 'R') row.right = m; else row.single = m;
     rows.set(m.id, row);

@@ -393,3 +393,62 @@ describe('3D anatomy', () => {
     expect(screen.getByTestId('video-stage')).toHaveAttribute('data-style', 'anatomy');
   });
 });
+
+describe('smarter results', () => {
+  it('shows a clear banner when the clip does not look like the chosen view', () => {
+    const base = buildRunningSideResult();
+    const result = { ...base, qa: { ...base.qa, warnings: [{ code: 'view_mismatch', detail: null }], detectedView: { view: 'front', ratio: 0.7 } }, score: { ...base.score, band: 'needs_review' as const } };
+    wrap(<ReviewView clip={clipOf({ result })} videoSrc={null} />);
+    expect(screen.getByTestId('qa-warning')).toHaveTextContent('Záznam vypadá jako pohled zepředu, ale byl označen jako zboku. Zkontrolujte to.');
+    expect(screen.getByTestId('score-label')).toHaveTextContent('Vyžaduje ruční kontrolu');
+  });
+
+  it('shows a confidence meter on each finding, an "nejisté" chip, and puts uncertain findings last', () => {
+    const base = buildRunningSideResult();
+    const flags = [
+      { ...base.flags[0], id: 'a', sentence: { cs: 'První nález', en: 'First' }, severity: 'red' as const, confidence: 0.3, uncertain: true },
+      { ...base.flags[1], id: 'b', sentence: { cs: 'Druhý nález', en: 'Second' }, severity: 'red' as const, confidence: 0.9, uncertain: false },
+    ];
+    wrap(<ReviewView clip={clipOf({ result: { ...base, flags } })} videoSrc={null} />);
+    const buttons = screen.getAllByRole('button').filter((b) => b.getAttribute('data-flag'));
+    expect(buttons.map((b) => b.getAttribute('data-flag'))).toEqual(['b', 'a']);
+    expect(screen.getAllByTestId('flag-confidence')).toHaveLength(2);
+    expect(screen.getAllByTestId('flag-uncertain')).toHaveLength(1);
+  });
+
+  it('shows the 3D model value next to the 2D one, with an explanation', () => {
+    const base = buildRunningSideResult();
+    const m = base.metrics.find((x) => x.id === 'knee_flexion_ic' && x.side === 'L')!;
+    const twin = { ...m, id: 'knee_flexion_ic_3d', source: '3d', value: m.value + 3, label: { cs: 'Pokrčení kolene (3D)', en: 'Knee flexion (3D)' } };
+    wrap(<ReviewView clip={clipOf({ result: { ...base, metrics: [...base.metrics, twin] } })} videoSrc={null} />);
+    const table = screen.getByTestId('metrics-table');
+    expect(within(table).queryByText('Pokrčení kolene (3D)')).toBeNull(); // not a row of its own
+    expect(table.textContent).toContain(`${String(m.value).replace('.', ',')} ° / ${String(m.value + 3).replace('.', ',')} °`);
+    expect(screen.getByTestId('twin-hint')).toHaveAttribute('title', expect.stringContaining('Nezkresluje'));
+  });
+});
+
+describe('live progress and a decision that can be taken back', () => {
+  it('draws the five stages with the running one and its percentage', () => {
+    wrap(<StatusView clip={clipOf({ status: 'processing', result: null, progress: { stage: 'pose', pct: 42 } })} />);
+    const stages = screen.getByTestId('stage-stepper');
+    const state = (id: string) => stages.querySelector(`[data-stage="${id}"]`)?.getAttribute('data-state');
+    expect(['download', 'pose', 'analysis', 'anatomy', 'done'].map(state)).toEqual(['done', 'active', 'pending', 'pending', 'pending']);
+    expect(screen.getByTestId('stage-pct')).toHaveTextContent('42 %');
+    expect(within(stages).getByText('Rozpoznání pohybu')).toBeInTheDocument();
+    expect(screen.getByTestId('overall-progress')).toBeInTheDocument();
+  });
+
+  it('shows the decision at once, then lets it be taken back within the undo time', async () => {
+    const user = userEvent.setup();
+    wrap(<ReviewView clip={clipOf()} videoSrc={null} />);
+    expect(screen.getByTestId('score-label')).toHaveTextContent('Návrh — čeká na kontrolu klinika');
+    await user.click(screen.getByRole('button', { name: 'Potvrdit' }));
+    await user.click(screen.getByRole('button', { name: 'Uložit rozhodnutí' }));
+    expect(screen.getByTestId('score-label')).toHaveTextContent('Rozhodnutí klinika: Sledovat');
+    expect(screen.getByTestId('decision-undo')).toHaveTextContent('Odešle se za 5 sekund');
+    await user.click(screen.getByRole('button', { name: 'Vrátit zpět' }));
+    expect(screen.getByTestId('score-label')).toHaveTextContent('Návrh — čeká na kontrolu klinika');
+    await waitFor(() => expect(screen.queryByTestId('decision-undo')).toBeNull());
+  });
+});

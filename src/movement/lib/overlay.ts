@@ -54,8 +54,8 @@ export interface Layers { body: boolean; hands: boolean; face: boolean; feet: bo
 export const DEFAULT_LAYERS: Layers = { body: true, hands: true, face: true, feet: true, angles: true, trail: true, events: true };
 
 /** What the review screen toggles: the anatomical layers, the keypoints and the extras. */
-export interface ViewLayers { bones: boolean; muscles: boolean; tendons: boolean; joints: boolean; points: boolean; angles: boolean; trail: boolean; events: boolean }
-export const DEFAULT_VIEW_LAYERS: ViewLayers = { bones: true, muscles: true, tendons: true, joints: true, points: false, angles: true, trail: true, events: true };
+export interface ViewLayers { bones: boolean; muscles: boolean; tendons: boolean; joints: boolean; points: boolean; angles: boolean; trail: boolean; events: boolean; /** 3D: semi-transparent copies of earlier poses */ ghosts: boolean }
+export const DEFAULT_VIEW_LAYERS: ViewLayers = { bones: true, muscles: true, tendons: true, joints: true, points: false, angles: true, trail: true, events: true, ghosts: false };
 /** 3D anatomie (MyoSim bones and muscles in WebGL), Anatomie 2D (the procedural drawing, the fallback) or Kostra (the wireframe of the keypoints). */
 export type OverlayStyle = 'anatomy3d' | 'anatomy' | 'wire';
 

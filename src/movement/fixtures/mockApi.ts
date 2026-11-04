@@ -61,8 +61,18 @@ const statusOf = (c: StoredClip): string => {
   if (!c.uploaded) return 'uploading';
   if (c.startedAt === null) return 'uploaded';
   const age = Date.now() - c.startedAt;
-  return age < 1500 ? 'queued' : age < 4000 ? 'processing' : 'done';
+  return age < 1500 ? 'queued' : age < 7500 ? 'processing' : 'done';
 };
+
+/** The mock walks through the stages: download, pose (0..100 %), analysis, anatomy. */
+function progressOf(c: StoredClip): { stage: string; pct: number; at: string } {
+  const t = (Date.now() - (c.startedAt ?? Date.now()) - 1500) / 1000; // seconds since processing began
+  const at = new Date().toISOString();
+  if (t < 0.6) return { stage: 'downloaded', pct: 100, at };
+  if (t < 3.6) return { stage: 'pose', pct: Math.round(((t - 0.6) / 3) * 100), at };
+  if (t < 4.8) return { stage: 'analysis', pct: Math.round(((t - 3.6) / 1.2) * 100), at };
+  return { stage: 'anatomy', pct: Math.round(Math.min(1, (t - 4.8) / 1.2) * 100), at };
+}
 
 const resultFor = (c: StoredClip): ClipResult => {
   const base = build(c.movement, c.clipId);
@@ -125,6 +135,7 @@ function detail(c: StoredClip) {
   const qa = rejected ? qaRejected() : null;
   return {
     clipId: c.clipId, sessionId: c.sessionId, patientId: c.patientId, movement: c.movement, view: c.view, status,
+    progress: status === 'processing' ? progressOf(c) : null,
     failureReason: rejected ? 'qa_rejected' : null, attemptCount: 1, hasVideo: true, qaPassed: rejected ? false : status === 'done' ? true : null,
     qa, markerPx: c.markerPx, pipelineVersion: '0.1.0', rulesVersion: c.movement === 'running' ? 'running.v1' : 'landing.v1', poseModelVersion: 'rtmpose-halpe26',
     /* a rejected clip carries a result with only its qa filled, like the callback */

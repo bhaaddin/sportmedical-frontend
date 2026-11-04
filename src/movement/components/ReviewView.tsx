@@ -4,18 +4,18 @@
  * scrubber, a chart, a finding or a metric sets it (anything -> video.currentTime).
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, Snackbar, Stack, Typography } from '@mui/material';
 import { ThreeDRotation, ZoomIn, Pause, PlayArrow, SkipNext, SkipPrevious, NavigateBefore, NavigateNext } from '@mui/icons-material';
 import { Shelf } from '../../ui/shelf';
 import { useDevice } from '../../layout/useDevice';
-import { getClipVideo, type ClipDetail, type Flag } from '../../api/movement';
+import { getClipVideo, useDecision, type ClipDetail, type DecisionInput, type Flag } from '../../api/movement';
 import { clampFrame, clock, seekTimeOf } from '../lib/frames';
 import { jointIndexesForFlag } from '../lib/joints';
 import { useMoveT } from '../i18n';
 import { VideoStage } from './VideoStage';
 import { useAnatomyEngine } from '../anatomy3d/useAnatomyEngine';
 import { Anatomy3DPanel } from '../anatomy3d/Anatomy3DPanel';
-import { MUSCLE_GROUPS, regionBodies, type MuscleGroup } from '../anatomy3d/anatomyMath';
+import { MUSCLE_GROUPS, activePulse, nearEvent, regionBodies, type MuscleGroup } from '../anatomy3d/anatomyMath';
 import type { MuscleInfo } from '../anatomy3d/engine';
 import { DEFAULT_VIEW_LAYERS, type OverlayStyle, type ViewLayers } from '../lib/overlay';
 import { Scrubber } from './Scrubber';
@@ -42,19 +42,55 @@ export function useClipVideoSrc(clipId: string): string | null {
   return src;
 }
 
-const SPEEDS = [0.25, 0.5, 1] as const;
-const LAYER_KEYS = ['bones', 'muscles', 'tendons', 'joints', 'points', 'angles', 'trail', 'events'] as const;
+/** The sentence of a processing warning: which view the clip looks like, which movement it should be. */
+function warningText(code: string, t: ReturnType<typeof useMoveT>['t'], result: NonNullable<ClipDetail['result']>): string {
+  if (code === 'view_mismatch') return t('warning.view_mismatch', { detected: t(`view.${(result.qa.detectedView?.view ?? 'side') as 'side' | 'front' | 'back'}`).toLowerCase(), selected: t(`view.${result.view}`).toLowerCase() });
+  if (code === 'movement_mismatch') return t('warning.movement_mismatch', { movement: t(`movement.${result.movement}`).toLowerCase() });
+  return t('warning.other');
+}
+
+const SPEEDS = [0.1, 0.25, 0.5, 1] as const;
+const LAYER_KEYS = ['bones', 'muscles', 'tendons', 'joints', 'points', 'angles', 'trail', 'ghosts', 'events'] as const;
 /** In the wireframe style only these toggles mean something. */
 const WIRE_KEYS = new Set<string>(['bones', 'angles', 'trail', 'events']);
 /** In the 3D style the joint caps do not exist (the real joints are in the meshes). */
-const D3_KEYS = new Set<string>(['bones', 'muscles', 'tendons', 'points', 'angles', 'trail', 'events']);
+const D3_KEYS = new Set<string>(['bones', 'muscles', 'tendons', 'points', 'angles', 'trail', 'ghosts', 'events']);
+/** The 2D anatomy has no 3D ghost trail. */
+const ANATOMY2D_KEYS = new Set<string>(['bones', 'muscles', 'tendons', 'joints', 'points', 'angles', 'trail', 'events']);
 const NO_BODIES: ReadonlySet<string> = new Set();
 
-export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: string | null }) {
+/** How long a saved decision can still be taken back before it is sent. */
+export const UNDO_MS = 5000;
+
+export function ReviewView({ clip: loaded, videoSrc }: { clip: ClipDetail; videoSrc?: string | null }) {
+  /* A decision shows at once and is sent after UNDO_MS; "Vrátit zpět" cancels it. Leaving the screen sends it immediately. */
+  const decide = useDecision(loaded.clipId);
+  const [pending, setPending] = useState<DecisionInput | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const pendingRef = useRef<DecisionInput | null>(null);
+  const send = useCallback((input: DecisionInput) => {
+    pendingRef.current = null;
+    decide.mutate(input, { onSettled: () => setPending(null) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decide.mutate]);
+  const submitDecision = (input: DecisionInput) => {
+    window.clearTimeout(timer.current);
+    pendingRef.current = input;
+    setPending(input);
+    timer.current = window.setTimeout(() => send(input), UNDO_MS);
+  };
+  const undoDecision = () => { window.clearTimeout(timer.current); pendingRef.current = null; setPending(null); };
+  useEffect(() => () => { window.clearTimeout(timer.current); if (pendingRef.current !== null) send(pendingRef.current); }, [send]);
+  const clip: ClipDetail = pending === null ? loaded : {
+    ...loaded,
+    decisions: [...loaded.decisions, { id: 'pending', action: pending.action, band: pending.band ?? null, faultTags: pending.faultTags, unsure: pending.unsure, note: pending.note, decidedBy: 'pending', decidedAt: new Date().toISOString() }],
+  };
+
   const { t, lang } = useMoveT();
   const device = useDevice();
   const phone = device === 'phone';
   const result = clip.result!;
+  const qaWarnings = result.qa.warnings ?? [];
   const count = result.skeleton.times.length;
   const times = result.skeleton.times;
   const fetched = useClipVideoSrc(clip.clipId);
@@ -71,6 +107,7 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
   const [style, setStyle] = useState<OverlayStyle>(available ? 'anatomy3d' : 'anatomy');
   const [groups, setGroups] = useState<ReadonlySet<MuscleGroup>>(() => new Set(MUSCLE_GROUPS));
   const [orbit, setOrbit] = useState(false);
+  const [slowEvents, setSlowEvents] = useState(false);
   const [picked, setPicked] = useState<MuscleInfo | null>(null);
   /* until the 3D engine is ready the 2D anatomy is drawn, so the picture is never empty */
   const orbitOpen = orbit && style === 'anatomy3d';
@@ -122,19 +159,44 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
   /* the 3D scene follows the toggles and the selected finding or muscle */
   useEffect(() => {
     if (engine === null) return;
-    engine.setLayers({ bones: layers.bones, muscles: layers.muscles, tendons: layers.tendons });
+    engine.setLayers({ bones: layers.bones, muscles: layers.muscles, tendons: layers.tendons, ghosts: layers.ghosts });
     engine.setGroups(groups);
     engine.setHighlight(highlightBodies);
     engine.setSelected(picked?.index ?? null);
     engine.renderAll();
-  }, [engine, layers.bones, layers.muscles, layers.tendons, groups, highlightBodies, picked]);
-  /* ...and the video frame */
+  }, [engine, layers.bones, layers.muscles, layers.tendons, layers.ghosts, groups, highlightBodies, picked]);
+  /* ...and the video frame; while playing the engine reads the video clock every animation frame instead, so slow motion is fluid
+     (the poses are blended between source frames) and not stepped */
   useEffect(() => {
     if (engine === null) return;
-    engine.setFrame(frame);
-    engine.renderAll();
     (window as unknown as { __movementEngine?: unknown }).__movementEngine = engine;
-  }, [engine, frame]);
+    engine.playIntro();
+  }, [engine]);
+  useEffect(() => {
+    if (engine === null) return;
+    engine.setPulse(activePulse(result.events, frame));
+    if (!playing) { engine.setFrame(frame); engine.renderAll(); }
+  }, [engine, frame, playing, result.events]);
+  useEffect(() => {
+    if (engine === null) return undefined;
+    engine.setFlowActive(playing);
+    if (!playing) return undefined;
+    let raf = 0;
+    const tick = () => {
+      const v = videoRef.current;
+      if (v !== null) {
+        const f = Math.min(count - 1, Math.max(0, v.currentTime * result.video.fps));
+        engine.setPulse(activePulse(result.events, f));
+        engine.setFrame(f);
+        engine.renderAll();
+        /* optional slow motion around the events */
+        if (slowEvents) v.playbackRate = nearEvent(result.events, f) ? Math.min(speed, 0.25) : speed;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engine, playing, count, result.video.fps, result.events, slowEvents, speed, videoRef]);
   const selectFlag = (flag: Flag) => {
     setSelected(flag);
     seek(flag.evidence.frame);
@@ -182,7 +244,7 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
             </Box>
           </Stack>
           <Box role="group" aria-label={t('review.layers')} sx={{ display: 'flex', gap: 0.75, overflowX: 'auto', pb: 1, mb: 0.5, scrollbarWidth: 'thin' }}>
-            {LAYER_KEYS.filter((k) => (shownStyle === 'anatomy3d' || style === 'anatomy3d' ? D3_KEYS.has(k) : style === 'anatomy' || WIRE_KEYS.has(k))).map((k) => (
+            {LAYER_KEYS.filter((k) => (shownStyle === 'anatomy3d' || style === 'anatomy3d' ? D3_KEYS.has(k) : style === 'anatomy' ? ANATOMY2D_KEYS.has(k) : WIRE_KEYS.has(k))).map((k) => (
               <Button
                 key={k}
                 size="small"
@@ -259,6 +321,9 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
                 {String(s).replace('.', ',')}×
               </Button>
             ))}
+            <Button size="small" onClick={() => setSlowEvents((v) => !v)} aria-pressed={slowEvents} variant={slowEvents ? 'contained' : 'outlined'} data-testid="slow-events" sx={{ minHeight: 44, textTransform: 'none', borderRadius: 999, ml: 1 }}>
+              {t('review.slow_events')}
+            </Button>
           </Stack>
         </Box>
       </Shelf>
@@ -287,7 +352,7 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
   );
   const decisionShelf = (
       <Shelf id="decision" title={t('decision.title')} layout="board" stagger={false}>
-        <DecisionPanel clip={clip} />
+        <DecisionPanel clip={clip} onSubmit={submitDecision} failed={decide.isError} />
       </Shelf>
   );
 
@@ -295,11 +360,17 @@ export function ReviewView({ clip, videoSrc }: { clip: ClipDetail; videoSrc?: st
   const column = (...items: React.ReactNode[]) => <Stack spacing={gap} sx={{ minWidth: 0 }}>{items.map((item, i) => <Fragment key={i}>{item}</Fragment>)}</Stack>;
 
   return (
+    <Stack spacing={2}>
+    {qaWarnings.map((w) => (
+      <Alert key={w.code} severity="warning" role="alert" data-testid="qa-warning">{warningText(w.code, t, result)}</Alert>
+    ))}
     <Box
       data-testid="review"
       sx={{ display: 'grid', gap: { xs: 3, md: 3.5 }, gridTemplateColumns: phone ? 'minmax(0, 1fr)' : device === 'tablet' ? 'minmax(0, 1.25fr) minmax(280px, 1fr)' : 'minmax(0, 1.6fr) minmax(340px, 1fr)', alignItems: 'start' }}
     >
       {phone ? column(videoShelf, scoreShelf, findingsShelf, curvesShelf, metricsShelf, decisionShelf) : <>{column(videoShelf, curvesShelf)}{column(scoreShelf, findingsShelf, metricsShelf, decisionShelf)}</>}
     </Box>
+    <Snackbar open={pending !== null} message={t('decision.pending')} data-testid="decision-undo" action={<Button color="inherit" onClick={undoDecision} sx={{ minHeight: 44 }}>{t('action.undo')}</Button>} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 88, md: 24 } }} />
+    </Stack>
   );
 }

@@ -69,11 +69,15 @@ export function Scrubber({ count, frame, fps, events, showEvents, onSeek }: {
         <Box
           key={`${e.type}-${e.side}-${e.frame}-${i}`}
           aria-hidden
+          data-flash={Math.abs(frame - e.frame) <= 3 ? 'on' : 'off'}
           title={`${t(`event.${e.type}`)}${e.side ? ` ${t(`side.short.${e.side}`)}` : ''} · ${e.frame + 1}`}
           data-event={e.type}
           sx={(theme) => ({
             position: 'absolute', left: `${ratioOfFrame(e.frame, count) * 100}%`, width: 3, ml: '-1.5px', borderRadius: 1,
             bgcolor: eventColor(theme, e.type), pointerEvents: 'none',
+            /* the marker flashes while the playhead is at its event (only under Animace "plné") */
+            'html[data-motion="full"] &[data-flash="on"]': { transform: 'scale(2.2, 1.35)', boxShadow: `0 0 8px ${eventColor(theme, e.type)}` },
+            transition: 'transform 140ms ease, box-shadow 140ms ease',
             ...(e.side === 'L' ? { top: 4, height: 16 } : e.side === 'R' ? { bottom: 4, height: 16 } : { top: 8, bottom: 8 }),
           })}
         />

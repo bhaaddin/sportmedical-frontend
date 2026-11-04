@@ -271,3 +271,124 @@ export function tubeFrames(line: ArrayLike<number>, rings: number, tangents: Flo
     binormals[r * 3 + 2] = tx * ny - ty * nx;
   }
 }
+
+/* ───────── motion: interpolation, easing, event moments, the intro, camera presets ───────── */
+
+/** Blends the poses of two frames into `out` ([B,7]: lerp the positions, slerp the unit quaternions w x y z). */
+export function lerpPoses(poses: Float32Array, nBodies: number, frame: number, out: Float32Array): void {
+  const last = poses.length / (nBodies * 7) - 1;
+  const f = Math.min(last, Math.max(0, frame));
+  const i0 = Math.floor(f);
+  const i1 = Math.min(last, i0 + 1);
+  const a = f - i0;
+  for (let b = 0; b < nBodies; b++) {
+    const o0 = (i0 * nBodies + b) * 7;
+    const o1 = (i1 * nBodies + b) * 7;
+    const o = b * 7;
+    for (let k = 0; k < 3; k++) out[o + k] = poses[o0 + k] + (poses[o1 + k] - poses[o0 + k]) * a;
+    let w1 = poses[o1 + 3], x1 = poses[o1 + 4], y1 = poses[o1 + 5], z1 = poses[o1 + 6];
+    const w0 = poses[o0 + 3], x0 = poses[o0 + 4], y0 = poses[o0 + 5], z0 = poses[o0 + 6];
+    let cos = w0 * w1 + x0 * x1 + y0 * y1 + z0 * z1;
+    if (cos < 0) { cos = -cos; w1 = -w1; x1 = -x1; y1 = -y1; z1 = -z1; }
+    let s0: number, s1: number;
+    if (cos > 0.9995) { s0 = 1 - a; s1 = a; } else {
+      const th = Math.acos(cos);
+      const sn = Math.sin(th);
+      s0 = Math.sin((1 - a) * th) / sn;
+      s1 = Math.sin(a * th) / sn;
+    }
+    const w = w0 * s0 + w1 * s1, x = x0 * s0 + x1 * s1, y = y0 * s0 + y1 * s1, z = z0 * s0 + z1 * s1;
+    const n = Math.hypot(w, x, y, z) || 1;
+    out[o + 3] = w / n; out[o + 4] = x / n; out[o + 5] = y / n; out[o + 6] = z / n;
+  }
+}
+
+/** Blends one value of a per-frame table (muscle length, contraction) between two frames. */
+export function lerpAt(table: ArrayLike<number>, stride: number, frames: number, frame: number, index: number): number {
+  const f = Math.min(frames - 1, Math.max(0, frame));
+  const i0 = Math.floor(f);
+  const i1 = Math.min(frames - 1, i0 + 1);
+  const a = f - i0;
+  const v0 = table[i0 * stride + index];
+  return v0 + (table[i1 * stride + index] - v0) * a;
+}
+
+export const easeInOutCubic = (t: number): number => {
+  const x = Math.min(1, Math.max(0, t));
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+};
+
+/** The earlier key frames for the ghost trail: every `step` frames back from `frame`, up to `count`, nearest first, never before 0. */
+export function onionFrames(frame: number, step = 6, count = 4): number[] {
+  const out: number[] = [];
+  for (let k = 1; k <= count; k++) {
+    const f = Math.floor(frame) - k * step;
+    if (f < 0) break;
+    out.push(f);
+  }
+  return out;
+}
+
+/** How strongly an event moment glows at `frame`: 1 on the event frame, fading to 0 over `span` frames either side. */
+export function pulseIntensity(frame: number, eventFrame: number, span = 6): number {
+  const d = Math.abs(frame - eventFrame);
+  return d >= span ? 0 : 1 - d / span;
+}
+
+export interface TimedEvent { type: string; side: 'L' | 'R' | null; frame: number }
+export const PULSE_EVENTS: readonly string[] = ['foot_strike', 'initial_contact', 'peak_knee_flexion'];
+
+/** The strongest event pulse at a frame: which leg and how much (null when none is near). */
+export function activePulse(events: readonly TimedEvent[], frame: number, span = 6): { side: 'L' | 'R'; k: number; frame: number } | null {
+  let best: { side: 'L' | 'R'; k: number; frame: number } | null = null;
+  for (const e of events) {
+    if (e.side === null || !PULSE_EVENTS.includes(e.type)) continue;
+    const k = pulseIntensity(frame, e.frame, span);
+    if (k > 0 && (best === null || k > best.k)) best = { side: e.side, k, frame: e.frame };
+  }
+  return best;
+}
+
+/** Slow motion near events: true when `frame` is within `window` frames of a pulse event. */
+export function nearEvent(events: readonly TimedEvent[], frame: number, window = 5): boolean {
+  return events.some((e) => PULSE_EVENTS.includes(e.type) && Math.abs(frame - e.frame) <= window);
+}
+
+/**
+ * The frame offset that lines up two clips on their first initial contact (or foot strike): add it to a frame of clip A to get
+ * the matching frame of clip B. Zero when either clip has no such event.
+ */
+export function alignOffset(a: readonly TimedEvent[], b: readonly TimedEvent[]): number {
+  const first = (ev: readonly TimedEvent[]) => ev.filter((e) => e.type === 'initial_contact' || e.type === 'foot_strike').sort((x, y) => x.frame - y.frame)[0];
+  const ea = first(a);
+  const eb = first(b);
+  return ea && eb ? eb.frame - ea.frame : 0;
+}
+
+/**
+ * The intro of the 3D view: the bones appear bottom-up. `rank` is a bone's height among all bones (0 = lowest, 1 = highest) and `p`
+ * the intro's progress 0..1; the bones take the first 80 % of the time, the muscles fade in during the last 25 %.
+ */
+export function introBone(rank: number, p: number): number {
+  const start = rank * 0.45;
+  return Math.min(1, Math.max(0, (p - start) / 0.55));
+}
+export const introMuscles = (p: number): number => Math.min(1, Math.max(0, (p - 0.75) / 0.25));
+
+export type CameraPreset = 'video' | 'front' | 'side' | 'back' | 'top';
+
+/**
+ * Where the camera stands for a preset, around `target`, at distance `d`. `heading` is the horizontal direction the athlete faces
+ * (unit x, y); 'video' is the camera of the recording (looking along +Y).
+ */
+export function cameraPreset(name: CameraPreset, heading: { x: number; y: number }, target: Vec3, d: number): { position: Vec3; up: Vec3 } {
+  const h = Math.hypot(heading.x, heading.y) < 1e-6 ? { x: 0, y: -1 } : { x: heading.x / Math.hypot(heading.x, heading.y), y: heading.y / Math.hypot(heading.x, heading.y) };
+  const up = { x: 0, y: 0, z: 1 };
+  switch (name) {
+    case 'video': return { position: { x: target.x, y: target.y - d, z: target.z + 0.1 }, up };
+    case 'front': return { position: { x: target.x + h.x * d, y: target.y + h.y * d, z: target.z + 0.1 }, up };
+    case 'back': return { position: { x: target.x - h.x * d, y: target.y - h.y * d, z: target.z + 0.1 }, up };
+    case 'side': return { position: { x: target.x - h.y * d, y: target.y + h.x * d, z: target.z + 0.1 }, up };
+    case 'top': return { position: { x: target.x, y: target.y - 0.001, z: target.z + d }, up };
+  }
+}

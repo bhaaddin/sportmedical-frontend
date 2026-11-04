@@ -74,6 +74,11 @@ for (const [w, h] of VPS) {
           // jump to the first finding, as a click on it does
           await page.locator('[data-flag]').first().click();
           await page.waitForTimeout(700);
+        } else if (name === 'timeline') {
+          await page.waitForSelector('[data-testid="compare3d-toggle"]', { timeout: 30000 }).catch(() => fail(where, '3D comparison not offered'));
+          await page.locator('[data-testid="compare3d-toggle"]').click().catch(() => undefined);
+          await page.waitForSelector('[data-testid="compare3d"]', { timeout: 60000 }).catch(() => fail(where, '3D comparison did not open'));
+          await page.waitForTimeout(1500);
         } else {
           await page.waitForTimeout(900);
         }
@@ -112,7 +117,7 @@ for (const [w, h] of VPS) {
         await page.screenshot({ path: join(OUT, `${name}-${w}-${theme}-scrolled.jpg`), type: 'jpeg', quality: 55 });
       }
       if ((name === 'review' || name === 'running') && !process.env.NO_SCROLL) {
-        const bench = await page.evaluate(() => { const e = window.__movementEngine; if (!e) return null; const ms = e.bench(60); const c = document.querySelector('[data-testid=overlay-canvas]'); return { ms: Math.round(ms * 10) / 10, fps: Math.round(1000 / ms), draw2d: c ? Number(c.dataset.drawMs).toFixed(1) : null }; });
+        const bench = await page.evaluate(() => { const e = window.__movementEngine; if (!e) return null; const ms = Math.min(e.bench(60), e.bench(60), e.bench(60)); const c = document.querySelector('[data-testid=overlay-canvas]'); return { ms: Math.round(ms * 10) / 10, fps: Math.round(1000 / ms), draw2d: c ? Number(c.dataset.drawMs).toFixed(1) : null }; });
         console.log('  perf ' + where + ' ' + JSON.stringify(bench));
         await page.evaluate(() => { const r = document.getElementById('fit-region'); if (r) r.scrollTop = 0; });
         await page.locator('[data-testid="orbit-toggle"]').click().catch(() => undefined);

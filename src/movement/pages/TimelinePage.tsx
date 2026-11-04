@@ -1,5 +1,5 @@
 /* A patient's movement timeline: score trend per movement, the sessions, before/after, and the consents. */
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { Box, Button, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
@@ -36,6 +36,9 @@ function Trend({ points }: { points: TrendPoint[] }) {
   );
 }
 
+/* the 3D engine is a lazy chunk: it loads only when the 3D comparison is opened */
+const Compare3D = lazy(() => import('../anatomy3d/Compare3D').then((m) => ({ default: m.Compare3D })));
+
 export default function TimelinePage() {
   const { t, maybe, lang } = useMoveT();
   const { patientId } = useParams<{ patientId: string }>();
@@ -48,6 +51,7 @@ export default function TimelinePage() {
   const [cmpMovement, setCmpMovement] = useState<Movement | null>(null);
   const movement = cmpMovement ?? movements[0] ?? 'running';
   const eligible = sessions.filter((s) => s.clips.some((c) => c.movement === movement && c.status === 'done'));
+  const [compare3d, setCompare3d] = useState(false);
   const [beforeId, setBeforeId] = useState<string | null>(null);
   const [afterId, setAfterId] = useState<string | null>(null);
   const before = eligible.find((s) => s.id === (beforeId ?? eligible[eligible.length - 1]?.id));
@@ -122,6 +126,12 @@ export default function TimelinePage() {
                 {eligible.map((s) => <MenuItem key={s.id} value={s.id} sx={{ minHeight: 44 }}>{formatDate(s.date)}</MenuItem>)}
               </TextField>
             </Stack>
+            {beforeClip.data?.result?.anatomy?.available === true && afterClip.data?.result?.anatomy?.available === true && (
+              <Box>
+                <Button variant={compare3d ? 'contained' : 'outlined'} aria-pressed={compare3d} onClick={() => setCompare3d((v) => !v)} data-testid="compare3d-toggle" sx={{ minHeight: 44, textTransform: 'none' }}>{t('timeline.compare3d')}</Button>
+              </Box>
+            )}
+            {compare3d && beforeClip.data && afterClip.data && <Suspense fallback={null}><Compare3D before={beforeClip.data} after={afterClip.data} /></Suspense>}
             {rows.length === 0 ? (
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>{t('timeline.compare.pick_two')}</Typography>
             ) : (

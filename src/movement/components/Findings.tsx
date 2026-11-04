@@ -1,12 +1,15 @@
 /* Score chip, flag list (by severity) and the left-right metrics table. */
 import { Box, Button, Stack, Typography } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, keyframes } from '@mui/material/styles';
 import { StatusChip, type ChipTone } from '../../components/ui';
 import type { ClipDetail, Flag, Metric } from '../../api/movement';
 import { asymmetryLevel, formatAsymmetry, formatValue, metricRows, outsideNorm } from '../lib/asymmetry';
 import { groupFlags, latestDecision, scoreView } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
 import { metricName, staffLabel } from '../lib/review';
+
+/** The chip pops when the score changes (a decision arrives): only under Animace "plné". */
+const pop = keyframes`from { transform: scale(0.86); opacity: 0.4; } 60% { transform: scale(1.07); } to { transform: scale(1); opacity: 1; }`;
 
 export const BAND_TONE: Record<string, ChipTone> = { green: 'green', watch: 'beige', red: 'red', needs_review: 'blue' };
 const SEVERITY_TONE: Record<Flag['severity'], ChipTone> = { red: 'red', watch: 'beige', info: 'grey' };
@@ -25,7 +28,12 @@ export function ScoreBlock({ clip }: { clip: ClipDetail }) {
   const decision = latestDecision(clip.decisions);
   return (
     <Stack spacing={1} data-testid="score-block" sx={{ p: { xs: 1.5, md: 2 } }}>
-      <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+      <Stack
+        key={`${view.kind}-${'band' in view ? view.band : ''}`}
+        direction="row"
+        data-testid="score-chips"
+        sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap', animation: `${pop} 420ms ease-out`, 'html:not([data-motion="full"]) &': { animation: 'none' } }}
+      >
         {view.kind === 'needs_review' && <BandChip band="needs_review" />}
         {view.kind === 'draft' && <BandChip band={view.band} />}
         {view.kind === 'decided' && <BandChip band={view.band} />}
@@ -97,6 +105,12 @@ export function FlagList({ flags, selectedId, lang, onSelect }: {
                     })}
                   >
                     <Typography sx={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>{f.sentence[lang]}</Typography>
+                    {(f.confidence !== null && f.confidence !== undefined) && (
+                      <Stack direction="row" sx={{ gap: 1, alignItems: 'center', mt: 0.25 }}>
+                        <ConfidenceMeter value={f.confidence} label={t('review.confidence')} />
+                        {f.uncertain && <StatusChip tone="beige" size="sm" testId="flag-uncertain">{t('review.uncertain')}</StatusChip>}
+                      </Stack>
+                    )}
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                       {t('review.evidence', { frame: ev.frame + 1 })}
                       {ev.value !== null && ev.value !== undefined && ev.unit ? ` · ${formatValue(ev.value, ev.unit)}` : ''}
@@ -113,13 +127,23 @@ export function FlagList({ flags, selectedId, lang, onSelect }: {
   );
 }
 
+/** A small confidence meter of a finding (0..1). */
+function ConfidenceMeter({ value, label }: { value: number; label: string }) {
+  return (
+    <Box role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={1} aria-valuenow={value} title={`${label}: ${Math.round(value * 100)} %`} data-testid="flag-confidence"
+      sx={(th) => ({ display: 'inline-block', width: 44, height: 5, borderRadius: 3, bgcolor: alpha(th.palette.text.primary, 0.14), verticalAlign: 'middle', overflow: 'hidden' })}>
+      <Box sx={(th) => ({ height: '100%', width: `${Math.round(value * 100)}%`, bgcolor: value < 0.5 ? th.palette.warning.main : th.palette.primary.main })} />
+    </Box>
+  );
+}
+
 export function MetricsTable({ metrics, onSeek }: { metrics: readonly Metric[]; onSeek: (frame: number) => void }) {
   const { t, maybe, lang } = useMoveT();
   const rows = metricRows(metrics);
-  const cell = (m: (typeof rows)[number]['left']) => {
+  const cell = (m: (typeof rows)[number]['left'], twin: Metric | null = null) => {
     if (m === null) return <Box component="span" sx={{ color: 'text.secondary' }}>–</Box>;
     const out = outsideNorm(m);
-    const text = formatValue(m.value, m.unit);
+    const text = twin ? `${formatValue(m.value, m.unit)} / ${formatValue(twin.value, twin.unit)}` : formatValue(m.value, m.unit);
     const color = out === true ? 'error.main' : 'text.primary';
     return m.frame === null || m.frame === undefined ? (
       <Box component="span" sx={{ color, fontWeight: 600 }}>{text}</Box>
@@ -134,7 +158,7 @@ export function MetricsTable({ metrics, onSeek }: { metrics: readonly Metric[]; 
       <Box component="table" data-testid="metrics-table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <Box component="tr" sx={{ textAlign: 'left', color: 'text.secondary', fontSize: 12 }}>
-            <Box component="th" scope="col" sx={{ p: 1, fontWeight: 600 }}>{t('review.metrics.metric')}</Box>
+            <Box component="th" scope="col" sx={{ p: 1, fontWeight: 600 }}>{t('review.metrics.metric')}{rows.some((r) => r.twin) && <Box component="span" title={t('review.metrics.twin_hint')} data-testid="twin-hint" sx={{ display: 'block', fontWeight: 400, cursor: 'help' }}>{t('review.metrics.twin')}</Box>}</Box>
             <Box component="th" scope="col" sx={{ p: 1, fontWeight: 600 }}>{t('side.short.L')}</Box>
             <Box component="th" scope="col" sx={{ p: 1, fontWeight: 600 }}>{t('side.short.R')}</Box>
             <Box component="th" scope="col" sx={{ p: 1, fontWeight: 600 }}>{t('review.metrics.asym')}</Box>
@@ -155,11 +179,11 @@ export function MetricsTable({ metrics, onSeek }: { metrics: readonly Metric[]; 
                   )}
                 </Box>
                 {r.single ? (
-                  <Box component="td" colSpan={2} sx={{ p: 0.5 }}>{cell(r.single)}</Box>
+                  <Box component="td" colSpan={2} sx={{ p: 0.5 }}>{cell(r.single, r.twin?.single ?? null)}</Box>
                 ) : (
                   <>
-                    <Box component="td" sx={{ p: 0.5 }}>{cell(r.left)}</Box>
-                    <Box component="td" sx={{ p: 0.5 }}>{cell(r.right)}</Box>
+                    <Box component="td" sx={{ p: 0.5 }}>{cell(r.left, r.twin?.left ?? null)}</Box>
+                    <Box component="td" sx={{ p: 0.5 }}>{cell(r.right, r.twin?.right ?? null)}</Box>
                   </>
                 )}
                 <Box component="td" sx={{ p: 1, fontVariantNumeric: 'tabular-nums' }}>

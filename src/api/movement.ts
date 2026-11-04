@@ -54,6 +54,9 @@ export const clipResultSchema = z.object({
     usableFrameRatio: z.number(),
     meanConfidence: z.number(),
     reasons: z.array(z.object({ code: z.string(), messageKey: z.string().optional(), detail: z.string().nullish() })),
+    /** The clip does not look like the chosen view / movement (`view_mismatch`, `movement_mismatch`); the score is then needs_review. */
+    warnings: z.array(z.object({ code: z.string(), messageKey: z.string().optional(), detail: z.string().nullish() })).optional(),
+    detectedView: z.object({ view: z.string(), ratio: z.number().nullish() }).nullish(),
   }),
   skeleton: z.object({
     /** `wholebody133` (body 17, feet 6, face 68, hands 2x21) or `halpe26`. */
@@ -85,6 +88,8 @@ export const clipResultSchema = z.object({
     asymmetryPct: z.number().nullish(),
     /** The pipeline's own name of the metric, in both languages. */
     label: z.object({ cs: z.string(), en: z.string() }).nullish(),
+    /** "3d" for the value read from the fitted musculoskeletal model (a twin `<id>_3d` of the 2D metric). */
+    source: z.string().nullish(),
   })),
   flags: z.array(z.object({
     id: z.string(),
@@ -101,6 +106,9 @@ export const clipResultSchema = z.object({
     }),
     sentence: z.object({ cs: z.string(), en: z.string() }),
     ruleVersion: z.string(),
+    /** 0..1: how far the evidence is from 2D noise; `uncertain` below 0.5. */
+    confidence: z.number().nullish(),
+    uncertain: z.boolean().optional(),
   })),
   /** The MyoSim musculoskeletal fit (CONTRACT 3b): when `available`, the API serves anatomy.json and anatomy.bin. */
   anatomy: z.object({ available: z.boolean(), model: z.string().optional(), bodies: z.number().optional(), muscles: z.number().optional(), reason: z.string().nullish() }).passthrough().nullish(),
@@ -188,6 +196,8 @@ export const clipDetailSchema = z
     /** The ClipResult once the clip is done; for a rejected clip only its `qa` part, so it is read strictly only when done. */
     result: z.unknown().optional(),
     decisions: z.array(decisionSchema).default([]),
+    /** While processing: the stage and its percentage (`downloaded`, `pose`, `analysis`, `anatomy`). */
+    progress: z.object({ stage: z.string(), pct: z.number().nullish(), at: z.string().nullish() }).nullish(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
   })
@@ -214,6 +224,7 @@ export const clipDetailSchema = z
       markerPx: c.markerPx ?? null,
       result,
       decisions: c.decisions,
+      ...(c.progress ? { progress: c.progress } : {}),
     };
   });
 export type ClipDetail = z.output<typeof clipDetailSchema>;
@@ -446,7 +457,7 @@ export const movementKeys = {
 };
 
 /** How often the status is asked while a clip is not finished. */
-export const CLIP_POLL_MS = 2500;
+export const CLIP_POLL_MS = 1500;
 
 /** A clip, polled while it is waiting for or in the pipeline. */
 export function useClip(clipId: string | undefined) {

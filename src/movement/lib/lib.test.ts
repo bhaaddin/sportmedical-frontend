@@ -9,6 +9,7 @@ import { checkClip } from './uploadCheck';
 import { asymmetryLevel, computeAsymmetry, formatAsymmetry, formatValue, metricRows } from './asymmetry';
 import { curvePath, extentOf, groupCurves } from './curves';
 import { clickToVideoPx, markerPixelLength, markerPlausible } from './marker';
+import { overallPct, stageOf, stageSteps } from './progress';
 import { metricName, compareMetrics, decisionReady, doneClipOf, groupFlags, scoreTrend, scoreView, staffLabel, tagsForMovement } from './review';
 import { buildDropJumpFrontResult, buildRunningSideResult, HALPE26_NAMES } from '../fixtures/synth';
 import { clipResultSchema, type ClipDetail, type ClipResult, type Decision, type Flag, type MovementSession } from '../../api/movement';
@@ -401,6 +402,39 @@ describe('metric names and asymmetry from the pipeline', () => {
     expect(rows[0].asymmetryPct).toBeNull();
     expect(formatAsymmetry(rows[0].asymmetryPct)).toBe('–');
     expect(metricRows([m('L', 12, 20), m('R', 10, 20)])[0].asymmetryPct).toBe(20);
+  });
+});
+
+describe('processing stages', () => {
+  const states = (status: Parameters<typeof stageSteps>[0], progress?: Parameters<typeof stageSteps>[1]) => stageSteps(status, progress).map((s) => s.state).join(',');
+  it('maps the wire stages onto the five steps', () => {
+    expect(stageOf('downloaded')).toBe('pose');
+    expect(stageOf('pose')).toBe('pose');
+    expect(stageOf('analysis')).toBe('analysis');
+    expect(stageOf('anatomy')).toBe('anatomy');
+    expect(stageOf('something new')).toBeNull();
+  });
+  it('waiting shows nothing running; processing without progress is downloading', () => {
+    expect(states('queued')).toBe('pending,pending,pending,pending,pending');
+    expect(states('uploaded')).toBe('pending,pending,pending,pending,pending');
+    expect(states('processing')).toBe('active,pending,pending,pending,pending');
+  });
+  it('a stage in progress has the earlier ones done and carries its percentage', () => {
+    expect(states('processing', { stage: 'downloaded', pct: 100 })).toBe('done,active,pending,pending,pending');
+    expect(states('processing', { stage: 'analysis', pct: 10 })).toBe('done,done,active,pending,pending');
+    expect(states('processing', { stage: 'anatomy', pct: 50 })).toBe('done,done,done,active,pending');
+    expect(stageSteps('processing', { stage: 'pose', pct: 130 })[1].pct).toBe(100);
+    expect(stageSteps('processing', { stage: 'pose', pct: 30 })[2].pct).toBeNull();
+  });
+  it('done has every step done; failed stops at the stage it reached', () => {
+    expect(states('done')).toBe('done,done,done,done,done');
+    expect(states('failed', { stage: 'pose', pct: 12 })).toBe('done,active,pending,pending,pending');
+  });
+  it('the overall bar is a quarter per working stage', () => {
+    expect(overallPct('queued')).toBe(0);
+    expect(overallPct('processing', { stage: 'pose', pct: 50 })).toBe(38);
+    expect(overallPct('processing', { stage: 'anatomy', pct: 100 })).toBe(100);
+    expect(overallPct('done')).toBe(100);
   });
 });
 

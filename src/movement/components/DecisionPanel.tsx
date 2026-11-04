@@ -5,17 +5,16 @@ import { alpha } from '@mui/material/styles';
 import { PictureAsPdf } from '@mui/icons-material';
 import { StatusChip } from '../../components/ui';
 import { usePermission } from '../../auth/usePermission';
-import { BANDS, getReportBlob, useDecision, type Band, type ClipDetail, type DecisionInput, type FaultTag } from '../../api/movement';
+import { BANDS, getReportBlob, type Band, type ClipDetail, type DecisionInput, type FaultTag } from '../../api/movement';
 import { decisionReady, decisionsNewestFirst, latestDecision, staffLabel, tagsForMovement } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
 import { BAND_TONE } from './Findings';
 
 type Action = DecisionInput['action'];
 
-export function DecisionPanel({ clip }: { clip: ClipDetail }) {
+export function DecisionPanel({ clip, onSubmit, failed = false }: { clip: ClipDetail; /** Hands the decision over; the screen shows it at once and sends it after the undo time. */ onSubmit: (input: DecisionInput) => void; failed?: boolean }) {
   const { t } = useMoveT();
   const mayDecide = usePermission('movement.review');
-  const mutation = useDecision(clip.clipId);
   const draftBand = clip.result?.score.band;
   const last = latestDecision(clip.decisions);
   const [action, setAction] = useState<Action | null>(null);
@@ -24,13 +23,11 @@ export function DecisionPanel({ clip }: { clip: ClipDetail }) {
   const [unsure, setUnsure] = useState(false);
   const [note, setNote] = useState('');
   const [more, setMore] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const { main, other } = tagsForMovement(clip.movement);
   const choose = (next: Action | null) => {
     if (next === null) return;
     setAction(next);
-    setSaved(false);
     /* Accepting takes the draft's band as it stands; editing starts from it. */
     if (next !== 'reject' && band === null && draftBand !== undefined && draftBand !== 'needs_review') setBand(draftBand);
   };
@@ -41,10 +38,8 @@ export function DecisionPanel({ clip }: { clip: ClipDetail }) {
     if (action === null) return;
     /* A rejection carries no band (the API does not ask for one); accept and edit do. */
     const sent: Band | null = action === 'reject' ? null : band;
-    mutation.mutate(
-      { action, band: sent, faultTags: tags, unsure, note: note.trim() },
-      { onSuccess: () => { setSaved(true); setAction(null); setBand(null); setTags([]); setUnsure(false); setNote(''); } },
-    );
+    onSubmit({ action, band: sent, faultTags: tags, unsure, note: note.trim() });
+    setAction(null); setBand(null); setTags([]); setUnsure(false); setNote('');
   };
 
   const shownTags = more ? [...main, ...other] : main;
@@ -116,10 +111,9 @@ export function DecisionPanel({ clip }: { clip: ClipDetail }) {
         )}
       </Box>
 
-      {mutation.isError && <Alert severity="error">{t('decision.failed')}</Alert>}
-      {saved && <Alert severity="success" role="status">{t('decision.saved')}</Alert>}
+      {failed && <Alert severity="error" role="alert">{t('decision.failed')}</Alert>}
       {action !== null && (
-        <Button variant="contained" onClick={submit} disabled={!ready || mutation.isPending} sx={{ minHeight: 44 }}>
+        <Button variant="contained" onClick={submit} disabled={!ready} sx={{ minHeight: 44 }}>
           {t('action.save')}
         </Button>
       )}

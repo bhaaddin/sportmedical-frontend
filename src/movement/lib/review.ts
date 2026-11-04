@@ -7,7 +7,8 @@ export const SEVERITY_ORDER = ['red', 'watch', 'info'] as const;
 /** Flags grouped by severity, worst first; empty groups are left out. Order inside a group is kept. */
 export function groupFlags(flags: readonly Flag[]): { severity: Flag['severity']; flags: Flag[] }[] {
   return SEVERITY_ORDER
-    .map((severity) => ({ severity, flags: flags.filter((f) => f.severity === severity) }))
+    /* inside a severity the uncertain findings come last (stable otherwise) */
+    .map((severity) => ({ severity, flags: flags.filter((f) => f.severity === severity).map((f, i) => ({ f, i })).sort((a, b) => Number(!!a.f.uncertain) - Number(!!b.f.uncertain) || a.i - b.i).map((x) => x.f) }))
     .filter((g) => g.flags.length > 0);
 }
 
@@ -53,6 +54,7 @@ export function decisionReady(action: 'accept' | 'edit' | 'reject' | null, band:
 
 /** The API names the author by staff id only: show "Klinik" with the last four characters, never the whole id. */
 export function staffLabel(staffId: string): string {
+  if (staffId === 'pending') return 'Vy';
   return `Klinik ${staffId.replace(/[^0-9a-z]/gi, '').slice(-4)}`;
 }
 
