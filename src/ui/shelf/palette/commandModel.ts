@@ -136,6 +136,7 @@ const ACTIONS: readonly Command[] = [
   { id: 'action-new-appointment', group: 'action', label: 'Nová objednávka', hint: 'Otevře kalendář na nejbližším volném termínu', to: '/planovani', state: { newAppointment: NOW }, keywords: ['rezervace', 'termín', 'objednat', 'nový'], boost: 6 },
   { id: 'action-new-patient', group: 'action', label: 'Nový pacient', hint: 'Plná registrace pacienta', to: '/patients/register', requires: 'patients.register', keywords: ['registrace', 'karta', 'přidat'], boost: 6 },
   { id: 'action-quick-registration', group: 'action', label: 'Rychlá registrace', hint: 'Čtyři údaje a hotovo, zbytek doplní pacient', to: '/patients/register?mode=quick', requires: 'patients.register', keywords: ['pacient', 'odkaz'], boost: 4 },
+  { id: 'action-movement-upload', group: 'action', label: 'Nahrát záznam pohybu', hint: 'Pohybová analýza: běh nebo doskok z telefonu', to: '/pohyb/nahrat', requires: 'movement.capture', flag: 'movement', keywords: ['pohyb', 'video', 'běh', 'doskok', 'analýza'] },
   { id: 'action-club-order', group: 'action', label: 'Klubová objednávka', hint: 'Hromadná objednávka pro tým', to: '/planovani', state: { openClubOrder: true }, keywords: ['klub', 'tým', 'hromadná'], boost: 4 },
 ];
 
@@ -157,6 +158,7 @@ const PAGES: readonly Command[] = [
   { id: 'page-clubs', group: 'page', label: 'Kluby a týmy', hint: 'Hromadné objednávky a odkazy pro sportovce', to: '/clubs' },
   { id: 'page-billing', group: 'page', label: 'Fakturace', hint: 'Doklady a platby', to: '/billing', requires: 'billing.manage', keywords: ['faktury', 'platby'] },
   { id: 'page-movement', group: 'page', label: 'Pohybová analýza', hint: 'Videozáznam pohybu a návrh hodnocení', to: '/pohyb', requires: 'movement.view', flag: 'movement', keywords: ['běh', 'doskok', 'kostra', 'video', 'pohyb'] },
+  { id: 'page-movement-admin', group: 'page', label: 'Správa pohybové analýzy', hint: 'Kvalita záznamů, souhlasy, verze a export', to: '/pohyb/spravce', requires: 'movement.admin', flag: 'movement', keywords: ['pohyb', 'statistiky', 'kvalita', 'export'] },
   { id: 'page-settings', group: 'page', label: 'Nastavení', hint: 'Konfigurace kliniky', to: '/settings', keywords: ['konfigurace'] },
   ...(Object.entries(SECTION_CHILDREN) as [string, (typeof SECTION_CHILDREN)['/billing']][]).flatMap(([parent, children]) =>
     children

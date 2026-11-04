@@ -37,7 +37,7 @@ type View = 'side' | 'front' | 'back';
 interface StoredDecision { id: string; action: string; band: string | null; faultTags: string[]; unsure: boolean; note: string | null; clinicianStaffId: string; decidedAt: string }
 interface StoredClip {
   clipId: string; sessionId: string; patientId: string; movement: Movement; view: View;
-  startedAt: number | null; uploaded: boolean; shift: number; markerPx: number | null; decisions: StoredDecision[]; createdAt: string;
+  startedAt: number | null; uploaded: boolean; shift: number; markerPx: number | null; decisions: StoredDecision[]; createdAt: string; injuryIds?: string[];
 }
 interface StoredSession { sessionId: string; patientId: string; appointmentId: string | null; date: string; serviceItemId: string | null; clipIds: string[] }
 interface StoredConsent { kind: 'care' | 'ml'; version: string; grantedAt: string; withdrawnAt: string | null; active: boolean }
@@ -140,7 +140,7 @@ function detail(c: StoredClip) {
     qa, markerPx: c.markerPx, pipelineVersion: '0.1.0', rulesVersion: c.movement === 'running' ? 'running.v1' : 'landing.v1', poseModelVersion: 'rtmpose-halpe26',
     /* a rejected clip carries a result with only its qa filled, like the callback */
     result: status === 'done' ? resultFor(c) : rejected ? { schemaVersion: 1, clipId: c.clipId, qa } : null,
-    decisions: c.decisions, createdAt: c.createdAt, updatedAt: c.createdAt,
+    decisions: c.decisions, injuryIds: c.injuryIds ?? [], reportDocumentId: c.decisions.length ? 'doc-1' : null, createdAt: c.createdAt, updatedAt: c.createdAt,
   };
 }
 
@@ -235,6 +235,25 @@ export async function handle(verb: string, path: string, options: Options = {}):
     });
   }
   if (path === '/admin/exports/retry-failed' && verb === 'post') return ok({ requeued: 2 });
+  if (path === '/settings' && verb === 'get') return ok(mockSettings);
+  if (path === '/settings' && verb === 'put') {
+    const days = Number(body.videoRetentionDays ?? mockSettings.videoRetentionDays);
+    if (days < 30 || days > 3650) refuse(400, 'movement.settings_invalid', 'Retention must be 30 to 3650 days.');
+    mockSettings = { ...mockSettings, ...(body as Partial<typeof mockSettings>) };
+    return ok(mockSettings);
+  }
+  if ((m = /^\/appointments\/([^/]+)\/session$/.exec(path)) && verb === 'post') {
+    if (!consentsOf('ZZ-test').some((r) => r.kind === 'care' && r.active)) refuse(409, 'movement.care_consent_missing', 'Care consent is missing.');
+    const s: StoredSession = { sessionId: id('s'), patientId: 'ZZ-test', appointmentId: m[1], date: new Date().toISOString().slice(0, 10), serviceItemId: null, clipIds: [] };
+    sessions.set('ZZ-test', [s, ...sessionsOf('ZZ-test')]);
+    return ok({ session: { sessionId: s.sessionId, patientId: 'ZZ-test', appointmentId: m[1], date: s.date, serviceItemId: null, clips: [] }, created: true });
+  }
+  if ((m = /^\/clips\/([^/]+)\/links\/injury\/([^/]+)$/.exec(path)) && verb === 'post') {
+    const c = clipOf(m[1]);
+    if (c.decisions.length === 0) refuse(409, 'movement.no_decision', 'Link an accepted clip.');
+    c.injuryIds = [...(c.injuryIds ?? []), m[2]];
+    return ok({ clipId: m[1], injuryId: m[2], patientId: c.patientId, linkedAt: new Date().toISOString() });
+  }
   return refuse(404, 'movement.not_found', `No mock for ${verb} ${path}`);
 }
 
@@ -252,6 +271,23 @@ export async function uploadClipFile(clipId: string, file: Blob, onProgress: (r:
 /* The anatomy of the two fixtures (MyoSim fit of the pipeline): json by import, the binary by URL. */
 import runningAnatomyBin from './running_side.anatomy.bin?url';
 import dropJumpAnatomyBin from './drop_jump_front.anatomy.bin?url';
+
+/* settings, the injury picker and the portal consent of the mock */
+let mockSettings = { serviceItemIds: [] as string[], videoRetentionDays: 365, mlExportEnabled: true, reportLanguage: 'cs' as 'cs' | 'en' };
+export function injuries() {
+  return [
+    { id: 'inj-1', injuryDate: new Date(Date.now() - 40 * 86_400_000).toISOString(), bodyRegion: 'Koleno', specificLocation: 'Přední zkřížený vaz', side: 'Left', status: 'Active' },
+    { id: 'inj-2', injuryDate: new Date(Date.now() - 200 * 86_400_000).toISOString(), bodyRegion: 'Kotník', specificLocation: null, side: 'Right', status: 'Cleared' },
+  ];
+}
+let portalMl: { active: boolean } = { active: false };
+export async function portalConsent(verb: string, body: unknown): Promise<{ careActive: boolean; mlTraining: { kind: string; version: string; grantedAt: string; withdrawnAt: string | null; active: boolean } | null }> {
+  await delay(80);
+  if (verb === 'put') portalMl = { active: true };
+  if (verb === 'delete') portalMl = { active: false };
+  void body;
+  return { careActive: true, mlTraining: { kind: 'ml', version: '1', grantedAt: new Date(Date.now() - 86_400_000).toISOString(), withdrawnAt: portalMl.active ? null : new Date().toISOString(), active: portalMl.active } };
+}
 
 export async function anatomyBin(clipId: string): Promise<ArrayBuffer> {
   const url = clipOf(clipId).movement === 'drop_jump' ? dropJumpAnatomyBin : runningAnatomyBin;

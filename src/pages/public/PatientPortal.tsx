@@ -14,7 +14,7 @@
    iPad and desktop: the artboard's main column beside a narrower one.
    ══════════════════════════════════════════════════════════════ */
 
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Alert, Box, Button, Chip, CircularProgress, TextField, Typography } from '@mui/material';
@@ -27,6 +27,8 @@ import {
 } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard, PortalInvoice } from '../../api/patientPortal';
 import { readPublicClinic } from '../../api/clinicSettings';
+/* Pohybová analýza: a lazy piece that draws nothing unless the server has the module on. */
+const PortalMovementSection = lazy(() => import('../../movement/pages/PortalMovementSection'));
 import type { PublicClinic } from '../../api/clinicSettings';
 import { useDevice } from '../../layout/useDevice';
 import PublicLayout from './PublicLayout';
@@ -702,6 +704,11 @@ export default function PatientPortal() {
 
           {/* ── Side column ── */}
           <PaneColumn>
+                {token !== undefined && (
+                  <Suspense fallback={null}>
+                    <PortalMovementSection token={token} wrap={(children) => <Section id="pohyb" title="Pohybová analýza">{children}</Section>} />
+                  </Suspense>
+                )}
                 <Section id="dokumenty" title="Dokumenty">
                   {dashboard.documents.length === 0 ? (
                     <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>

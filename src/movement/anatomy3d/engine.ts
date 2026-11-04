@@ -20,8 +20,22 @@ export interface MuscleInfo { index: number; name: string; label: string; group:
 
 const RADIAL = 6;
 const LEG_BODY = /^(femur|tibia|patella|talus|calcn|toes)_([rl])$/;
-const HAND_BONE = /(proxph|midph|distph|mc_|thumb|lunate|scaphoid|pisiform|triquetrum|capitate|trapezium|trapezoid|hamate)/;
-const GHOST_OPACITY = [0.32, 0.23, 0.15, 0.09];
+/* the ghost trail keeps the bones that show the movement: no hand bones, no rib cage, no vertebrae, no skull */
+const HAND_BONE = /(proxph|midph|distph|mc_|thumb|lunate|scaphoid|pisiform|triquetrum|capitate|trapezium|trapezoid|hamate|^torso|^head|^neck|^lumbar|^chest|^Abdomen)/;
+const GHOST_OPACITY = [0.34, 0.24, 0.15];
+
+let softwareGl: boolean | null = null;
+/** True when WebGL is drawn by the CPU (SwiftShader, llvmpipe, a blocklisted GPU): the scene then drops multisampling and the bump map. */
+export function isSoftwareGl(): boolean {
+  if (softwareGl !== null) return softwareGl;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    const name = gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+    softwareGl = /swiftshader|llvmpipe|software|basic render/i.test(name);
+  } catch { softwareGl = false; }
+  return softwareGl;
+}
 
 /** Only the Animace setting "plné" lets things move on their own (the setting is mirrored on <html data-motion>). */
 export const motionFull = (): boolean => typeof document !== 'undefined' && document.documentElement.dataset.motion === 'full';
@@ -121,7 +135,9 @@ export class AnatomyEngine {
       if (!node) return;
       node.removeFromParent();
       node.matrixAutoUpdate = false;
-      const mat = new T.MeshStandardMaterial({ color: 0xe9dec3, roughness: 0.58, metalness: 0.0, emissive: 0x000000 });
+      const mat = isSoftwareGl()
+        ? new T.MeshLambertMaterial({ color: 0xe9dec3, emissive: 0x000000 })
+        : new T.MeshStandardMaterial({ color: 0xe9dec3, roughness: 0.58, metalness: 0.0, emissive: 0x000000 });
       node.traverse((o: any) => {
         if (o.isMesh) {
           o.material = mat;
@@ -196,7 +212,10 @@ export class AnatomyEngine {
     this.geo = geo;
 
     const tex = this.fibreTexture();
-    this.muscleMaterial = new T.MeshStandardMaterial({ vertexColors: true, map: tex, bumpMap: tex, bumpScale: 1.4, roughness: 0.46, metalness: 0.02, transparent: false, opacity: 1 });
+    /* the CPU renderer gets the cheaper diffuse-only material (no specular, no bump): the picture is nearly the same, the frame much faster */
+    this.muscleMaterial = isSoftwareGl()
+      ? new T.MeshLambertMaterial({ vertexColors: true, map: tex, transparent: false, opacity: 1 })
+      : new T.MeshStandardMaterial({ vertexColors: true, map: tex, bumpMap: tex, bumpScale: 1.4, roughness: 0.46, metalness: 0.02, transparent: false, opacity: 1 });
     this.muscleMesh = new T.Mesh(geo, this.muscleMaterial);
     this.muscleMesh.frustumCulled = false;
     this.muscleMesh.name = 'muscles';
@@ -469,6 +488,7 @@ export class AnatomyEngine {
       const sw = swell(rel, contraction) * (sel ? 1.25 : 1) * (pulsed ? 1 + 0.18 * this.pulse!.k : 1);
       /* the fibres slide along the muscle faster the harder it works */
       const flowShift = this.flow * (0.25 + 2.2 * contraction);
+      const flowing = this.flowOn && motionFull();
       for (let r = 0; r < rings; r++) {
         const t = r / (rings - 1);
         const tn = tendonness(t);
@@ -489,7 +509,7 @@ export class AnatomyEngine {
           this.pos[v] = cx + ox * radius; this.pos[v + 1] = cy + oy * radius; this.pos[v + 2] = cz + oz * radius;
           this.nor[v] = ox; this.nor[v + 1] = oy; this.nor[v + 2] = oz;
           this.col[v] = cr; this.col[v + 1] = cg; this.col[v + 2] = cb;
-          this.uv[vi * 2 + 1] = t * 4 - flowShift;
+          if (flowing) this.uv[vi * 2 + 1] = t * 4 - flowShift;
         }
       }
     }
@@ -497,7 +517,7 @@ export class AnatomyEngine {
     at.position.needsUpdate = true;
     at.normal.needsUpdate = true;
     at.color.needsUpdate = true;
-    at.uv.needsUpdate = true;
+    if (this.flowOn && motionFull()) at.uv.needsUpdate = true;
   }
 
   /* ───────── reading ───────── */
@@ -638,7 +658,7 @@ export class AnatomyView {
     const T = engine.THREE;
     this.canvas = canvas;
     this.mode = mode;
-    this.renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: !isSoftwareGl(), powerPreference: 'high-performance' });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.target = new T.Vector3(0, 0, 0);

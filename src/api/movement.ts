@@ -196,6 +196,10 @@ export const clipDetailSchema = z
     /** The ClipResult once the clip is done; for a rejected clip only its `qa` part, so it is read strictly only when done. */
     result: z.unknown().optional(),
     decisions: z.array(decisionSchema).default([]),
+    /** The athlete report filed in the patient's documents, the injuries the clip points at, and whether the retention job removed the files. */
+    reportDocumentId: z.string().nullish(),
+    injuryIds: z.array(z.string()).default([]),
+    filesDeleted: z.boolean().optional(),
     /** While processing: the stage and its percentage (`downloaded`, `pose`, `analysis`, `anatomy`). */
     progress: z.object({ stage: z.string(), pct: z.number().nullish(), at: z.string().nullish() }).nullish(),
     createdAt: z.string().optional(),
@@ -225,6 +229,9 @@ export const clipDetailSchema = z
       result,
       decisions: c.decisions,
       ...(c.progress ? { progress: c.progress } : {}),
+      ...(c.reportDocumentId ? { reportDocumentId: c.reportDocumentId } : {}),
+      ...(c.injuryIds.length > 0 ? { injuryIds: c.injuryIds } : {}),
+      ...(c.filesDeleted === true ? { filesDeleted: true } : {}),
     };
   });
 export type ClipDetail = z.output<typeof clipDetailSchema>;
@@ -253,6 +260,7 @@ export const sessionSchema = z
     appointmentId: z.string().nullish(),
     date: z.string(),
     serviceItemId: z.string().nullish(),
+    billingItemId: z.string().nullish(),
     clips: z.array(clipSummarySchema).default([]),
   })
   .transform((s) => ({ id: s.sessionId, patientId: s.patientId, appointmentId: s.appointmentId ?? null, date: s.date, clips: s.clips }));
@@ -521,3 +529,82 @@ export function useRetryFailedExports() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: retryFailedExports, onSuccess: () => qc.invalidateQueries({ queryKey: movementKeys.admin }) });
 }
+
+/* ───────────── integration: settings, appointments, injuries, the patient portal ───────────── */
+
+/** GET/PUT /settings (movement.admin): which services are movement services, retention, the ML export switch, the report language. */
+export const movementSettingsSchema = z.object({
+  serviceItemIds: z.array(z.string()),
+  videoRetentionDays: z.number().int(),
+  mlExportEnabled: z.boolean(),
+  reportLanguage: z.enum(['cs', 'en']),
+});
+export type MovementSettings = z.infer<typeof movementSettingsSchema>;
+export const RETENTION_DAYS_MIN = 30;
+export const RETENTION_DAYS_MAX = 3650;
+
+export async function getMovementSettings(): Promise<MovementSettings> {
+  return movementSettingsSchema.parse(await call('get', '/settings'));
+}
+
+/** Fields left out keep their value on the server. */
+export async function putMovementSettings(patch: Partial<MovementSettings>): Promise<MovementSettings> {
+  return movementSettingsSchema.parse(await call('put', '/settings', { body: patch }));
+}
+
+export function useMovementSettings(enabled = true) {
+  return useQuery({ queryKey: ['movement', 'settings'], queryFn: getMovementSettings, enabled });
+}
+
+export function useSaveMovementSettings() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: putMovementSettings, onSuccess: (s) => qc.setQueryData(['movement', 'settings'], s) });
+}
+
+/** POST /appointments/{id}/session: opens (or returns) the session of a movement-service appointment. 409 codes: care_consent_missing, not_movement_service, appointment_cancelled. */
+export async function openAppointmentSession(appointmentId: string): Promise<{ session: MovementSession; created: boolean }> {
+  return z.object({ session: sessionSchema, created: z.boolean().default(false) }).parse(await call('post', `/appointments/${encodeURIComponent(appointmentId)}/session`));
+}
+
+/** POST /clips/{id}/links/injury/{injuryId} (movement.review): a pointer from the clip to an injury of the same patient. */
+export async function linkClipToInjury(clipId: string, injuryId: string): Promise<void> {
+  await call('post', `/clips/${encodeURIComponent(clipId)}/links/injury/${encodeURIComponent(injuryId)}`);
+}
+
+/** The injury records of a patient, for the link picker (region, side and date only). */
+export const injurySchema = z.object({
+  id: z.string(),
+  injuryDate: z.string().optional(),
+  bodyRegion: z.string().optional(),
+  specificLocation: z.string().nullish(),
+  side: z.string().nullish(),
+  status: z.string().optional(),
+});
+export type Injury = z.infer<typeof injurySchema>;
+
+export async function listPatientInjuries(patientId: string): Promise<Injury[]> {
+  if (movementMock()) return (await mock()).injuries();
+  const res = await client.get(`/api/injuries/patient/${encodeURIComponent(patientId)}`);
+  const body = unwrap(res.data);
+  const list = Array.isArray(body) ? body : ((body as { items?: unknown[] } | null)?.items ?? []);
+  return z.array(injurySchema).parse(list);
+}
+
+/** The patient's own training consent in their portal (token in the address; no staff session). */
+export const portalConsentSchema = z.object({
+  careActive: z.boolean(),
+  mlTraining: z.object({ kind: z.string(), version: z.string(), grantedAt: z.string(), withdrawnAt: z.string().nullish(), active: z.boolean() }).nullish(),
+});
+export type PortalConsent = z.infer<typeof portalConsentSchema>;
+
+const portalHttp = axios.create({ baseURL: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '', timeout: 20_000 });
+
+async function portalCall(verb: 'get' | 'put' | 'delete', token: string, body?: unknown): Promise<PortalConsent> {
+  if (movementMock()) return (await mock()).portalConsent(verb, body);
+  const res = await portalHttp.request({ method: verb, url: `/api/patient-portal/${encodeURIComponent(token)}/movement/consent`, data: body });
+  return portalConsentSchema.parse(unwrap(res.data));
+}
+
+export const getPortalConsent = (token: string) => portalCall('get', token);
+export const grantPortalConsent = (token: string) => portalCall('put', token, { version: CONSENT_VERSION });
+export const withdrawPortalConsent = (token: string) => portalCall('delete', token);

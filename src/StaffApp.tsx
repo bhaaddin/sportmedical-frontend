@@ -38,6 +38,7 @@ import { usePageArrival } from './motion/PageTransition';
 const NotFound = lazy(() => import('./pages/NotFound'));
 /* DEV only: the pop-out gallery the contrast audit reads (scripts/stage3b); the condition is a build-time constant, so a production bundle has neither the route nor the module. */
 const PopoutGallery = import.meta.env.DEV ? lazy(() => import('./dev/PopoutGallery')) : null;
+const MovementSettingsPage = lazy(() => import('./movement/pages/MovementSettingsPage'));
 const MovementRoutes = lazy(() => import('./movement/MovementRoutes'));
 const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const PlannerPage = lazy(() => import('./planner/PlannerPage'));
@@ -529,6 +530,7 @@ export default function StaffApp() {
           <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
           <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
           {movementEnabled() ? <Route path="/pohyb/*" element={<RequirePermission of="movement.view"><MovementRoutes /></RequirePermission>} /> : null}
+          <Route path="/nastaveni/pohybova-analyza" element={<RequirePermission of="movement.admin"><MovementSettingsPage /></RequirePermission>} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:group" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />

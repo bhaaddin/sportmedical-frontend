@@ -9,6 +9,10 @@ import { checkClip } from './uploadCheck';
 import { asymmetryLevel, computeAsymmetry, formatAsymmetry, formatValue, metricRows } from './asymmetry';
 import { curvePath, extentOf, groupCurves } from './curves';
 import { clickToVideoPx, markerPixelLength, markerPlausible } from './marker';
+import { notificationTarget } from './notifications';
+import { bandSparkline, canLinkInjury, sessionStatus } from './review';
+import { labelPriorityFloor, pillFont, placeLabels } from './skeleton';
+import { MOVEMENT_FLAG_KEY } from '../flags';
 import { overallPct, stageOf, stageSteps } from './progress';
 import { metricName, compareMetrics, decisionReady, doneClipOf, groupFlags, scoreTrend, scoreView, staffLabel, tagsForMovement } from './review';
 import { buildDropJumpFrontResult, buildRunningSideResult, HALPE26_NAMES } from '../fixtures/synth';
@@ -555,5 +559,85 @@ describe('fixtures are a valid, consistent ClipResult', () => {
       expect(r.events.filter((e) => e.type === 'foot_strike' && e.side === side).length).toBeGreaterThanOrEqual(2);
       expect(r.events.filter((e) => e.type === 'toe_off' && e.side === side).length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('angle pills that do not overlap', () => {
+  const item = (id: string, px: number, py: number, priority = 2) => ({ id, ax: px, ay: py + 20, px, py, w: 40, h: 22, priority });
+  const boxes = (placed: ReturnType<typeof placeLabels>, items: ReturnType<typeof item>[]) => placed.filter((p) => !p.hidden).map((p) => ({ x: p.x, y: p.y, w: items.find((i) => i.id === p.id)!.w, h: 22 }));
+  it('keeps a label where it wants to be when the spot is free', () => {
+    const [p] = placeLabels([item('a', 100, 100)]);
+    expect(p).toMatchObject({ x: 100, y: 100, leader: false, hidden: false });
+  });
+  it('moves the second of two overlapping labels to a free spot and draws a leader line to its joint', () => {
+    const items = [item('a', 100, 100, 3), item('b', 104, 102, 2)];
+    const placed = placeLabels(items);
+    expect(placed.find((p) => p.id === 'a')).toMatchObject({ x: 100, y: 100, leader: false });
+    const b = placed.find((p) => p.id === 'b')!;
+    expect(b.hidden).toBe(false);
+    expect(b.leader).toBe(true);
+    const [one, two] = boxes(placed, items);
+    expect(Math.abs(one.x - two.x) >= 40 || Math.abs(one.y - two.y) >= 22).toBe(true);
+  });
+  it('the important label is placed first whichever comes first in the list', () => {
+    const placed = placeLabels([item('low', 100, 100, 1), item('high', 100, 100, 3)]);
+    expect(placed.find((p) => p.id === 'high')).toMatchObject({ x: 100, y: 100, leader: false });
+  });
+  it('many labels end up with no overlap at all', () => {
+    const items = Array.from({ length: 6 }, (_, i) => item('l' + i, 100 + i * 3, 100 + i * 2, 2));
+    const placed = placeLabels(items);
+    const bs = boxes(placed, items);
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) expect(Math.abs(bs[i].x - bs[j].x) >= 40 || Math.abs(bs[i].y - bs[j].y) >= 22).toBe(true);
+  });
+  it('a label of no importance is dropped when there is no room, an important one never is; the stage edge is respected', () => {
+    const crowd = [item('a', 20, 12, 3), item('b', 20, 12, 0)];
+    const small = placeLabels(crowd, { w: 44, h: 24 });
+    expect(small.find((p) => p.id === 'b')?.hidden).toBe(true);
+    expect(small.find((p) => p.id === 'a')?.hidden).toBe(false);
+    const inside = placeLabels([item('a', 5, 5, 3)], { w: 300, h: 300 });
+    expect(inside[0].x - 20).toBeGreaterThanOrEqual(0);
+  });
+  it('a small figure keeps only the knees, a tiny one none; the font follows the zoom', () => {
+    expect(labelPriorityFloor(400)).toBe(0);
+    expect(labelPriorityFloor(120)).toBe(2);
+    expect(labelPriorityFloor(60)).toBe(3);
+    expect(pillFont(0.2)).toBeLessThan(pillFont(1));
+    expect(pillFont(1)).toBeLessThan(pillFont(5));
+    expect(pillFont(99)).toBe(pillFont(1.3));
+  });
+});
+
+describe('integration rules', () => {
+  it('the status of a movement appointment', () => {
+    expect(sessionStatus([])).toBe('none');
+    expect(sessionStatus([{ status: 'processing', hasDecision: false }])).toBe('processing');
+    expect(sessionStatus([{ status: 'done', hasDecision: false }, { status: 'queued', hasDecision: false }])).toBe('processing');
+    expect(sessionStatus([{ status: 'done', hasDecision: false }])).toBe('review');
+    expect(sessionStatus([{ status: 'done', hasDecision: true }, { status: 'done', hasDecision: false }])).toBe('review');
+    expect(sessionStatus([{ status: 'done', hasDecision: true }])).toBe('done');
+    expect(sessionStatus([{ status: 'failed', hasDecision: false }])).toBe('failed');
+  });
+  it('only a red finding of a confirmed clip can be linked to an injury', () => {
+    expect(canLinkInjury('red', [{ action: 'accept' }])).toBe(true);
+    expect(canLinkInjury('red', [{ action: 'edit' }])).toBe(true);
+    expect(canLinkInjury('red', [{ action: 'reject' }])).toBe(false);
+    expect(canLinkInjury('red', [])).toBe(false);
+    expect(canLinkInjury('watch', [{ action: 'accept' }])).toBe(false);
+  });
+  it('the sparkline is the ratings over time, oldest first, without sessions that have no finished clip', () => {
+    const mk = (date: string, band: 'green' | 'watch' | 'red' | null, status = 'done') => ({ id: date, patientId: 'p', appointmentId: null, date, clips: band === null ? [] : [{ clipId: date, movement: 'running' as const, view: 'side' as const, status: status as 'done', band, hasDecision: false }] });
+    const points = bandSparkline([mk('2026-10-01', 'red'), mk('2026-09-01', 'green'), mk('2026-11-01', null), mk('2026-08-01', 'watch', 'failed')]);
+    expect(points.map((p) => p.level)).toEqual([1, 3]);
+    expect(bandSparkline([])).toEqual([]);
+  });
+  it('a movement notification opens the movement screens; others keep the server link', () => {
+    localStorage.setItem(MOVEMENT_FLAG_KEY, '1');
+    const id = '0190a000-0000-7000-8000-00000000a1b2';
+    expect(notificationTarget({ kind: 'movement.finished', actionUrl: '/patients/' + id })).toBe('/pohyb/pacient/' + id);
+    expect(notificationTarget({ kind: 'movement.report_ready', actionUrl: '/patients/' + id })).toBe('/patients/' + id + '/dokumenty');
+    expect(notificationTarget({ kind: 'appointment.booked', actionUrl: '/kalendar/x' })).toBe('/kalendar/x');
+    expect(notificationTarget({ kind: 'movement.finished' })).toBeUndefined();
+    localStorage.removeItem(MOVEMENT_FLAG_KEY);
+    expect(notificationTarget({ kind: 'movement.finished', actionUrl: '/patients/' + id })).toBe('/patients/' + id);
   });
 });

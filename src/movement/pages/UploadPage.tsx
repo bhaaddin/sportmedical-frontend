@@ -51,7 +51,8 @@ export default function UploadPage() {
 
   const [movement, setMovement] = useState<Movement>('running');
   const [view, setView] = useState<View>('side');
-  const [sessionChoice, setSessionChoice] = useState('new');
+  /* from the calendar the session of the appointment is already open */
+  const [sessionChoice, setSessionChoice] = useState(() => params.get('sessionId') ?? 'new');
   const [file, setFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [verdict, setVerdict] = useState<CheckVerdict | null>(null);
@@ -67,7 +68,8 @@ export default function UploadPage() {
   const created = useRef<{ sessionId: string; clipId: string; uploadUrl: string; markerPx: number | undefined } | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
-  const todays = useMemo(() => (sessions.data ?? []).filter((s) => s.date === today), [sessions.data, today]);
+  const fromCalendar = params.get('sessionId');
+  const todays = useMemo(() => (sessions.data ?? []).filter((s) => s.date === today || s.id === fromCalendar), [sessions.data, today, fromCalendar]);
 
   useEffect(() => () => { if (frame) URL.revokeObjectURL(frame.url); }, [frame]);
   useEffect(() => () => abort.current?.abort(), []);

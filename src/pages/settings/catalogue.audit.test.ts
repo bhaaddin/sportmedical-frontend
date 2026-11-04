@@ -27,6 +27,7 @@ const ALL_PERMISSIONS = [
   'patients.view', 'patients.register', 'patients.edit', 'patients.sensitive_identity.view', 'patients.view_all',
   'settings.clinic.manage', 'users.manage', 'roles.manage', 'bookings.create', 'bookings.edit', 'bookings.cancel',
   'questionnaires.manage', 'billing.manage', 'documents.view', 'documents.manage', 'communication.manage',
+  'movement.view', 'movement.capture', 'movement.review', 'movement.admin',
 ];
 
 const idsFor = (held: string[]) =>
@@ -55,8 +56,8 @@ describe('the router asks for the permission the menu lists', () => {
 describe('who sees what in the second half of Nastavení', () => {
   const OPEN_TO_EVERYBODY = ['hodnoceni-pacientu', 'dvoufazove'];
 
-  it('shows an owner (every permission) all 19 screens', () => {
-    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(19);
+  it('shows an owner (every permission) all 20 screens', () => {
+    expect(idsFor(ALL_PERMISSIONS)).toHaveLength(20);
     expect(idsFor(ALL_PERMISSIONS)).toEqual(myItems.map((x) => x.item.id).sort());
   });
 

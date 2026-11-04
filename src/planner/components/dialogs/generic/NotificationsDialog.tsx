@@ -9,6 +9,7 @@
  *      rows open the term.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { notificationTarget } from '../../../../movement/lib/notifications';
 import {
   buildNotificationSections,
   exactNotificationTime,
@@ -44,9 +45,10 @@ function NotificationsBody({ close }: { close: () => void }) {
 
   const open = async (row: NotificationRow) => {
     const note = await feed.markRead(row.id);
-    if (note?.actionUrl) {
+    const target = note ? notificationTarget(note) : undefined;
+    if (target) {
       close();
-      navigate(note.actionUrl);
+      navigate(target);
     }
   };
 

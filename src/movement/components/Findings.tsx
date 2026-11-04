@@ -7,6 +7,7 @@ import { asymmetryLevel, formatAsymmetry, formatValue, metricRows, outsideNorm }
 import { groupFlags, latestDecision, scoreView } from '../lib/review';
 import { formatDateTime, useMoveT } from '../i18n';
 import { metricName, staffLabel } from '../lib/review';
+import { InjuryLink } from './InjuryLink';
 
 /** The chip pops when the score changes (a decision arrives): only under Animace "plné". */
 const pop = keyframes`from { transform: scale(0.86); opacity: 0.4; } 60% { transform: scale(1.07); } to { transform: scale(1); opacity: 1; }`;
@@ -73,7 +74,9 @@ export function qaLabel(code: string, messageKey: string | undefined, maybe: (ke
   return maybe(messageKey ?? `movement.qa.${code}`, fallback);
 }
 
-export function FlagList({ flags, selectedId, lang, onSelect }: {
+export function FlagList({ flags, selectedId, lang, onSelect, clip }: {
+  /** The clip: with it a red finding offers the link to an injury of the patient. */
+  clip?: ClipDetail;
   flags: readonly Flag[];
   selectedId: string | null;
   lang: 'cs' | 'en';
@@ -117,6 +120,7 @@ export function FlagList({ flags, selectedId, lang, onSelect }: {
                       {ev.threshold !== null && ev.threshold !== undefined && ev.unit ? ` · ${t('review.threshold', { value: formatValue(ev.threshold, ev.unit) })}` : ''}
                     </Typography>
                   </Button>
+                  {clip !== undefined && f.severity === 'red' && <InjuryLink clip={clip} flag={f} />}
                 </li>
               );
             })}

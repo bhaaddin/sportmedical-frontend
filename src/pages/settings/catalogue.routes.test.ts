@@ -26,6 +26,7 @@ const OWNER = [
   'patients.view', 'patients.register', 'patients.edit', 'patients.sensitive_identity.view', 'patients.view_all',
   'settings.clinic.manage', 'users.manage', 'roles.manage', 'bookings.create', 'bookings.edit', 'bookings.cancel',
   'questionnaires.manage', 'billing.manage', 'documents.view', 'documents.manage', 'communication.manage',
+  'movement.view', 'movement.capture', 'movement.review', 'movement.admin',
 ] as const satisfies readonly Permission[];
 
 /** `const Name = lazy(() => import('./pages/x'))` -> Name => './pages/x' */

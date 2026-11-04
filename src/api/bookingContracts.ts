@@ -708,6 +708,9 @@ export type CreateUnregisteredInput = z.infer<typeof createUnregisteredInputSche
  * belongs to the register, so the detail asks for it by `patientId`.
  */
 export const appointmentSchema = z.object({
+  /** Movement analysis (the calendar read models carry these): a booking of a movement service, and its session once opened. */
+  isMovementService: z.boolean().optional(),
+  movementSessionId: z.string().nullish(),
   id: z.string(),
   calendarId: z.string(),
   patientId: z.string(),

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy } from 'react';
+import { movementEnabled } from '../../movement/flags';
+const MovementAppointmentAction = lazy(() => import('../../movement/components/MovementAppointmentAction'));
 import {
   Alert,
   Avatar,
@@ -942,6 +945,16 @@ function DetailBody({
               */
               error={conflict ? null : rescheduleMutation.error}
             />
+            </Box>
+          ) : null}
+
+          {/* Pohybová analýza: only for a booking of a movement service, and only while the module is on. */}
+          {hasPatient && movementEnabled() && (appointment as { isMovementService?: boolean }).isMovementService === true ? (
+            <Box>
+              <SectionLabel>Pohybová analýza</SectionLabel>
+              <Suspense fallback={null}>
+                <MovementAppointmentAction appointmentId={appointment.id} patientId={appointment.patientId} sessionId={(appointment as { movementSessionId?: string | null }).movementSessionId ?? null} />
+              </Suspense>
             </Box>
           ) : null}
 

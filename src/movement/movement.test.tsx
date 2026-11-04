@@ -452,3 +452,128 @@ describe('live progress and a decision that can be taken back', () => {
     await waitFor(() => expect(screen.queryByTestId('decision-undo')).toBeNull());
   });
 });
+
+describe('integration screens (mock backend)', () => {
+  const mockOn = () => { localStorage.setItem(MOVEMENT_FLAG_KEY, '1'); localStorage.setItem(MOVEMENT_MOCK_KEY, '1'); };
+
+  it('settings: loads the values, validates the retention days and saves', async () => {
+    mockOn();
+    const { default: Page, retentionError } = await import('./pages/MovementSettingsPage');
+    expect(retentionError('29')).toBe(true);
+    expect(retentionError('30')).toBe(false);
+    expect(retentionError('3650')).toBe(false);
+    expect(retentionError('3651')).toBe(true);
+    expect(retentionError('abc')).toBe(true);
+    expect(retentionError('12.5')).toBe(true);
+    const user = userEvent.setup();
+    wrap(<Page />);
+    const days = await screen.findByRole('textbox', { name: 'Uchovávat videa (dní)' });
+    await waitFor(() => expect(days).toHaveValue('365'));
+    const save = screen.getByRole('button', { name: 'Uložit nastavení' });
+    expect(save).toBeDisabled();
+    await user.clear(days);
+    await user.type(days, '10');
+    expect(screen.getByText(/Zadejte celé číslo od 30 do 3650/)).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    await user.clear(days);
+    await user.type(days, '90');
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(await screen.findByText('Nastavení uloženo.')).toBeInTheDocument();
+  });
+
+  it('settings: the owner switch writes the local flag', async () => {
+    mockOn();
+    const { default: Page } = await import('./pages/MovementSettingsPage');
+    wrap(<Page />);
+    const toggle = await screen.findByRole('switch', { name: 'Pohybová analýza je zapnutá' });
+    await userEvent.setup().click(toggle);
+    expect(localStorage.getItem(MOVEMENT_FLAG_KEY)).toBeNull();
+  });
+
+  it('calendar: a movement booking shows its status and offers to open the session', async () => {
+    mockOn();
+    localStorage.setItem('permissions', JSON.stringify(['movement.view', 'movement.capture']));
+    const { default: Action } = await import('./components/MovementAppointmentAction');
+    wrap(<Action appointmentId="appt-1" patientId="ZZ-test" />);
+    expect(await screen.findByTestId('movement-status')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Zahájit analýzu' })).toBeEnabled();
+  });
+
+  it('calendar: without movement.capture there is a status but no action', async () => {
+    mockOn();
+    localStorage.setItem('permissions', JSON.stringify(['movement.view']));
+    const { default: Action } = await import('./components/MovementAppointmentAction');
+    wrap(<Action appointmentId="appt-1" patientId="ZZ-test" />);
+    expect(await screen.findByTestId('movement-status')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /analýzu/ })).toBeNull();
+  });
+
+  it('portal: the patient gives and withdraws the training consent', async () => {
+    mockOn();
+    const { default: Portal } = await import('./pages/PortalMovementSection');
+    const user = userEvent.setup();
+    wrap(<Portal token="t" wrap={(c) => <section aria-label="Pohybová analýza">{c}</section>} />);
+    const off = await screen.findByRole('button', { name: 'Nesouhlasím' });
+    expect(off).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Souhlasím' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Souhlasím' })).toHaveAttribute('aria-pressed', 'true'));
+    await user.click(screen.getByRole('button', { name: 'Nesouhlasím' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Nesouhlasím' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByText(/Souhlas můžete kdykoli odvolat/)).toBeInTheDocument();
+  });
+
+  it('portal: with the module off at the server (the request fails) nothing is drawn', async () => {
+    localStorage.clear();
+    const { default: Portal } = await import('./pages/PortalMovementSection');
+    const { container } = wrap(<Portal token="t" wrap={(c) => <section>{c}</section>} />);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(container.querySelector('[data-testid="portal-movement"]')).toBeNull();
+  });
+
+  it('review: a red finding of a confirmed clip can be linked to an injury', async () => {
+    mockOn();
+    const user = userEvent.setup();
+    const base = buildRunningSideResult();
+    const result = { ...base, flags: [{ ...base.flags[0], id: 'redone', severity: 'red' as const, sentence: { cs: 'Červený nález', en: 'Red' } }] };
+    const decisions = [{ id: 'd1', action: 'accept' as const, band: 'red' as const, faultTags: [], unsure: false, note: '', decidedBy: 'abcd', decidedAt: '2026-11-03T10:00:00Z' }];
+    wrap(<ReviewView clip={clipOf({ result, decisions })} videoSrc={null} />);
+    await user.click(await screen.findByRole('button', { name: 'Propojit se zraněním' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Koleno/ }));
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: /Koleno/ })).toBeNull());
+  });
+
+  it('review: without a decision the injury link is offered but disabled', () => {
+    mockOn();
+    const base = buildRunningSideResult();
+    const result = { ...base, flags: [{ ...base.flags[0], severity: 'red' as const }] };
+    wrap(<ReviewView clip={clipOf({ result })} videoSrc={null} />);
+    expect(screen.getByRole('button', { name: 'Propojit se zraněním' })).toBeDisabled();
+  });
+
+  it('review: a linked injury shows as a chip', async () => {
+    mockOn();
+    const base = buildRunningSideResult();
+    const result = { ...base, flags: [{ ...base.flags[0], severity: 'red' as const }] };
+    wrap(<ReviewView clip={clipOf({ result, injuryIds: ['inj-1'] })} videoSrc={null} />);
+    expect(await screen.findByTestId('injury-chip')).toHaveTextContent('Zranění');
+  });
+
+  it('patient card: latest rating, trend and the ways on', async () => {
+    mockOn();
+    localStorage.setItem('permissions', JSON.stringify(['movement.view', 'movement.capture', 'documents.view']));
+    const { default: Card } = await import('./pages/PatientMovementCard');
+    wrap(<Card patientId="ZZ-test" />);
+    expect(await screen.findByTestId('sparkline')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Nahrát záznam' })).toHaveAttribute('href', '/pohyb/nahrat?patientId=ZZ-test');
+    expect(screen.getByRole('link', { name: 'Zprávy v dokumentech' })).toHaveAttribute('href', '/patients/ZZ-test/dokumenty');
+    expect(screen.getByTestId('consent-panel')).toBeInTheDocument();
+  });
+
+  it('patient card: hidden without movement.view', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+    const { default: Card } = await import('./pages/PatientMovementCard');
+    const { container } = wrap(<Card patientId="ZZ-test" />);
+    expect(container.querySelector('[data-related="movement"]')).toBeNull();
+  });
+});

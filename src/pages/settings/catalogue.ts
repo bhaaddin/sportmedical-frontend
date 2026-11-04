@@ -433,6 +433,16 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'users.manage',
       },
       {
+        /* The owner also switches the module itself on here, so this item is not hidden while the module is off. */
+        id: 'pohybova-analyza',
+        label: 'Pohybová analýza',
+        description: 'Které služby jsou pohybová analýza, doba uchování videí, export pro trénink modelů a jazyk zprávy',
+        to: '/nastaveni/pohybova-analyza',
+        scope: null,
+        keywords: ['pohyb', 'běh', 'doskok', 'video', 'kostra', 'svaly', 'analýza pohybu'],
+        requires: 'movement.admin',
+      },
+      {
         /*
          * Personal, not administrative: every signed-in user secures their
          * own account here, so no `requires`.

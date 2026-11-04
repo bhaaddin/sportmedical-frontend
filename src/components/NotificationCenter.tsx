@@ -7,6 +7,7 @@
    - WebSocket real-time updates
    ══════════════════════════════════════════════════════════════ */
 import { useState, useMemo } from 'react';
+import { notificationTarget } from '../movement/lib/notifications';
 import {
   Box, Typography, IconButton, Badge, Popover, List, ListItem, ListItemIcon,
   ListItemText, Button, Divider, Skeleton, Tooltip,
@@ -272,9 +273,10 @@ export default function NotificationCenter({
    */
   const markAsRead = async (id: string) => {
     const note = await markRead(id);
-    if (note?.actionUrl) {
+    const target = note ? notificationTarget(note) : undefined;
+    if (target) {
       handleClose();
-      navigate(note.actionUrl);
+      navigate(target);
     }
   };
 

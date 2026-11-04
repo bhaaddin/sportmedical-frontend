@@ -6,7 +6,7 @@
  * pixels. The scene is drawn straight from the result's `edges` and `groups` (no fixed point layout): body limbs thick with a dark
  * halo, hands with every finger bone, the face as a fine mesh, feet with heel-toe triangles, all fading with confidence.
  */
-import { LAYER_OF, MIN_CONFIDENCE, confidenceAlpha, edgeAlpha, edgeRegion, edgeStyle, flexionArc, jointRadius, lineUnit, regionsOf, sideOf, trailOf, type Bounds, type Region, type Skeleton } from './skeleton';
+import { LAYER_OF, MIN_CONFIDENCE, labelPriorityFloor, pillFont, placeLabels, confidenceAlpha, edgeAlpha, edgeRegion, edgeStyle, flexionArc, jointRadius, lineUnit, regionsOf, sideOf, trailOf, type Bounds, type Region, type Skeleton } from './skeleton';
 
 export interface Box { x: number; y: number; w: number; h: number }
 export interface ContainRect extends Box { scale: number }
@@ -64,7 +64,7 @@ export type ColorKey = 'left' | 'right' | 'center' | 'face' | 'highlight';
 export interface StrokeBatch { region: Region; key: ColorKey; width: number; alpha: number; halo: boolean; glow: boolean; segs: number[] }
 export interface Dot { x: number; y: number; r: number; key: ColorKey; alpha: number; region: Region }
 export interface ArcShape { cx: number; cy: number; r: number; start: number; sweep: number; key: ColorKey }
-export interface Pill { x: number; y: number; text: string; tone: 'angle' | 'event' }
+export interface Pill { x: number; y: number; text: string; tone: 'angle' | 'event'; /** the joint this pill belongs to, when it was moved away from it */ leader?: { x: number; y: number } }
 export interface Ring { x: number; y: number; r: number }
 export interface Trail { key: ColorKey; pts: { x: number; y: number }[] }
 export interface OverlayScene {
@@ -76,7 +76,7 @@ export interface OverlayScene {
 export const wireLayersOf = (l: ViewLayers): Layers => ({ body: l.bones, hands: l.bones, face: l.bones, feet: l.bones, angles: l.angles, trail: l.trail, events: l.events });
 
 /** An angle to show: the joint, the points of the segments on both sides of it, and the measured value. */
-export interface AngleSpec { joint: number; prev: number[]; next: number; value: number }
+export interface AngleSpec { joint: number; prev: number[]; next: number; value: number; /** 2 for a knee, 1 for a hip: what is dropped first on a small figure */ priority?: number }
 
 export interface SceneInput {
   skeleton: Skeleton;
@@ -167,26 +167,42 @@ export function buildScene(input: SceneInput): OverlayScene {
     }
   }
 
-  /* flexion arcs with their value in a small pill */
+  /* flexion arcs with their value in a small pill; pills never overlap, and a small figure keeps only the important ones */
+  const font = pillFont(unit);
+  const items: { id: string; ax: number; ay: number; px: number; py: number; w: number; h: number; priority: number; text: string; tone: 'angle' | 'event' }[] = [];
+  let top = Infinity, bottom = -Infinity;
+  pose.forEach((_, i) => { const p = regions[i] === 'body' || regions[i] === 'feet' ? point(i) : null; if (p) { top = Math.min(top, p.y); bottom = Math.max(bottom, p.y); } });
+  const floor = labelPriorityFloor(Number.isFinite(top) ? bottom - top : 1e9);
   if (layers.angles && input.angles !== undefined) {
-    for (const spec of input.angles) {
+    input.angles.forEach((spec, k) => {
       const j = point(spec.joint);
       const n = point(spec.next);
       const ps = spec.prev.map(point).filter((p): p is NonNullable<typeof p> => p !== null);
-      if (j === null || n === null || ps.length === 0) continue;
+      if (j === null || n === null || ps.length === 0) return;
       const prev = { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
       const arc = flexionArc(prev, j, n, spec.value);
       const r = 20 * unit;
+      const priority = spec.priority ?? 1;
+      if (priority < floor) return;
       scene.arcs.push({ cx: j.x, cy: j.y, r, start: arc.start, sweep: arc.sweep, key: keyOf(spec.joint) });
-      scene.labels.push({ x: j.x + Math.cos(arc.mid) * (r + 15 * unit), y: j.y + Math.sin(arc.mid) * (r + 15 * unit), text: `${Math.round(spec.value)}°`, tone: 'angle' });
-    }
+      const text = `${Math.round(spec.value)}°`;
+      items.push({ id: `a${k}`, ax: j.x, ay: j.y, px: j.x + Math.cos(arc.mid) * (r + 15 * unit), py: j.y + Math.sin(arc.mid) * (r + 15 * unit), w: text.length * font * 0.62 + 12, h: font + 8, priority: priority + 1, text, tone: 'angle' });
+    });
   }
   if (layers.events && input.eventCaptions !== undefined) {
     input.eventCaptions.forEach((c, i) => {
       const p = point(c.joint);
-      if (p !== null) scene.labels.push({ x: p.x + 14, y: p.y + 18 + i * 22, text: c.text, tone: 'event' });
+      if (p === null) return;
+      const evFont = Math.max(10, font - 3);
+      items.push({ id: `e${i}`, ax: p.x, ay: p.y, px: p.x + 14, py: p.y + 18 + i * 22, w: c.text.length * evFont * 0.6 + 12, h: evFont + 8, priority: 0, text: c.text, tone: 'event' });
     });
   }
+  const placedAt = placeLabels(items, input.box);
+  items.forEach((it, i) => {
+    const pl = placedAt[i];
+    if (pl.hidden) return;
+    scene.labels.push({ x: pl.x, y: pl.y, text: it.text, tone: it.tone, ...(pl.leader ? { leader: { x: it.ax, y: it.ay } } : {}) });
+  });
   return scene;
 }
 
@@ -261,11 +277,21 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: OverlayScene, si
     ctx.stroke();
   }
 
-  const fontPx = Math.round(11 + 3 * Math.min(1, scene.unit));
+  const fontPx = pillFont(scene.unit);
   ctx.font = `700 ${fontPx}px system-ui, sans-serif`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   for (const l of scene.labels) {
+    if (l.leader) {
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = colors.label;
+      ctx.lineWidth = Math.max(1, scene.unit);
+      ctx.beginPath();
+      ctx.moveTo(l.leader.x, l.leader.y);
+      ctx.lineTo(l.x, l.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     const px = l.tone === 'event' ? Math.max(10, fontPx - 3) : fontPx;
     ctx.font = `700 ${px}px system-ui, sans-serif`;
     const w = ctx.measureText(l.text).width + 12;

@@ -342,7 +342,7 @@ export function ReviewView({ clip: loaded, videoSrc }: { clip: ClipDetail; video
   );
   const findingsShelf = (
       <Shelf id="findings" title={t('review.findings')} hint={t('review.findings.hint')} count={result.flags.length} layout="board" stagger={false} empty={result.flags.length === 0} emptyState={{ text: t('review.findings.empty') }}>
-        <FlagList flags={result.flags} selectedId={selected?.id ?? null} lang={lang} onSelect={selectFlag} />
+        <FlagList clip={clip} flags={result.flags} selectedId={selected?.id ?? null} lang={lang} onSelect={selectFlag} />
       </Shelf>
   );
   const metricsShelf = (

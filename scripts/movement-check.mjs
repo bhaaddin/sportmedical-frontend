@@ -27,8 +27,10 @@ const PAGES = {
   admin: '/pohyb/spravce',
   failed: '/pohyb/klip/fx-qa-rejected',
   home: '/pohyb',
+  settings: '/nastaveni/pohybova-analyza',
+  preview: '/pohyb/nahled',
 };
-const ONLY = (process.env.PAGES ?? 'review,running,upload,timeline,admin,failed,home').split(',');
+const ONLY = (process.env.PAGES ?? 'review,running,upload,timeline,admin,failed,home,settings,preview').split(',');
 mkdirSync(OUT, { recursive: true });
 
 const pw = await loadPlaywright();

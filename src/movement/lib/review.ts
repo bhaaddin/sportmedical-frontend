@@ -120,3 +120,30 @@ export function metricName(label: { cs: string; en: string } | null | undefined,
   const words = id.replace(/[._]+/g, ' ').trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+export type SessionStatus = 'none' | 'processing' | 'review' | 'done' | 'failed';
+
+/** The state of an appointment's movement session as the calendar chip says it: no clips, processing, awaiting review, done (or failed). */
+export function sessionStatus(clips: readonly Pick<ClipSummaryLike, 'status' | 'hasDecision'>[]): SessionStatus {
+  if (clips.length === 0) return 'none';
+  if (clips.some((c) => c.status === 'uploading' || c.status === 'uploaded' || c.status === 'queued' || c.status === 'processing')) return 'processing';
+  const done = clips.filter((c) => c.status === 'done');
+  if (done.length === 0) return 'failed';
+  return done.some((c) => !c.hasDecision) ? 'review' : 'done';
+}
+interface ClipSummaryLike { status: string; hasDecision: boolean }
+
+/** Whether a finding may be linked to an injury: a red finding on a clip that has an accepted or edited decision. */
+export function canLinkInjury(flagSeverity: string, decisions: readonly { action: string }[]): boolean {
+  return flagSeverity === 'red' && decisions.some((d) => d.action === 'accept' || d.action === 'edit');
+}
+
+/** The sparkline of a patient's bands over time, oldest first: one level (1 green .. 3 red) per session that has a finished clip. */
+export function bandSparkline(sessions: readonly MovementSession[]): { date: string; level: 1 | 2 | 3; band: 'green' | 'watch' | 'red' }[] {
+  const points: { date: string; level: 1 | 2 | 3; band: 'green' | 'watch' | 'red' }[] = [];
+  for (const s of sessions) {
+    const clip = s.clips.find((c) => c.status === 'done' && c.band !== null && c.band !== 'needs_review');
+    if (clip && clip.band !== null && clip.band !== 'needs_review') points.push({ date: s.date, level: BAND_LEVEL[clip.band], band: clip.band });
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+}

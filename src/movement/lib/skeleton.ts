@@ -163,3 +163,62 @@ export function trailOf(frames: Skeleton['frames'], frame: number, index: number
   }
   return out;
 }
+
+/* ───────── labels that do not overlap ───────── */
+
+export interface LabelItem {
+  id: string;
+  /** The joint the label belongs to, and where the label would like to be (centres, canvas px). */
+  ax: number; ay: number; px: number; py: number;
+  w: number; h: number;
+  /** Higher wins a free spot; a label of priority 0 is dropped when there is none. */
+  priority: number;
+}
+export interface PlacedLabel { id: string; x: number; y: number; /** moved away from its joint: draw a leader line */ leader: boolean; hidden: boolean }
+
+const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, gap: number): boolean =>
+  Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + gap;
+
+/**
+ * Places the pills so that none covers another: each takes its wish if free, else the nearest free spot on rings around its joint
+ * (a leader line then joins it to the joint). Important labels place first; one that finds no room is hidden unless it matters
+ * (priority > 0). bounds keeps them inside the stage.
+ */
+export function placeLabels(items: readonly LabelItem[], bounds?: { w: number; h: number }, gap = 3): PlacedLabel[] {
+  const order = [...items].sort((a, b) => b.priority - a.priority || (a.id < b.id ? -1 : 1));
+  const placed: { id: string; x: number; y: number; w: number; h: number }[] = [];
+  const out = new Map<string, PlacedLabel>();
+  const inside = (x: number, y: number, it: LabelItem) => bounds === undefined || (x - it.w / 2 >= 0 && x + it.w / 2 <= bounds.w && y - it.h / 2 >= 0 && y + it.h / 2 <= bounds.h);
+  for (const it of order) {
+    const free = (x: number, y: number) => inside(x, y, it) && !placed.some((p) => overlaps({ x, y, w: it.w, h: it.h }, p, gap));
+    let spot: { x: number; y: number } | null = free(it.px, it.py) ? { x: it.px, y: it.py } : null;
+    for (let ring = 1; spot === null && ring <= 4; ring++) {
+      const radius = it.h * 0.9 * ring + Math.hypot(it.px - it.ax, it.py - it.ay);
+      for (let k = 0; k < 12 && spot === null; k++) {
+        const ang = (k / 12) * Math.PI * 2 + Math.atan2(it.py - it.ay, it.px - it.ax);
+        const x = it.ax + Math.cos(ang) * radius;
+        const y = it.ay + Math.sin(ang) * radius;
+        if (free(x, y)) spot = { x, y };
+      }
+    }
+    if (spot === null) {
+      if (it.priority > 0) spot = { x: it.px, y: it.py };
+      else { out.set(it.id, { id: it.id, x: it.px, y: it.py, leader: false, hidden: true }); continue; }
+    }
+    placed.push({ id: it.id, x: spot.x, y: spot.y, w: it.w, h: it.h });
+    out.set(it.id, { id: it.id, x: spot.x, y: spot.y, leader: Math.hypot(spot.x - it.px, spot.y - it.py) > it.h * 0.4, hidden: false });
+  }
+  return items.map((it) => out.get(it.id)!);
+}
+
+/** Which angle labels are worth drawing for a figure this tall on screen: all, only the knees, or none. */
+export function labelPriorityFloor(figurePx: number): number {
+  if (figurePx < 90) return 3;
+  if (figurePx < 170) return 2;
+  return 0;
+}
+
+/** The pill font follows the zoom: smaller on a tiny stage, larger when zoomed in. */
+export function pillFont(unit: number): number {
+  return Math.round(10 + 4 * Math.min(1.3, Math.max(0.55, unit)));
+}

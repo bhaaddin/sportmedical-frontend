@@ -100,6 +100,7 @@ describe('a settings route', () => {
  * server sends, so these say what somebody HOLDS.
  */
 const EVERYTHING = [
+  'movement.admin',
   'patients.view',
   'patients.register',
   'patients.edit',

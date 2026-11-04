@@ -49,7 +49,7 @@ export function angleLabelTargets(curves: Record<string, unknown>): { joint: str
   return out;
 }
 
-export interface AngleSpecOut { joint: number; prev: number[]; next: number; value: number }
+export interface AngleSpecOut { joint: number; prev: number[]; next: number; value: number; priority: number }
 
 /**
  * The flexion arcs to draw at a frame: knees (hip - knee - ankle) and hips (shoulder - hip - knee) of the sides the curves have.
@@ -68,7 +68,7 @@ export function angleSpecs(names: readonly string[], curves: Record<string, read
       const j = idx(joint);
       const p = idx(prev);
       const n = idx(next);
-      if (value !== null && value !== undefined && j >= 0 && p >= 0 && n >= 0) out.push({ joint: j, prev: [p], next: n, value });
+      if (value !== null && value !== undefined && j >= 0 && p >= 0 && n >= 0) out.push({ joint: j, prev: [p], next: n, value, priority: curve.startsWith('knee') ? 2 : 1 });
     }
   }
   return out;
